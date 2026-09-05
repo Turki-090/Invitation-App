@@ -1,0 +1,27 @@
+{
+  "name": "dawah-platform",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "generate": "pnpm --filter @dawah/design-tokens build && prisma generate --schema database/schema.prisma",
+    "openapi:lint": "redocly lint openapi/openapi.yaml",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "@prisma/client": "6.19.3",
+    "@redocly/cli": "2.51.2",
+    "prettier": "3.9.6",
+    "prisma": "6.19.3",
+    "turbo": "2.10.12",
+    "typescript": "5.9.3"
+  }
+}

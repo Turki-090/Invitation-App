@@ -1,0 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  "@prisma/client": true
+  "@prisma/engines": true
+  "@scarf/scarf": false
+  esbuild: true
+  prisma: true
+  sharp: true
+
+minimumReleaseAgeExclude:
+  - "@redocly/cli@2.51.2"

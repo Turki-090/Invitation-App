@@ -1,0 +1,173 @@
+openapi: 3.1.0
+info:
+  title: Dawah Platform API
+  version: 1.0.0
+  description: Versioned contract shared by the web application and future iOS and Android clients.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: /api/v1
+    description: Current deployment
+tags:
+  - name: health
+    description: Service health and readiness checks.
+  - name: events
+    description: Event lifecycle and event-scoped host access.
+paths:
+  /health/live:
+    get:
+      summary: Check API liveness
+      tags: [health]
+      operationId: getLiveness
+      security: []
+      responses:
+        "200":
+          description: API process is alive.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, const: ok }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events:
+    get:
+      summary: List accessible events
+      tags: [events]
+      operationId: listEvents
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Events available through active event memberships.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EventSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      summary: Create an event
+      tags: [events]
+      operationId: createEvent
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateEvent" }
+      responses:
+        "201":
+          description: Event and owner membership created atomically.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventSummary" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Unauthorized:
+      description: Missing, invalid, or expired host token.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    ValidationError:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    TooManyRequests:
+      description: The request rate limit was exceeded.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+  schemas:
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: object, additionalProperties: true }
+    CreateEvent:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          nameAr,
+          eventType,
+          eventDate,
+          startTime,
+          timezone,
+          venueNameAr,
+          city,
+          allowRsvpEdits,
+        ]
+      properties:
+        nameAr: { type: string, minLength: 2, maxLength: 120 }
+        nameEn: { type: string, minLength: 2, maxLength: 120 }
+        eventType: { type: string, minLength: 2, maxLength: 40 }
+        eventDate: { type: string, format: date }
+        startTime: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+        endTime: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+        timezone: { type: string, example: Asia/Riyadh }
+        venueNameAr: { type: string, minLength: 2, maxLength: 160 }
+        venueNameEn: { type: string, minLength: 2, maxLength: 160 }
+        city: { type: string, minLength: 2, maxLength: 80 }
+        mapUrl: { type: string, format: uri }
+        rsvpDeadline: { type: string, format: date }
+        allowRsvpEdits: { type: boolean, default: true }
+    EventSummary:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          nameAr,
+          nameEn,
+          eventType,
+          eventDate,
+          timezone,
+          venueNameAr,
+          city,
+          status,
+          role,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        nameAr: { type: string }
+        nameEn: { type: [string, "null"] }
+        eventType: { type: string }
+        eventDate: { type: string, format: date }
+        timezone: { type: string }
+        venueNameAr: { type: string }
+        city: { type: string }
+        status:
+          type: string
+          enum:
+            [
+              DRAFT,
+              ACTIVE,
+              RSVP_OPEN,
+              RSVP_CLOSED,
+              EVENT_DAY,
+              COMPLETED,
+              ARCHIVED,
+            ]
+        role:
+          type: string
+          enum: [OWNER, CO_HOST, CHECK_IN_STAFF]

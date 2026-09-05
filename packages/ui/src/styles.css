@@ -1,0 +1,479 @@
+@import "@dawah/design-tokens/tokens.css";
+
+html {
+  background: var(--bg-app);
+  color: var(--text-body);
+  font-family: var(--font-ui);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+button,
+input,
+select,
+textarea {
+  color: inherit;
+  font: inherit;
+}
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+:focus-visible {
+  outline: 0;
+  box-shadow: var(--focus-ring);
+}
+.phone,
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.dawah-icon--flip-rtl {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+[dir="rtl"] .dawah-icon--flip-rtl {
+  transform: scaleX(-1);
+}
+
+.dawah-button {
+  --button-bg: var(--ink);
+  --button-fg: var(--text-on-dark);
+  --button-border: var(--ink);
+  --button-hover: #2b261f;
+  --button-active: #3a342b;
+  align-items: center;
+  background: var(--button-bg);
+  border: 1px solid var(--button-border);
+  border-radius: var(--radius-control);
+  color: var(--button-fg);
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: var(--weight-medium);
+  gap: var(--space-2);
+  justify-content: center;
+  line-height: 1;
+  min-height: var(--control-h-md);
+  padding-inline: var(--space-4);
+  transition: var(--transition-control);
+  white-space: nowrap;
+}
+.dawah-button:hover:not(:disabled) {
+  background: var(--button-hover);
+}
+.dawah-button:active:not(:disabled) {
+  background: var(--button-active);
+}
+.dawah-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.dawah-button--accent {
+  --button-bg: var(--accent);
+  --button-border: var(--accent);
+  --button-hover: var(--accent-hover);
+  --button-active: #6a4f2a;
+}
+.dawah-button--secondary {
+  --button-bg: var(--surface-card);
+  --button-fg: var(--text-body);
+  --button-border: var(--border-strong);
+  --button-hover: var(--surface-hover);
+  --button-active: var(--surface-pressed);
+}
+.dawah-button--ghost {
+  --button-bg: transparent;
+  --button-fg: var(--text-secondary);
+  --button-border: transparent;
+  --button-hover: var(--surface-hover);
+  --button-active: var(--surface-pressed);
+}
+.dawah-button--danger {
+  --button-bg: var(--danger);
+  --button-border: var(--danger);
+  --button-hover: #9a4331;
+  --button-active: #7f3527;
+}
+.dawah-button--danger-soft {
+  --button-bg: var(--danger-bg);
+  --button-fg: var(--danger-fg);
+  --button-border: var(--danger-bg);
+  --button-hover: #f1d8d2;
+  --button-active: #eac9c1;
+}
+.dawah-button--whatsapp {
+  --button-bg: var(--wa-teal);
+  --button-border: var(--wa-teal);
+  --button-hover: var(--wa-teal-dark);
+  --button-active: #0b6259;
+}
+.dawah-button--guest-primary {
+  --button-bg: var(--inv-deep);
+  --button-fg: var(--inv-cream);
+  --button-border: var(--inv-deep);
+  --button-hover: var(--inv-deep-2);
+  --button-active: #1e1710;
+}
+.dawah-button--guest-secondary {
+  --button-bg: transparent;
+  --button-fg: var(--inv-deep);
+  --button-border: var(--inv-line);
+  --button-hover: rgba(154, 118, 66, 0.08);
+  --button-active: rgba(154, 118, 66, 0.14);
+}
+.dawah-button--sm {
+  min-height: var(--control-h-sm);
+  padding-inline: var(--space-3);
+  font-size: var(--text-sm);
+}
+.dawah-button--lg {
+  min-height: var(--control-h-lg);
+  padding-inline: var(--space-5);
+  font-size: var(--text-base);
+}
+.dawah-button--guest {
+  border-radius: var(--radius-lg);
+  min-height: var(--control-h-guest);
+  padding-inline: var(--space-6);
+  font-size: var(--text-guest-lg);
+  font-weight: var(--weight-semibold);
+}
+.dawah-button--full {
+  width: 100%;
+}
+.dawah-spin {
+  animation: dawah-spin 1s linear infinite;
+}
+@keyframes dawah-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dawah-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+}
+.dawah-card--sunken {
+  background: var(--surface-sunken);
+  border-color: transparent;
+  box-shadow: none;
+}
+.dawah-card--accent {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft-2);
+  box-shadow: none;
+}
+.dawah-card--dark {
+  background: var(--ink);
+  border-color: var(--ink);
+  box-shadow: none;
+  color: var(--text-on-dark);
+}
+.dawah-card__header {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+  padding: var(--card-pad) var(--card-pad) 0;
+}
+.dawah-card__header h3 {
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
+  margin: 0;
+}
+.dawah-card__header p {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  margin: 2px 0 0;
+}
+.dawah-card__actions {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+}
+.dawah-card__body {
+  flex: 1;
+  padding: var(--card-pad);
+}
+.dawah-card__footer {
+  align-items: center;
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+  padding: var(--space-3) var(--card-pad);
+}
+
+.dawah-status-pill {
+  align-items: center;
+  background: var(--notsent-bg);
+  border-radius: var(--radius-pill);
+  color: var(--notsent-fg);
+  display: inline-flex;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  gap: 6px;
+  height: 26px;
+  padding-inline: 9px;
+  white-space: nowrap;
+}
+.dawah-status-pill--sm {
+  font-size: var(--text-xs);
+  height: 22px;
+  padding-inline: 7px;
+}
+.dawah-status-pill--accepted {
+  background: var(--accepted-bg);
+  color: var(--accepted-fg);
+}
+.dawah-status-pill--declined,
+.dawah-status-pill--failed {
+  background: var(--declined-bg);
+  color: var(--declined-fg);
+}
+.dawah-status-pill--pending {
+  background: var(--pending-bg);
+  color: var(--pending-fg);
+}
+.dawah-status-pill--partial {
+  background: var(--partial-bg);
+  color: var(--partial-fg);
+}
+.dawah-status-pill--checkedin {
+  background: var(--checkedin-bg);
+  color: var(--checkedin-fg);
+}
+.dawah-status-pill__detail {
+  font-weight: var(--weight-regular);
+  opacity: 0.8;
+}
+
+.dawah-stat-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 18px;
+}
+.dawah-stat-card__label {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  gap: var(--space-2);
+}
+.dawah-stat-card__dot {
+  background: var(--notsent);
+  border-radius: 50%;
+  height: 8px;
+  width: 8px;
+}
+.dawah-stat-card__dot--accepted {
+  background: var(--accepted);
+}
+.dawah-stat-card__dot--declined {
+  background: var(--declined);
+}
+.dawah-stat-card__dot--pending {
+  background: var(--pending);
+}
+.dawah-stat-card__dot--partial {
+  background: var(--partial);
+}
+.dawah-stat-card__dot--checkedin {
+  background: var(--checkedin);
+}
+.dawah-stat-card__value {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.dawah-stat-card__value strong {
+  font-size: var(--text-3xl);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+.dawah-stat-card__value span {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.dawah-stat-card small {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.dawah-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dawah-field > label {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.dawah-field > label span {
+  color: var(--danger);
+}
+.dawah-field__hint,
+.dawah-field__error {
+  font-size: var(--text-sm);
+  margin: 0;
+}
+.dawah-field__hint {
+  color: var(--text-muted);
+}
+.dawah-field__error {
+  color: var(--danger-fg);
+}
+.dawah-input {
+  align-items: center;
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  display: flex;
+  gap: var(--space-2);
+  min-height: var(--control-h-lg);
+  padding-inline: var(--space-3);
+  transition: var(--transition-control);
+}
+.dawah-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+.dawah-input--invalid {
+  border-color: var(--danger);
+}
+.dawah-input--invalid:focus-within {
+  box-shadow: 0 0 0 3px rgba(181, 83, 62, 0.2);
+}
+.dawah-input input {
+  background: transparent;
+  border: 0;
+  min-width: 0;
+  outline: 0;
+  width: 100%;
+}
+.dawah-input svg {
+  color: var(--text-muted);
+  flex: none;
+}
+
+.dawah-empty-state {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 460px;
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+}
+.dawah-empty-state__icon {
+  align-items: center;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  display: flex;
+  height: 52px;
+  justify-content: center;
+  width: 52px;
+}
+.dawah-empty-state h2 {
+  font-size: var(--text-xl);
+  margin: 0;
+}
+.dawah-empty-state p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.dawah-dialog {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-dialog);
+  box-shadow: var(--shadow-overlay);
+  color: var(--text-body);
+  max-height: calc(100vh - 32px);
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 0;
+  width: 100%;
+}
+.dawah-dialog::backdrop {
+  background: var(--scrim);
+}
+.dawah-dialog > header,
+.dawah-dialog > footer {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+}
+.dawah-dialog > header {
+  border-bottom: 1px solid var(--border-default);
+}
+.dawah-dialog > footer {
+  border-top: 1px solid var(--border-default);
+  justify-content: flex-end;
+}
+.dawah-dialog h2 {
+  font-size: var(--text-lg);
+  margin: 0;
+}
+.dawah-dialog header p {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  margin: 2px 0 0;
+}
+.dawah-dialog__body {
+  overflow: auto;
+  padding: var(--space-5);
+}
+.dawah-icon-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  height: var(--touch-min);
+  justify-content: center;
+  width: var(--touch-min);
+}
+.dawah-icon-button:hover {
+  background: var(--surface-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dawah-spin {
+    animation: none;
+  }
+}

@@ -1,0 +1,11 @@
+System Design/
+GPT — Wedding Platform Master Business & Technical Build Specification.md
+node_modules/
+.next/
+.turbo/
+dist/
+coverage/
+.env*
+pnpm-lock.yaml
+database/migrations/
+packages/design-tokens/generated/

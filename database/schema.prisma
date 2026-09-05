@@ -1,0 +1,251 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserLocale {
+  ar_SA
+  en
+}
+
+enum EventStatus {
+  DRAFT
+  ACTIVE
+  RSVP_OPEN
+  RSVP_CLOSED
+  EVENT_DAY
+  COMPLETED
+  ARCHIVED
+}
+
+enum EventMembershipRole {
+  OWNER
+  CO_HOST
+  CHECK_IN_STAFF
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
+enum InvitationType {
+  SINGLE
+  NAMED_GROUP
+  PRIMARY_WITH_COMPANIONS
+}
+
+enum RsvpStatus {
+  PENDING
+  ACCEPTED
+  PARTIALLY_ACCEPTED
+  DECLINED
+}
+
+enum RsvpSource {
+  WHATSAPP
+  GUEST_WEB
+  HOST_MANUAL
+  SYSTEM
+}
+
+model User {
+  id             String   @id @default(uuid()) @db.Uuid
+  authProviderId String   @unique @map("auth_provider_id")
+  displayName    String?  @map("display_name")
+  email          String?
+  phoneE164      String?  @map("phone_e164")
+  preferredLocale UserLocale @default(ar_SA) @map("preferred_locale")
+  timezone       String   @default("Asia/Riyadh")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  ownedEvents        Event[]           @relation("EventOwner")
+  memberships       EventMembership[]
+  createdInvitations InvitationGroup[] @relation("InvitationCreator")
+  auditLogs         AuditLog[]         @relation("AuditActor")
+
+  @@map("users")
+}
+
+model Event {
+  id             String      @id @default(uuid()) @db.Uuid
+  ownerUserId    String      @map("owner_user_id") @db.Uuid
+  nameAr         String      @map("name_ar")
+  nameEn         String?     @map("name_en")
+  eventType      String      @map("event_type")
+  eventDate      DateTime    @map("event_date") @db.Date
+  startTime      DateTime    @map("start_time") @db.Time(0)
+  endTime        DateTime?   @map("end_time") @db.Time(0)
+  timezone       String
+  venueNameAr    String      @map("venue_name_ar")
+  venueNameEn    String?     @map("venue_name_en")
+  city           String
+  latitude       Decimal?    @db.Decimal(9, 6)
+  longitude      Decimal?    @db.Decimal(9, 6)
+  mapUrl         String?     @map("map_url")
+  rsvpDeadline   DateTime?   @map("rsvp_deadline") @db.Date
+  allowRsvpEdits Boolean     @default(true) @map("allow_rsvp_edits")
+  qrEnabled      Boolean     @default(false) @map("qr_enabled")
+  status         EventStatus @default(DRAFT)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  archivedAt     DateTime?   @map("archived_at")
+
+  owner             User              @relation("EventOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  memberships       EventMembership[]
+  invitationGroups  InvitationGroup[]
+  auditLogs         AuditLog[]
+
+  @@index([ownerUserId])
+  @@index([status, eventDate])
+  @@map("events")
+}
+
+model EventMembership {
+  id              String              @id @default(uuid()) @db.Uuid
+  eventId         String              @map("event_id") @db.Uuid
+  userId          String              @map("user_id") @db.Uuid
+  role            EventMembershipRole
+  status          MembershipStatus    @default(PENDING)
+  permissionsJson Json                @default("[]") @map("permissions_json")
+  invitedBy       String?             @map("invited_by") @db.Uuid
+  createdAt       DateTime            @default(now()) @map("created_at")
+  acceptedAt      DateTime?           @map("accepted_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([userId, status])
+  @@map("event_memberships")
+}
+
+model InvitationGroup {
+  id                String         @id @default(uuid()) @db.Uuid
+  eventId           String         @map("event_id") @db.Uuid
+  displayName       String         @map("display_name")
+  contactName       String         @map("contact_name")
+  phoneE164         String         @map("phone_e164")
+  phoneCountry      String         @map("phone_country")
+  invitationType    InvitationType @map("invitation_type")
+  maxCompanions     Int            @default(0) @map("max_companions")
+  internalNote      String?        @map("internal_note")
+  rsvpStatus        RsvpStatus     @default(PENDING) @map("rsvp_status")
+  expectedAttendees Int            @default(0) @map("expected_attendees")
+  createdBy         String         @map("created_by") @db.Uuid
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  cancelledAt       DateTime?      @map("cancelled_at")
+
+  event        Event                      @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  creator      User                       @relation("InvitationCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  members      GuestMember[]
+  rsvp         Rsvp?
+  publicAccess PublicInvitationCapability?
+  rsvpHistory  RsvpHistory[]
+
+  @@index([eventId, rsvpStatus])
+  @@index([eventId, phoneE164])
+  @@index([eventId, displayName])
+  @@map("invitation_groups")
+}
+
+model GuestMember {
+  id                String   @id @default(uuid()) @db.Uuid
+  invitationGroupId String   @map("invitation_group_id") @db.Uuid
+  name              String
+  position          Int
+  isPrimary         Boolean  @default(false) @map("is_primary")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  invitationGroup InvitationGroup @relation(fields: [invitationGroupId], references: [id], onDelete: Cascade)
+  rsvpMember      RsvpMember?
+
+  @@unique([invitationGroupId, position])
+  @@index([invitationGroupId, isPrimary])
+  @@map("guest_members")
+}
+
+model Rsvp {
+  id                String     @id @default(uuid()) @db.Uuid
+  invitationGroupId String     @unique @map("invitation_group_id") @db.Uuid
+  status            RsvpStatus
+  companionCount    Int        @default(0) @map("companion_count")
+  source            RsvpSource
+  respondedAt       DateTime   @default(now()) @map("responded_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  invitationGroup InvitationGroup @relation(fields: [invitationGroupId], references: [id], onDelete: Cascade)
+  members         RsvpMember[]
+
+  @@map("rsvps")
+}
+
+model RsvpMember {
+  id            String  @id @default(uuid()) @db.Uuid
+  rsvpId        String  @map("rsvp_id") @db.Uuid
+  guestMemberId String  @unique @map("guest_member_id") @db.Uuid
+  attending     Boolean
+
+  rsvp        Rsvp        @relation(fields: [rsvpId], references: [id], onDelete: Cascade)
+  guestMember GuestMember @relation(fields: [guestMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([rsvpId, guestMemberId])
+  @@map("rsvp_members")
+}
+
+model PublicInvitationCapability {
+  id                String    @id @default(uuid()) @db.Uuid
+  invitationGroupId String    @unique @map("invitation_group_id") @db.Uuid
+  tokenHash         String    @unique @map("token_hash")
+  expiresAt         DateTime? @map("expires_at")
+  revokedAt         DateTime? @map("revoked_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  invitationGroup InvitationGroup @relation(fields: [invitationGroupId], references: [id], onDelete: Cascade)
+
+  @@map("public_invitation_capabilities")
+}
+
+model RsvpHistory {
+  id                String     @id @default(uuid()) @db.Uuid
+  invitationGroupId String     @map("invitation_group_id") @db.Uuid
+  previousStatus    RsvpStatus @map("previous_status")
+  newStatus         RsvpStatus @map("new_status")
+  previousCount     Int        @map("previous_count")
+  newCount          Int        @map("new_count")
+  source            RsvpSource
+  actorReference    String?    @map("actor_reference")
+  createdAt         DateTime   @default(now()) @map("created_at")
+
+  invitationGroup InvitationGroup @relation(fields: [invitationGroupId], references: [id], onDelete: Restrict)
+
+  @@index([invitationGroupId, createdAt])
+  @@map("rsvp_history")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  eventId     String?  @map("event_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  actorType   String   @map("actor_type")
+  action      String
+  targetType  String   @map("target_type")
+  targetId    String   @map("target_id")
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  event Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  actor User?  @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("audit_logs")
+}
