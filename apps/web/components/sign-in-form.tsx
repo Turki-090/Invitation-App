@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { developmentAuthBypassEnabled } from "@/lib/api";
 import { getSupabaseClient } from "@/lib/supabase";
 
 const phoneSchema = z.object({
@@ -129,6 +130,20 @@ export function SignInForm() {
           تغيير رقم الجوال
         </Button>
       </form>
+    );
+  }
+
+  if (developmentAuthBypassEnabled) {
+    return (
+      <div className="auth-form">
+        <div className="development-access-note" role="note">
+          <strong>بيئة اختبار محلية</strong>
+          <span>تجاوز مؤقت للتحقق من رقم الجوال. لا يعمل في الإنتاج.</span>
+        </div>
+        <Button fullWidth onClick={() => router.push("/events")} size="lg">
+          الدخول التجريبي
+        </Button>
+      </div>
     );
   }
 

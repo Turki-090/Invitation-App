@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import type { CreateEventInput, EventSummary } from "@dawah/api-contract";
 import type { Event, EventMembershipRole, Prisma, User } from "@prisma/client";
 import type { AuthPrincipal } from "../auth/auth.types";
@@ -10,7 +10,9 @@ type EventWithRole = Event & {
 
 @Injectable()
 export class EventsService {
-  public constructor(private readonly prisma: PrismaService) {}
+  public constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+  ) {}
 
   public async list(principal: AuthPrincipal): Promise<EventSummary[]> {
     const user = await this.ensureUser(principal);

@@ -1,12 +1,32 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": ["DAWAH_ENV", "NODE_ENV"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "generated/**", ".next/**", "!.next/cache/**"]
     },
     "dev": {
+      "dependsOn": ["^build"],
       "cache": false,
+      "env": [
+        "API_BODY_LIMIT_BYTES",
+        "API_CORS_ORIGINS",
+        "API_PORT",
+        "API_READY_TIMEOUT_MS",
+        "DATABASE_URL",
+        "DAWAH_DEV_AUTH_BYPASS",
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_DAWAH_DEV_AUTH_BYPASS",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "QUEUE_PREFIX",
+        "REDIS_URL",
+        "SUPABASE_JWT_AUDIENCE",
+        "SUPABASE_URL",
+        "WORKER_PORT",
+        "WORKER_READY_TIMEOUT_MS"
+      ],
       "persistent": true
     },
     "test": {

@@ -4,24 +4,38 @@
   "private": true,
   "packageManager": "pnpm@11.19.0",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev --parallel",
+    "build": "node scripts/build.mjs",
+    "build:all": "turbo run build",
+    "dev": "node --env-file=.env.example --env-file-if-exists=.env scripts/dev.mjs",
+    "dev:apps": "turbo run dev --parallel",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "generate": "pnpm --filter @dawah/design-tokens build && prisma generate --schema database/schema.prisma",
+    "generate": "pnpm --filter @dawah/design-tokens build && prisma generate --schema database/schema.prisma && pnpm openapi:generate",
+    "lint": "oxlint --deny-warnings --ignore-pattern packages/api-client/src/generated apps packages scripts database/seed.mjs",
+    "migrate": "prisma migrate deploy --schema database/schema.prisma",
+    "openapi:check": "openapi-typescript openapi/openapi.yaml --output packages/api-client/src/generated/schema.ts --export-type --check",
+    "openapi:generate": "openapi-typescript openapi/openapi.yaml --output packages/api-client/src/generated/schema.ts --export-type",
     "openapi:lint": "redocly lint openapi/openapi.yaml",
+    "artifacts:check": "node scripts/check-tracked-artifacts.mjs",
+    "seed": "node --env-file=.env.example --env-file-if-exists=.env database/seed.mjs",
+    "smoke": "node --env-file=.env.test.example --env-file-if-exists=.env.test scripts/smoke-start.mjs",
+    "smoke:containers": "node --env-file=.env.test.example --env-file-if-exists=.env.test scripts/smoke-containers.mjs",
     "test": "turbo run test",
+    "test:integration": "node --env-file=.env.test.example --env-file-if-exists=.env.test scripts/run-integration-tests.mjs",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
     "@prisma/client": "6.19.3",
     "@redocly/cli": "2.51.2",
+    "openapi-typescript": "7.13.0",
+    "oxlint": "1.81.0",
     "prettier": "3.9.6",
     "prisma": "6.19.3",
     "turbo": "2.10.12",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "yaml": "2.9.0"
   }
 }

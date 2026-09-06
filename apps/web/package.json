@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dawah/api-client": "workspace:*",
     "@dawah/api-contract": "workspace:*",
+    "@dawah/config": "workspace:*",
     "@dawah/ui": "workspace:*",
     "@hookform/resolvers": "5.9.1",
     "@supabase/supabase-js": "2.115.0",
