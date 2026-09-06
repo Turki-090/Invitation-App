@@ -9,3 +9,4 @@ coverage/
 pnpm-lock.yaml
 database/migrations/
 packages/design-tokens/generated/
+packages/api-client/src/generated/

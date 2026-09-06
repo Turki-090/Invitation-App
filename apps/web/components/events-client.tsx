@@ -20,7 +20,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
-import { apiRequest } from "@/lib/api";
+import {
+  createEvent as requestCreateEvent,
+  developmentAuthBypassEnabled,
+  listEvents,
+} from "@/lib/api";
 import { getSupabaseClient } from "@/lib/supabase";
 
 const eventStatus: Record<EventSummary["status"], string> = {
@@ -40,10 +44,11 @@ export function EventsClient() {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const supabase = getSupabaseClient();
+  const apiAvailable = Boolean(supabase) || developmentAuthBypassEnabled;
   const events = useQuery({
     queryKey: ["events"],
-    enabled: Boolean(supabase),
-    queryFn: () => apiRequest<EventSummary[]>(supabase!, "/events"),
+    enabled: apiAvailable,
+    queryFn: () => listEvents(supabase),
   });
   const form = useForm<EventFormInput, unknown, CreateEventInput>({
     resolver: zodResolver(createEventSchema),
@@ -65,10 +70,7 @@ export function EventsClient() {
   });
   const createEvent = useMutation({
     mutationFn: (input: CreateEventInput) =>
-      apiRequest<EventSummary>(supabase!, "/events", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
+      requestCreateEvent(supabase, input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["events"] });
       setCreateOpen(false);
@@ -109,7 +111,7 @@ export function EventsClient() {
           </Button>
         </header>
 
-        {!supabase ? (
+        {!apiAvailable ? (
           <Card tone="sunken">
             <p className="form-error">
               لم يتم إعداد تسجيل الدخول. أضف قيم Supabase إلى ملف البيئة ثم أعد

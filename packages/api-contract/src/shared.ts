@@ -9,3 +9,13 @@ export const apiErrorSchema = z.object({
 });
 
 export type ApiError = z.infer<typeof apiErrorSchema>;
+
+export const readinessSchema = z.object({
+  status: z.literal("ok"),
+  checks: z.object({
+    database: z.literal("ok"),
+    redis: z.literal("ok"),
+  }),
+});
+
+export type Readiness = z.infer<typeof readinessSchema>;

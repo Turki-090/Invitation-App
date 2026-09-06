@@ -6,7 +6,8 @@ services:
       POSTGRES_USER: dawah
       POSTGRES_PASSWORD: dawah
     ports:
-      - "5432:5432"
+      # Keep the project database separate from any system PostgreSQL install.
+      - "5433:5432"
     volumes:
       - dawah-postgres:/var/lib/postgresql/data
     healthcheck:
@@ -26,6 +27,66 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  postgres-test:
+    profiles: ["test"]
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: dawah_test
+      POSTGRES_USER: dawah_test
+      POSTGRES_PASSWORD: dawah_test
+    ports:
+      - "5434:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dawah_test -d dawah_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      DAWAH_ENV: local
+      DATABASE_URL: postgresql://dawah:dawah@postgres:5432/dawah?schema=public
+      REDIS_URL: redis://redis:6379
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_JWT_AUDIENCE: ${SUPABASE_JWT_AUDIENCE:-authenticated}
+      DAWAH_DEV_AUTH_BYPASS: "false"
+      API_PORT: "4000"
+      API_CORS_ORIGINS: http://localhost:3000
+      API_BODY_LIMIT_BYTES: "1048576"
+      API_READY_TIMEOUT_MS: "2000"
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      NODE_ENV: production
+      DAWAH_ENV: local
+      REDIS_URL: redis://redis:6379
+      QUEUE_PREFIX: dawah:local
+      WORKER_PORT: "4001"
+      WORKER_READY_TIMEOUT_MS: "2000"
+    ports:
+      - "4001:4001"
+    depends_on:
+      redis:
+        condition: service_healthy
 
 volumes:
   dawah-postgres:

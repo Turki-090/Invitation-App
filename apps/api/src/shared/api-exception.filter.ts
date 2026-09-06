@@ -3,6 +3,7 @@ import {
   Catch,
   HttpException,
   HttpStatus,
+  Logger,
   type ExceptionFilter,
 } from "@nestjs/common";
 import type { Response } from "express";
@@ -15,6 +16,8 @@ interface ExceptionPayload {
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(ApiExceptionFilter.name);
+
   public catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
     const status =
@@ -25,6 +28,13 @@ export class ApiExceptionFilter implements ExceptionFilter {
       exception instanceof HttpException ? exception.getResponse() : null;
     const payload: ExceptionPayload =
       typeof raw === "object" && raw !== null ? raw : {};
+
+    if (!(exception instanceof HttpException)) {
+      this.logger.error(
+        "Unhandled request exception.",
+        exception instanceof Error ? exception.stack : String(exception),
+      );
+    }
 
     response.status(status).json({
       error: {

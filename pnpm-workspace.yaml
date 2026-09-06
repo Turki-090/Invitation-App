@@ -2,11 +2,17 @@ packages:
   - apps/*
   - packages/*
 
+confirmModulesPurge: false
+injectWorkspacePackages: true
+syncInjectedDepsAfterScripts:
+  - build
+
 allowBuilds:
   "@prisma/client": true
   "@prisma/engines": true
   "@scarf/scarf": false
   esbuild: true
+  msgpackr-extract: false
   prisma: true
   sharp: true
 
