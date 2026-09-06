@@ -5,6 +5,7 @@
   --ink: #17140F;
   --ink-2: #544B41;
   --ink-3: #8C8378;
+  --ink-accessible-muted: #756C62;
   --ink-4: #B8AFA3;
   --line: #E9E3DA;
   --line-strong: #D8D0C4;
@@ -87,6 +88,7 @@
   --radius-full: 999px;
   --font-ui: 'IBM Plex Sans Arabic', 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
   --font-display: 'Amiri', 'Cormorant Garamond', Georgia, serif;
+  --font-display-latin: 'Cormorant Garamond', 'Amiri', Georgia, serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
   --text-xs: 12px;
   --text-sm: 13px;
@@ -129,7 +131,7 @@
   --surface-pressed: var(--pressed);
   --text-body: var(--ink);
   --text-secondary: var(--ink-2);
-  --text-muted: var(--ink-3);
+  --text-muted: var(--ink-accessible-muted);
   --text-disabled: var(--ink-4);
   --text-on-dark: var(--paper);
   --text-on-accent: var(--white);

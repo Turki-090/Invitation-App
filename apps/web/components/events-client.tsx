@@ -12,6 +12,8 @@ import {
   Dialog,
   EmptyState,
   Field,
+  HostShell,
+  IconButton,
   Input,
   StatusPill,
 } from "@dawah/ui";
@@ -20,6 +22,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
+import { LocaleSwitcher } from "@/components/locale-switcher";
+import type { AppLocale } from "@/i18n/config";
+import type { Dictionary } from "@/i18n/dictionaries";
 import {
   createEvent as requestCreateEvent,
   developmentAuthBypassEnabled,
@@ -27,19 +32,34 @@ import {
 } from "@/lib/api";
 import { getSupabaseClient } from "@/lib/supabase";
 
-const eventStatus: Record<EventSummary["status"], string> = {
-  DRAFT: "upcoming",
-  ACTIVE: "upcoming",
-  RSVP_OPEN: "rsvp-open",
-  RSVP_CLOSED: "rsvp-closed",
-  EVENT_DAY: "today",
-  COMPLETED: "completed",
-  ARCHIVED: "archived",
+const eventStatus: Record<
+  EventSummary["status"],
+  { status: string; label: keyof Dictionary["events"] }
+> = {
+  DRAFT: { status: "upcoming", label: "statusUpcoming" },
+  ACTIVE: { status: "upcoming", label: "statusUpcoming" },
+  RSVP_OPEN: { status: "rsvp-open", label: "statusRsvpOpen" },
+  RSVP_CLOSED: { status: "rsvp-closed", label: "statusRsvpClosed" },
+  EVENT_DAY: { status: "today", label: "statusToday" },
+  COMPLETED: { status: "completed", label: "statusCompleted" },
+  ARCHIVED: { status: "archived", label: "statusArchived" },
 };
 
 type EventFormInput = z.input<typeof createEventSchema>;
 
-export function EventsClient() {
+interface EventsClientProps {
+  locale: AppLocale;
+  copy: Dictionary["events"];
+  common: Dictionary["common"];
+  shellCopy: Dictionary["shell"];
+}
+
+export function EventsClient({
+  locale,
+  copy,
+  common,
+  shellCopy,
+}: EventsClientProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
@@ -62,7 +82,7 @@ export function EventsClient() {
       timezone: "Asia/Riyadh",
       venueNameAr: "",
       venueNameEn: undefined,
-      city: "الرياض",
+      city: copy.defaultCity,
       mapUrl: undefined,
       rsvpDeadline: undefined,
       allowRsvpEdits: true,
@@ -80,57 +100,79 @@ export function EventsClient() {
 
   const signOut = async () => {
     await supabase?.auth.signOut();
-    router.push("/");
+    router.push(`/${locale}`);
   };
 
   return (
-    <main className="events-shell">
-      <aside className="events-side">
-        <a className="wordmark" href="/">
-          <span>دعوة</span>
-          <small>DAWAH</small>
+    <HostShell
+      brand={
+        <a
+          aria-label={common.homeLabel}
+          className="wordmark"
+          href={`/${locale}`}
+        >
+          <span>{common.wordmark}</span>
+          <small>{common.wordmarkLatin}</small>
         </a>
-        <nav aria-label="التنقل الرئيسي">
-          <a aria-current="page" href="/events">
-            المناسبات
-          </a>
-        </nav>
-        <Button fullWidth onClick={signOut} variant="ghost">
-          تسجيل الخروج
+      }
+      collapseLabel={shellCopy.collapse}
+      compactUtility={
+        <IconButton label={copy.signOut} name="log-out" onClick={signOut} />
+      }
+      expandLabel={shellCopy.expand}
+      items={[
+        {
+          id: "events",
+          label: copy.title,
+          href: `/${locale}/events`,
+          icon: "calendar",
+          active: true,
+        },
+      ]}
+      navigationLabel={copy.navigationLabel}
+      topbar={
+        <LocaleSwitcher
+          arabicLabel={common.arabic}
+          englishLabel={common.english}
+          label={common.language}
+          locale={locale}
+        />
+      }
+      utility={
+        <Button fullWidth icon="log-out" onClick={signOut} variant="ghost">
+          {copy.signOut}
         </Button>
-      </aside>
+      }
+    >
       <section className="events-content">
         <header className="page-header">
           <div>
-            <p className="eyebrow">لوحة الإدارة</p>
-            <h1>المناسبات</h1>
-            <p>أنشئ مناسبة أو افتح مناسبة قائمة لإدارة الدعوات والحضور.</p>
+            <p className="eyebrow">{copy.eyebrow}</p>
+            <h1>{copy.title}</h1>
+            <p>{copy.intro}</p>
           </div>
           <Button icon="plus" onClick={() => setCreateOpen(true)}>
-            إنشاء مناسبة
+            {copy.create}
           </Button>
         </header>
 
         {!apiAvailable ? (
           <Card tone="sunken">
-            <p className="form-error">
-              لم يتم إعداد تسجيل الدخول. أضف قيم Supabase إلى ملف البيئة ثم أعد
-              تشغيل التطبيق.
-            </p>
+            <p className="form-error">{copy.setupMissing}</p>
           </Card>
         ) : events.isLoading ? (
-          <div aria-label="جارٍ تحميل المناسبات" className="event-grid">
+          <div aria-label={copy.loading} className="event-grid">
             <div className="skeleton event-skeleton" />
             <div className="skeleton event-skeleton" />
           </div>
         ) : events.isError ? (
           <EmptyState
             icon="circle-alert"
-            title="تعذر تحميل المناسبات"
-            description="تحقق من اتصال واجهة API ثم حاول مرة أخرى."
+            title={copy.loadErrorTitle}
+            description={copy.loadErrorDescription}
             action={
               <Button onClick={() => events.refetch()} variant="secondary">
-                إعادة المحاولة
+                {common.retry}
               </Button>
             }
           />
@@ -142,37 +184,43 @@ export function EventsClient() {
                 actions={
                   <StatusPill
                     kind="event"
-                    locale="ar"
-                    status={eventStatus[event.status]}
+                    label={copy[eventStatus[event.status].label]}
+                    status={eventStatus[event.status].status}
                   />
                 }
               >
                 <article className="event-card">
                   <p className="eyebrow">
                     {event.eventType === "WEDDING"
-                      ? "حفل زواج"
+                      ? copy.wedding
                       : event.eventType}
                   </p>
-                  <h2>{event.nameAr}</h2>
+                  <h2>
+                    {locale === "en"
+                      ? (event.nameEn ?? event.nameAr)
+                      : event.nameAr}
+                  </h2>
                   <dl>
                     <div>
-                      <dt>التاريخ</dt>
+                      <dt>{copy.date}</dt>
                       <dd>
-                        {new Intl.DateTimeFormat("ar-SA", {
+                        {new Intl.DateTimeFormat(locale, {
                           dateStyle: "long",
                           timeZone: event.timezone,
                         }).format(new Date(`${event.eventDate}T12:00:00Z`))}
                       </dd>
                     </div>
                     <div>
-                      <dt>الموقع</dt>
+                      <dt>{copy.location}</dt>
                       <dd>
-                        {event.venueNameAr}، {event.city}
+                        {event.venueNameAr}
+                        {locale === "ar-SA" ? "، " : ", "}
+                        {event.city}
                       </dd>
                     </div>
                   </dl>
                   <Button iconEnd="arrow-left" variant="secondary">
-                    فتح المناسبة
+                    {copy.open}
                   </Button>
                 </article>
               </Card>
@@ -181,11 +229,11 @@ export function EventsClient() {
         ) : (
           <EmptyState
             icon="calendar"
-            title="لا توجد مناسبات بعد"
-            description="أنشئ المناسبة الأولى، ثم أضف مجموعات الدعوات وحدد من تشملهم كل دعوة."
+            title={copy.emptyTitle}
+            description={copy.emptyDescription}
             action={
               <Button icon="plus" onClick={() => setCreateOpen(true)}>
-                إنشاء المناسبة الأولى
+                {copy.emptyAction}
               </Button>
             }
           />
@@ -193,24 +241,25 @@ export function EventsClient() {
       </section>
 
       <Dialog
-        description="أدخل المعلومات الأساسية. يمكن تعديل إعدادات الدعوات لاحقًا."
+        closeLabel={common.close}
+        description={copy.dialogDescription}
         footer={
           <>
             <Button onClick={() => setCreateOpen(false)} variant="secondary">
-              إلغاء
+              {common.cancel}
             </Button>
             <Button
               form="create-event-form"
               loading={createEvent.isPending}
               type="submit"
             >
-              حفظ المناسبة
+              {copy.save}
             </Button>
           </>
         }
         onClose={() => setCreateOpen(false)}
         open={createOpen}
-        title="إنشاء مناسبة"
+        title={copy.dialogTitle}
       >
         <form
           className="event-form"
@@ -219,21 +268,23 @@ export function EventsClient() {
         >
           <Field
             id="nameAr"
-            label="اسم المناسبة بالعربية"
-            error={form.formState.errors.nameAr?.message}
+            label={copy.nameAr}
+            error={form.formState.errors.nameAr ? copy.invalidField : undefined}
             required
           >
             <Input
               {...form.register("nameAr")}
               id="nameAr"
               invalid={Boolean(form.formState.errors.nameAr)}
-              placeholder="حفل زواج خالد ونورة"
+              placeholder={copy.nameArPlaceholder}
             />
           </Field>
           <Field
             id="eventDate"
-            label="تاريخ المناسبة"
-            error={form.formState.errors.eventDate?.message}
+            label={copy.eventDate}
+            error={
+              form.formState.errors.eventDate ? copy.invalidField : undefined
+            }
             required
           >
             <Input
@@ -247,8 +298,10 @@ export function EventsClient() {
           <div className="form-row">
             <Field
               id="startTime"
-              label="وقت البدء"
-              error={form.formState.errors.startTime?.message}
+              label={copy.startTime}
+              error={
+                form.formState.errors.startTime ? copy.invalidField : undefined
+              }
               required
             >
               <Input
@@ -261,8 +314,10 @@ export function EventsClient() {
             </Field>
             <Field
               id="endTime"
-              label="وقت الانتهاء"
-              error={form.formState.errors.endTime?.message}
+              label={copy.endTime}
+              error={
+                form.formState.errors.endTime ? copy.invalidField : undefined
+              }
             >
               <Input
                 {...form.register("endTime")}
@@ -275,8 +330,10 @@ export function EventsClient() {
           </div>
           <Field
             id="venueNameAr"
-            label="اسم القاعة أو الموقع"
-            error={form.formState.errors.venueNameAr?.message}
+            label={copy.venueNameAr}
+            error={
+              form.formState.errors.venueNameAr ? copy.invalidField : undefined
+            }
             required
           >
             <Input
@@ -287,8 +344,8 @@ export function EventsClient() {
           </Field>
           <Field
             id="city"
-            label="المدينة"
-            error={form.formState.errors.city?.message}
+            label={copy.city}
+            error={form.formState.errors.city ? copy.invalidField : undefined}
             required
           >
             <Input
@@ -299,8 +356,10 @@ export function EventsClient() {
           </Field>
           <Field
             id="rsvpDeadline"
-            label="آخر موعد للرد"
-            error={form.formState.errors.rsvpDeadline?.message}
+            label={copy.rsvpDeadline}
+            error={
+              form.formState.errors.rsvpDeadline ? copy.invalidField : undefined
+            }
           >
             <Input
               {...form.register("rsvpDeadline")}
@@ -312,11 +371,11 @@ export function EventsClient() {
           </Field>
           {createEvent.isError ? (
             <p className="form-error" role="alert">
-              تعذر حفظ المناسبة. تحقق من البيانات والاتصال ثم حاول مرة أخرى.
+              {copy.saveError}
             </p>
           ) : null}
         </form>
       </Dialog>
-    </main>
+    </HostShell>
   );
 }

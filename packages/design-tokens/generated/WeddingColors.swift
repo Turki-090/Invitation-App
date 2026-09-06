@@ -7,6 +7,7 @@ public enum WeddingColors {
   public static let ink = Color(red: 0.0902, green: 0.0784, blue: 0.0588)
   public static let ink2 = Color(red: 0.3294, green: 0.2941, blue: 0.2549)
   public static let ink3 = Color(red: 0.5490, green: 0.5137, blue: 0.4706)
+  public static let inkAccessibleMuted = Color(red: 0.4588, green: 0.4235, blue: 0.3843)
   public static let ink4 = Color(red: 0.7216, green: 0.6863, blue: 0.6392)
   public static let line = Color(red: 0.9137, green: 0.8902, blue: 0.8549)
   public static let lineStrong = Color(red: 0.8471, green: 0.8157, blue: 0.7686)

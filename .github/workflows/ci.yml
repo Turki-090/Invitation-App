@@ -64,6 +64,9 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm storybook:build
+      - run: pnpm --filter @dawah/web exec playwright install --with-deps chromium
+      - run: pnpm test:storybook
       - run: pnpm test:integration
       - run: pnpm build
       - run: pnpm artifacts:check

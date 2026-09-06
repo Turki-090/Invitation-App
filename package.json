@@ -23,7 +23,10 @@
     "seed": "node --env-file=.env.example --env-file-if-exists=.env database/seed.mjs",
     "smoke": "node --env-file=.env.test.example --env-file-if-exists=.env.test scripts/smoke-start.mjs",
     "smoke:containers": "node --env-file=.env.test.example --env-file-if-exists=.env.test scripts/smoke-containers.mjs",
+    "storybook": "pnpm --filter @dawah/web storybook",
+    "storybook:build": "pnpm --filter @dawah/web build-storybook",
     "test": "turbo run test",
+    "test:storybook": "pnpm --filter @dawah/web test:storybook",
     "test:integration": "node --env-file=.env.test.example --env-file-if-exists=.env.test scripts/run-integration-tests.mjs",
     "typecheck": "turbo run typecheck"
   },

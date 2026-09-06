@@ -9,29 +9,35 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { developmentAuthBypassEnabled } from "@/lib/api";
 import { getSupabaseClient } from "@/lib/supabase";
+import type { AppLocale } from "@/i18n/config";
+import type { Dictionary } from "@/i18n/dictionaries";
 
-const phoneSchema = z.object({
-  phone: z
-    .string()
-    .trim()
-    .refine(
-      (value) => value.startsWith("+") && isValidPhoneNumber(value),
-      "أدخل رقمًا صحيحًا بصيغة دولية.",
-    ),
-});
-const codeSchema = z.object({
-  code: z
-    .string()
-    .trim()
-    .regex(/^\d{6}$/, "أدخل رمز التحقق المكوّن من 6 أرقام."),
-});
-type PhoneValues = z.infer<typeof phoneSchema>;
-type CodeValues = z.infer<typeof codeSchema>;
+interface SignInFormProps {
+  locale: AppLocale;
+  copy: Dictionary["auth"];
+}
 
-export function SignInForm() {
+export function SignInForm({ locale, copy }: SignInFormProps) {
   const router = useRouter();
   const [phone, setPhone] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+  const phoneSchema = z.object({
+    phone: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value.startsWith("+") && isValidPhoneNumber(value),
+        copy.phoneValidation,
+      ),
+  });
+  const codeSchema = z.object({
+    code: z
+      .string()
+      .trim()
+      .regex(/^\d{6}$/, copy.codeValidation),
+  });
+  type PhoneValues = z.infer<typeof phoneSchema>;
+  type CodeValues = z.infer<typeof codeSchema>;
   const phoneForm = useForm<PhoneValues>({
     resolver: zodResolver(phoneSchema),
     defaultValues: { phone: "+966" },
@@ -46,9 +52,7 @@ export function SignInForm() {
       setServerError(null);
       const supabase = getSupabaseClient();
       if (!supabase) {
-        setServerError(
-          "لم يتم إعداد موفر تسجيل الدخول بعد. أضف إعدادات Supabase للبيئة المحلية.",
-        );
+        setServerError(copy.providerMissing);
         return;
       }
       const { error } = await supabase.auth.signInWithOtp({
@@ -56,7 +60,7 @@ export function SignInForm() {
         options: { shouldCreateUser: true },
       });
       if (error) {
-        setServerError("تعذر إرسال رمز التحقق. تحقق من الرقم وحاول مرة أخرى.");
+        setServerError(copy.sendFailed);
         return;
       }
       setPhone(submittedPhone);
@@ -68,7 +72,7 @@ export function SignInForm() {
     setServerError(null);
     const supabase = getSupabaseClient();
     if (!supabase) {
-      setServerError("لم يتم إعداد موفر تسجيل الدخول بعد.");
+      setServerError(copy.providerMissingShort);
       return;
     }
     const { error } = await supabase.auth.verifyOtp({
@@ -77,10 +81,10 @@ export function SignInForm() {
       type: "sms",
     });
     if (error) {
-      setServerError("رمز التحقق غير صحيح أو انتهت صلاحيته.");
+      setServerError(copy.invalidCode);
       return;
     }
-    router.push("/events");
+    router.push(`/${locale}/events`);
   });
 
   if (phone) {
@@ -88,9 +92,9 @@ export function SignInForm() {
       <form className="auth-form" onSubmit={verifyCode}>
         <Field
           id="code"
-          label="رمز التحقق"
+          label={copy.codeLabel}
           error={codeForm.formState.errors.code?.message}
-          hint={`أُرسل الرمز إلى ${phone}`}
+          hint={copy.codeHint.replace("{phone}", phone)}
           required
         >
           <Input
@@ -115,7 +119,7 @@ export function SignInForm() {
           size="lg"
           type="submit"
         >
-          تأكيد الرمز
+          {copy.verifyCode}
         </Button>
         <Button
           fullWidth
@@ -127,7 +131,7 @@ export function SignInForm() {
           size="lg"
           variant="ghost"
         >
-          تغيير رقم الجوال
+          {copy.changePhone}
         </Button>
       </form>
     );
@@ -137,11 +141,15 @@ export function SignInForm() {
     return (
       <div className="auth-form">
         <div className="development-access-note" role="note">
-          <strong>بيئة اختبار محلية</strong>
-          <span>تجاوز مؤقت للتحقق من رقم الجوال. لا يعمل في الإنتاج.</span>
+          <strong>{copy.developmentTitle}</strong>
+          <span>{copy.developmentNote}</span>
         </div>
-        <Button fullWidth onClick={() => router.push("/events")} size="lg">
-          الدخول التجريبي
+        <Button
+          fullWidth
+          onClick={() => router.push(`/${locale}/events`)}
+          size="lg"
+        >
+          {copy.developmentLogin}
         </Button>
       </div>
     );
@@ -151,9 +159,9 @@ export function SignInForm() {
     <form className="auth-form" onSubmit={requestCode}>
       <Field
         id="phone"
-        label="رقم الجوال"
+        label={copy.phoneLabel}
         error={phoneForm.formState.errors.phone?.message}
-        hint="مثال: +9665XXXXXXXX"
+        hint={copy.phoneHint}
         required
       >
         <Input
@@ -177,7 +185,7 @@ export function SignInForm() {
         size="lg"
         type="submit"
       >
-        إرسال رمز التحقق
+        {copy.sendCode}
       </Button>
     </form>
   );

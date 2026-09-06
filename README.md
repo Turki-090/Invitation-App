@@ -13,6 +13,9 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
+The localized web routes are `/ar-SA` and `/en`. Requests without a locale are
+redirected to the best supported language, falling back to Arabic.
+
 `pnpm dev` uses the safe local defaults in `.env.example`, starts PostgreSQL and
 Redis, generates required sources, deploys migrations, and starts web, API, and
 worker processes. Create a private `.env` only when overriding those defaults.
@@ -64,6 +67,18 @@ pnpm build
 pnpm artifacts:check
 pnpm smoke
 ```
+
+Stage 2 adds Storybook, accessibility checks, and visual regression:
+
+```powershell
+pnpm storybook
+pnpm storybook:build
+pnpm test:storybook
+```
+
+The component catalogue, RTL/LTR rules, responsive contract, and accessibility
+verification are documented in
+[`docs/design-system-stage2.md`](docs/design-system-stage2.md).
 
 ## API contract workflow
 

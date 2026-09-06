@@ -9,6 +9,7 @@ object WeddingColors {
   val Ink = Color(0xFF17140F)
   val Ink2 = Color(0xFF544B41)
   val Ink3 = Color(0xFF8C8378)
+  val InkAccessibleMuted = Color(0xFF756C62)
   val Ink4 = Color(0xFFB8AFA3)
   val Line = Color(0xFFE9E3DA)
   val LineStrong = Color(0xFFD8D0C4)
