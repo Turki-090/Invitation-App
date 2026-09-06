@@ -1,3 +1,13 @@
+@import "@fontsource/ibm-plex-sans-arabic/arabic-400.css";
+@import "@fontsource/ibm-plex-sans-arabic/arabic-500.css";
+@import "@fontsource/ibm-plex-sans-arabic/arabic-600.css";
+@import "@fontsource/ibm-plex-sans-arabic/arabic-700.css";
+@import "@fontsource-variable/ibm-plex-sans/wght.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
+@import "@fontsource/amiri/arabic-400.css";
+@import "@fontsource/amiri/arabic-700.css";
+@import "@fontsource-variable/cormorant-garamond/wght.css";
 @import "@dawah/design-tokens/tokens.css";
 
 html {
@@ -17,6 +27,15 @@ body {
 *::before,
 *::after {
   box-sizing: border-box;
+}
+.dawah-sr-only {
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 button,
 input,
@@ -87,10 +106,10 @@ a:hover {
   opacity: 0.5;
 }
 .dawah-button--accent {
-  --button-bg: var(--accent);
-  --button-border: var(--accent);
-  --button-hover: var(--accent-hover);
-  --button-active: #6a4f2a;
+  --button-bg: var(--accent-hover);
+  --button-border: var(--accent-hover);
+  --button-hover: #6a4f2a;
+  --button-active: #563f21;
 }
 .dawah-button--secondary {
   --button-bg: var(--surface-card);
@@ -475,5 +494,1307 @@ a:hover {
 @media (prefers-reduced-motion: reduce) {
   .dawah-spin {
     animation: none;
+  }
+}
+
+/* Core */
+.dawah-avatar {
+  align-items: center;
+  background: var(--accent-soft);
+  border-radius: var(--radius-full);
+  color: var(--accent-hover);
+  display: inline-flex;
+  flex: none;
+  font-size: var(--dawah-avatar-text);
+  font-weight: var(--weight-semibold);
+  height: var(--dawah-avatar-size);
+  justify-content: center;
+  line-height: 1;
+  overflow: hidden;
+  width: var(--dawah-avatar-size);
+}
+.dawah-avatar--dark {
+  background: var(--ink);
+  color: var(--text-on-dark);
+}
+.dawah-avatar img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+.dawah-icon-button {
+  color: var(--text-secondary);
+  flex: none;
+  position: relative;
+  transition: var(--transition-control);
+}
+.dawah-icon-button--sm {
+  height: var(--control-h-sm);
+  min-height: var(--control-h-sm);
+  width: var(--control-h-sm);
+}
+.dawah-icon-button--md {
+  height: var(--control-h-md);
+  width: var(--control-h-md);
+}
+.dawah-icon-button--lg {
+  height: var(--control-h-lg);
+  width: var(--control-h-lg);
+}
+.dawah-icon-button--outline {
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+}
+.dawah-icon-button--active,
+.dawah-icon-button--active:hover {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+.dawah-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.dawah-icon-button__badge {
+  align-items: center;
+  background: var(--danger);
+  border: 2px solid var(--surface-card);
+  border-radius: var(--radius-full);
+  color: white;
+  display: flex;
+  font-size: 9px;
+  font-weight: var(--weight-bold);
+  height: 14px;
+  inset-block-start: 2px;
+  inset-inline-end: 2px;
+  justify-content: center;
+  min-width: 14px;
+  padding-inline: 2px;
+  position: absolute;
+}
+.dawah-tabs {
+  display: flex;
+  gap: 2px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.dawah-tabs--underline {
+  border-block-end: 1px solid var(--border-default);
+}
+.dawah-tabs--pill {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-control);
+  gap: 4px;
+  padding: 4px;
+}
+.dawah-tabs__tab {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  flex: none;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  gap: 6px;
+  height: 40px;
+  padding-inline: 12px;
+  white-space: nowrap;
+}
+.dawah-tabs--underline .dawah-tabs__tab {
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+}
+.dawah-tabs--underline .dawah-tabs__tab[aria-selected="true"] {
+  border-block-end-color: var(--ink);
+}
+.dawah-tabs--pill .dawah-tabs__tab {
+  border-radius: var(--radius-sm);
+  height: 32px;
+}
+.dawah-tabs--pill .dawah-tabs__tab[aria-selected="true"] {
+  background: var(--surface-card);
+  box-shadow: var(--shadow-card);
+}
+.dawah-tabs--pill .dawah-tabs__tab[aria-selected="true"]:focus-visible {
+  box-shadow: var(--focus-ring), var(--shadow-card);
+}
+.dawah-tabs__tab[aria-selected="true"] {
+  color: var(--text-body);
+  font-weight: var(--weight-semibold);
+}
+.dawah-tabs__tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.dawah-tabs__count {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  padding: 1px 6px;
+}
+.dawah-tabs__tab[aria-selected="true"] .dawah-tabs__count {
+  background: var(--ink);
+  color: var(--text-on-dark);
+}
+.dawah-tag {
+  align-items: center;
+  background: var(--surface-sunken);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  display: inline-flex;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  gap: 6px;
+  height: 28px;
+  line-height: 1;
+  padding-inline: 10px;
+  white-space: nowrap;
+}
+.dawah-tag--sm {
+  font-size: var(--text-xs);
+  height: 22px;
+  padding-inline: 8px;
+}
+.dawah-tag--outline {
+  background: transparent;
+  border-color: var(--border-strong);
+}
+.dawah-tag--accent {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+.dawah-tag button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  margin-inline-end: -4px;
+  padding: 2px;
+}
+.dawah-tooltip {
+  display: inline-flex;
+  position: relative;
+}
+.dawah-tooltip__bubble {
+  background: var(--ink);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-raised);
+  color: var(--text-on-dark);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  inset-inline-start: 50%;
+  line-height: 1.4;
+  opacity: 0;
+  padding: 6px 10px;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%);
+  transition: opacity var(--dur-fast) var(--ease-out);
+  white-space: nowrap;
+  z-index: 20;
+}
+.dawah-tooltip__bubble--top {
+  inset-block-end: calc(100% + 6px);
+}
+.dawah-tooltip__bubble--bottom {
+  inset-block-start: calc(100% + 6px);
+}
+.dawah-tooltip__bubble[data-open="true"] {
+  opacity: 1;
+}
+
+/* Forms */
+.dawah-input--sm,
+.dawah-select--sm {
+  min-height: var(--control-h-sm);
+}
+.dawah-input--md,
+.dawah-select--md {
+  min-height: var(--control-h-md);
+}
+.dawah-input--lg,
+.dawah-select--lg {
+  min-height: var(--control-h-lg);
+}
+.dawah-input--mono input,
+.dawah-input__prefix,
+.dawah-input__suffix {
+  direction: ltr;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: isolate;
+}
+.dawah-input__prefix,
+.dawah-input__suffix {
+  color: var(--text-muted);
+  flex: none;
+  font-size: var(--text-sm);
+}
+.dawah-select {
+  align-items: center;
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  display: flex;
+  position: relative;
+  transition: var(--transition-control);
+}
+.dawah-select:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+.dawah-select--invalid {
+  border-color: var(--danger);
+}
+.dawah-select select {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  height: 100%;
+  min-height: inherit;
+  outline: 0;
+  padding-inline: 12px 36px;
+  width: 100%;
+}
+.dawah-select > svg {
+  color: var(--text-muted);
+  inset-inline-end: 10px;
+  pointer-events: none;
+  position: absolute;
+}
+.dawah-select select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.dawah-check,
+.dawah-radio {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 10px;
+  min-height: var(--touch-min);
+}
+.dawah-check:has(input:disabled),
+.dawah-radio:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.dawah-check__control,
+.dawah-radio__control {
+  display: inline-flex;
+  flex: none;
+  position: relative;
+}
+.dawah-check__control input,
+.dawah-radio__control input,
+.dawah-switch__control input {
+  cursor: inherit;
+  height: 100%;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  position: absolute;
+  width: 100%;
+}
+.dawah-check__box {
+  align-items: center;
+  background: var(--surface-card);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: white;
+  display: inline-flex;
+  height: 20px;
+  justify-content: center;
+  transition: var(--transition-control);
+  width: 20px;
+}
+.dawah-check input:checked + .dawah-check__box,
+.dawah-check input[aria-checked="mixed"] + .dawah-check__box {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.dawah-check input:focus-visible + .dawah-check__box,
+.dawah-radio input:focus-visible + span,
+.dawah-switch input:focus-visible ~ .dawah-switch__track {
+  box-shadow: var(--focus-ring);
+}
+.dawah-check__copy,
+.dawah-radio__copy,
+.dawah-switch__copy {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--text-md);
+  gap: 2px;
+  line-height: 1.4;
+}
+.dawah-check__copy small,
+.dawah-radio__copy small,
+.dawah-switch__copy small {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+.dawah-check--guest {
+  gap: 14px;
+}
+.dawah-check--guest .dawah-check__box {
+  border-radius: 8px;
+  height: 28px;
+  width: 28px;
+}
+.dawah-check--guest .dawah-check__copy {
+  font-size: var(--text-guest-body);
+  font-weight: var(--weight-medium);
+}
+.dawah-radio__control > span {
+  background: var(--surface-card);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  display: block;
+  height: 20px;
+  transition: var(--transition-control);
+  width: 20px;
+}
+.dawah-radio input:checked + span {
+  border-color: var(--ink);
+  border-width: 6px;
+}
+.dawah-switch {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 16px;
+  justify-content: space-between;
+  min-height: var(--touch-min);
+}
+.dawah-switch:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.dawah-switch__copy > span {
+  font-weight: var(--weight-medium);
+}
+.dawah-switch__control {
+  display: inline-flex;
+  flex: none;
+  height: 24px;
+  position: relative;
+  width: 40px;
+}
+.dawah-switch__track {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+  inset: 0;
+  position: absolute;
+  transition: var(--transition-control);
+}
+.dawah-switch__thumb {
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(23, 20, 15, 0.25);
+  height: 18px;
+  inset-block-start: 3px;
+  inset-inline-start: 3px;
+  position: absolute;
+  transition: inset-inline-start var(--dur-base) var(--ease-out);
+  width: 18px;
+}
+.dawah-switch input:checked ~ .dawah-switch__track {
+  background: var(--accepted);
+}
+.dawah-switch input:checked ~ .dawah-switch__thumb {
+  inset-inline-start: 19px;
+}
+.dawah-stepper {
+  align-items: center;
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  display: inline-flex;
+  height: 40px;
+  overflow: hidden;
+}
+.dawah-stepper button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  flex: none;
+  height: 100%;
+  justify-content: center;
+  width: 40px;
+}
+.dawah-stepper button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.dawah-stepper button:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+.dawah-stepper output {
+  align-items: center;
+  align-self: stretch;
+  border-inline: 1px solid var(--border-default);
+  display: inline-flex;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  justify-content: center;
+  min-width: 44px;
+}
+.dawah-stepper--guest {
+  height: 56px;
+}
+.dawah-stepper--guest button {
+  width: 56px;
+}
+.dawah-stepper--guest output {
+  font-size: var(--text-guest-xl);
+  min-width: 64px;
+}
+.dawah-choice-card {
+  align-items: center;
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
+  gap: 14px;
+  min-height: 56px;
+  padding: 14px 16px;
+  text-align: start;
+  transition: var(--transition-control);
+  width: 100%;
+}
+.dawah-choice-card:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.dawah-choice-card--selected {
+  background: var(--accent-soft);
+  border: 2px solid var(--ink);
+}
+.dawah-choice-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.dawah-choice-card__icon {
+  align-items: center;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  display: inline-flex;
+  flex: none;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+.dawah-choice-card--selected .dawah-choice-card__icon {
+  background: var(--ink);
+  color: var(--text-on-dark);
+}
+.dawah-choice-card__copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dawah-choice-card__copy strong {
+  font-size: var(--text-base);
+  line-height: 1.3;
+}
+.dawah-choice-card__copy > span {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.dawah-choice-card__meta {
+  color: var(--text-muted);
+  flex: none;
+  font-size: var(--text-sm);
+}
+.dawah-choice-card__check {
+  align-items: center;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  color: white;
+  display: inline-flex;
+  flex: none;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+.dawah-choice-card--selected .dawah-choice-card__check {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.dawah-choice-card--guest {
+  background: transparent;
+  border-color: var(--inv-line);
+  min-height: 64px;
+  padding: 16px 18px;
+}
+.dawah-choice-card--guest.dawah-choice-card--selected {
+  background: rgba(154, 118, 66, 0.1);
+  border-color: var(--inv-deep);
+}
+.dawah-choice-card--guest .dawah-choice-card__copy strong {
+  font-size: var(--text-guest-lg);
+}
+.dawah-choice-card--guest .dawah-choice-card__copy > span {
+  font-size: var(--text-base);
+}
+
+/* Feedback */
+.dawah-toast {
+  align-items: flex-start;
+  background: var(--ink);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-overlay);
+  color: var(--text-on-dark);
+  display: flex;
+  gap: 12px;
+  max-width: 100%;
+  padding: 12px 14px;
+  width: 380px;
+}
+.dawah-toast__icon {
+  flex: none;
+  margin-block-start: 1px;
+}
+.dawah-toast--success .dawah-toast__icon {
+  color: var(--success);
+}
+.dawah-toast--error .dawah-toast__icon {
+  color: var(--danger);
+}
+.dawah-toast--warning .dawah-toast__icon {
+  color: var(--warning);
+}
+.dawah-toast--info .dawah-toast__icon {
+  color: var(--info);
+}
+.dawah-toast__copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.dawah-toast__copy strong {
+  font-size: var(--text-md);
+}
+.dawah-toast__copy > span {
+  color: rgba(251, 249, 246, 0.72);
+  font-size: var(--text-sm);
+}
+.dawah-toast__copy > div {
+  margin-block-start: 8px;
+}
+.dawah-toast__dismiss,
+.dawah-toast__dismiss:hover {
+  color: rgba(251, 249, 246, 0.78);
+  margin: -6px;
+}
+.dawah-banner {
+  align-items: flex-start;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.dawah-banner--compact {
+  align-items: center;
+  padding: 10px 14px;
+}
+.dawah-banner__icon {
+  align-items: center;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  flex: none;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+.dawah-banner--danger .dawah-banner__icon {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.dawah-banner--warning .dawah-banner__icon {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.dawah-banner--info .dawah-banner__icon {
+  background: var(--info-bg);
+  color: var(--info);
+}
+.dawah-banner--success .dawah-banner__icon {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.dawah-banner--neutral .dawah-banner__icon {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+.dawah-banner__copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.dawah-banner__copy strong {
+  font-size: var(--text-md);
+}
+.dawah-banner__copy span {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.dawah-banner__actions {
+  align-items: center;
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+.dawah-skeleton {
+  animation: dawah-shimmer 1.4s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    var(--surface-sunken) 25%,
+    var(--surface-pressed) 50%,
+    var(--surface-sunken) 75%
+  );
+  background-size: 400% 100%;
+  display: block;
+}
+@keyframes dawah-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+/* Data */
+.dawah-phone {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.dawah-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dawah-progress__track {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-pill);
+  display: flex;
+  gap: 2px;
+  overflow: hidden;
+}
+.dawah-progress__segment {
+  transition: width var(--dur-slow) var(--ease-out);
+}
+.dawah-progress__segment--accepted,
+.dawah-progress__key--accepted {
+  background: var(--accepted);
+}
+.dawah-progress__segment--partial,
+.dawah-progress__key--partial {
+  background: var(--partial);
+}
+.dawah-progress__segment--declined,
+.dawah-progress__key--declined {
+  background: var(--declined);
+}
+.dawah-progress__segment--pending,
+.dawah-progress__key--pending {
+  background: var(--pending);
+}
+.dawah-progress__segment--notsent,
+.dawah-progress__key--notsent {
+  background: var(--notsent);
+}
+.dawah-progress__segment--checkedin,
+.dawah-progress__key--checkedin {
+  background: var(--checkedin);
+}
+.dawah-progress__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.dawah-progress__legend > span {
+  align-items: center;
+  display: inline-flex;
+  font-size: var(--text-sm);
+  gap: 8px;
+}
+.dawah-progress__legend i {
+  border-radius: 3px;
+  height: 10px;
+  width: 10px;
+}
+.dawah-progress__legend > span > span:last-child {
+  color: var(--text-muted);
+}
+.dawah-funnel {
+  align-items: stretch;
+  display: flex;
+  gap: 8px;
+}
+.dawah-funnel__group {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+}
+.dawah-funnel__step {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  grid-template-columns: auto 1fr;
+  min-width: 0;
+}
+.dawah-funnel__step > span {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  grid-column: 1 / -1;
+}
+.dawah-funnel__step strong {
+  font-size: var(--text-2xl);
+  line-height: 1;
+}
+.dawah-funnel__step small {
+  align-self: end;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.dawah-funnel__step > i {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-pill);
+  grid-column: 1 / -1;
+  height: 6px;
+  overflow: hidden;
+}
+.dawah-funnel__step > i span {
+  background: var(--ink);
+  display: block;
+  height: 100%;
+}
+.dawah-funnel__group:last-child .dawah-funnel__step > i span {
+  background: var(--accepted);
+}
+.dawah-funnel__group > svg {
+  color: var(--text-disabled);
+  flex: none;
+}
+.dawah-timeline {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dawah-timeline li {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  padding-block-end: 18px;
+  position: relative;
+}
+.dawah-timeline--dense li {
+  padding-block-end: 12px;
+}
+.dawah-timeline li:not(:last-child)::before {
+  background: var(--border-default);
+  content: "";
+  inset-block: 20px 0;
+  inset-inline-start: 9px;
+  position: absolute;
+  width: 2px;
+}
+.dawah-timeline__marker {
+  align-items: center;
+  align-self: start;
+  background: var(--notsent);
+  border-radius: 50%;
+  color: white;
+  display: inline-flex;
+  height: 20px;
+  justify-content: center;
+  position: relative;
+  width: 20px;
+  z-index: 1;
+}
+.dawah-timeline__marker--accepted {
+  background: var(--accepted);
+}
+.dawah-timeline__marker--declined {
+  background: var(--declined);
+}
+.dawah-timeline__marker--pending {
+  background: var(--pending);
+}
+.dawah-timeline__marker--partial {
+  background: var(--partial);
+}
+.dawah-timeline__marker--checkedin {
+  background: var(--checkedin);
+}
+.dawah-timeline__item--hollow .dawah-timeline__marker {
+  background: var(--surface-card);
+  border: 2px solid var(--notsent);
+}
+.dawah-timeline li > div {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--text-md);
+  line-height: 1.4;
+  min-width: 0;
+}
+.dawah-timeline li > div small,
+.dawah-timeline time {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.dawah-timeline__strong {
+  font-weight: var(--weight-semibold);
+}
+.dawah-table-wrap {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.dawah-table-scroll {
+  overflow-x: auto;
+}
+.dawah-table-wrap table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-md);
+  width: 100%;
+}
+.dawah-table-wrap th,
+.dawah-table-wrap td {
+  padding: 12px 14px;
+  text-align: start;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.dawah-table-wrap--dense th,
+.dawah-table-wrap--dense td {
+  padding: 8px 12px;
+}
+.dawah-table-wrap th {
+  background: var(--surface-sunken);
+  border-block-end: 1px solid var(--border-default);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  inset-block-start: 0;
+  position: sticky;
+  z-index: 1;
+}
+.dawah-table-wrap tbody tr:not(:last-child) td {
+  border-block-end: 1px solid var(--border-default);
+}
+.dawah-table-wrap tbody tr {
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.dawah-table-wrap tbody tr:hover,
+.dawah-table-wrap tbody tr:focus-visible {
+  background: var(--surface-hover);
+}
+.dawah-table-wrap tbody tr[data-selected="true"] {
+  background: var(--accent-soft);
+}
+.dawah-table__select {
+  width: 52px;
+}
+.dawah-table__action {
+  text-align: center !important;
+  width: 52px;
+}
+.dawah-table-card__content {
+  flex: 1;
+  min-width: 0;
+}
+.dawah-table-card__action {
+  margin-inline-start: auto;
+}
+.dawah-table__align--center {
+  text-align: center !important;
+}
+.dawah-table__align--end {
+  text-align: end !important;
+}
+.dawah-table__wrap {
+  white-space: normal !important;
+}
+.dawah-table-cards {
+  display: none;
+}
+
+/* Overlays */
+.dawah-drawer {
+  background: var(--surface-card);
+  border: 0;
+  border-inline-start: 1px solid var(--border-default);
+  box-shadow: var(--shadow-overlay);
+  color: var(--text-body);
+  height: 100dvh;
+  inset-block: 0;
+  inset-inline-end: 0;
+  inset-inline-start: auto;
+  margin: 0;
+  max-height: 100dvh;
+  max-width: min(var(--drawer-w), 100vw);
+  padding: 0;
+  width: 100%;
+}
+.dawah-drawer[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.dawah-drawer::backdrop {
+  background: var(--scrim);
+}
+.dawah-drawer > header,
+.dawah-drawer > footer {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+}
+.dawah-drawer > header {
+  border-block-end: 1px solid var(--border-default);
+}
+.dawah-drawer > footer {
+  border-block-start: 1px solid var(--border-default);
+  justify-content: flex-end;
+}
+.dawah-drawer h2 {
+  font-size: var(--text-lg);
+  margin: 0;
+}
+.dawah-drawer header p {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  margin: 2px 0 0;
+}
+.dawah-drawer__body {
+  overflow: auto;
+  padding: var(--space-5);
+}
+
+/* Responsive host and guest foundations */
+.dawah-host-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-height: 100dvh;
+  transition: grid-template-columns var(--dur-slow) var(--ease-out);
+}
+.dawah-host-shell--collapsed {
+  grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr);
+}
+.dawah-host-shell__sidebar {
+  background: var(--surface-card);
+  border-inline-end: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  height: 100dvh;
+  inset-block-start: 0;
+  min-width: 0;
+  padding: var(--space-5) var(--space-3);
+  position: sticky;
+}
+.dawah-host-shell__brand {
+  min-height: 40px;
+  overflow: hidden;
+  padding-inline: var(--space-2);
+}
+.dawah-host-nav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.dawah-host-nav__item {
+  align-items: center;
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
+  display: flex;
+  gap: var(--space-3);
+  min-height: var(--touch-min);
+  overflow: hidden;
+  padding: 9px 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dawah-host-nav__item:hover {
+  background: var(--surface-hover);
+  color: var(--text-body);
+  text-decoration: none;
+}
+.dawah-host-nav__item[aria-current="page"] {
+  background: var(--ink);
+  color: var(--text-on-dark);
+  font-weight: var(--weight-semibold);
+}
+.dawah-host-nav__item svg {
+  flex: none;
+}
+.dawah-host-nav__badge {
+  background: var(--danger-bg);
+  border-radius: var(--radius-pill);
+  color: var(--danger-fg);
+  font-size: var(--text-xs);
+  margin-inline-start: auto;
+  padding: 1px 7px;
+}
+.dawah-host-shell__utility {
+  overflow: hidden;
+}
+.dawah-host-shell__collapse {
+  align-self: flex-end;
+}
+.dawah-host-shell--collapsed .dawah-host-nav__label,
+.dawah-host-shell--collapsed .dawah-host-nav__badge,
+.dawah-host-shell--collapsed .dawah-host-shell__utility,
+.dawah-host-shell--collapsed .dawah-host-shell__brand > :not(:first-child) {
+  display: none;
+}
+.dawah-host-shell--collapsed .dawah-host-nav__item {
+  justify-content: center;
+  padding-inline: 0;
+}
+.dawah-host-shell__workspace {
+  min-width: 0;
+}
+.dawah-host-shell__topbar {
+  align-items: center;
+  background: var(--surface-card);
+  border-block-end: 1px solid var(--border-default);
+  display: flex;
+  height: var(--topbar-h);
+  inset-block-start: 0;
+  justify-content: space-between;
+  padding-inline: var(--gutter);
+  position: sticky;
+  z-index: 10;
+}
+.dawah-host-shell__compact-utility {
+  display: none;
+  flex: none;
+}
+.dawah-host-shell--collapsed .dawah-host-shell__compact-utility {
+  display: block;
+}
+.dawah-host-shell__main {
+  margin-inline: auto;
+  max-width: var(--content-max);
+  padding: var(--space-8) var(--gutter);
+  width: 100%;
+}
+.dawah-bottom-nav {
+  display: none;
+}
+.dawah-guest-shell {
+  align-items: center;
+  background: var(--inv-cream-2);
+  color: var(--inv-deep);
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: var(--space-5);
+}
+.dawah-guest-card {
+  background: var(--inv-cream);
+  border: 1px solid var(--inv-line);
+  border-radius: 38px;
+  box-shadow: var(--shadow-invitation);
+  max-width: var(--guest-w);
+  overflow: hidden;
+  width: 100%;
+}
+.dawah-guest-card > header {
+  border-block-end: 1px solid var(--inv-line);
+  padding: var(--space-10) var(--space-6) var(--space-8);
+  text-align: center;
+}
+.dawah-guest-card > header p:first-child {
+  color: var(--accent-hover);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  margin: 0 0 var(--space-3);
+}
+.dawah-guest-card h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-display-sm);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-snug);
+  margin: 0;
+}
+[lang="en"] .dawah-guest-card h1 {
+  font-family: var(--font-display-latin);
+}
+.dawah-guest-card > header p:last-child:not(:first-child) {
+  font-size: var(--text-guest-body);
+  line-height: var(--leading-relaxed);
+  margin: var(--space-3) 0 0;
+}
+.dawah-guest-card__body {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--text-guest-body);
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+.dawah-guest-card > footer {
+  border-block-start: 1px solid var(--inv-line);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  padding: var(--space-4) var(--space-6);
+  text-align: center;
+}
+
+@media (max-width: 1100px) and (min-width: 801px) {
+  .dawah-host-shell {
+    grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr);
+  }
+  .dawah-host-nav__label,
+  .dawah-host-nav__badge,
+  .dawah-host-shell__utility,
+  .dawah-host-shell__collapse {
+    display: none;
+  }
+  .dawah-host-nav__item {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .dawah-host-shell__compact-utility {
+    display: block;
+  }
+}
+@media (max-width: 900px) {
+  .dawah-table-wrap--responsive {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+  .dawah-table-wrap--responsive .dawah-table-scroll {
+    display: none;
+  }
+  .dawah-table-wrap--responsive .dawah-table-cards {
+    display: grid;
+    gap: var(--space-3);
+  }
+  .dawah-table-cards article {
+    align-items: flex-start;
+    background: var(--surface-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-card);
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+  .dawah-table-cards article[data-selected="true"] {
+    background: var(--accent-soft);
+    border-color: var(--accent-soft-2);
+  }
+  .dawah-funnel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .dawah-funnel__group > svg {
+    display: none;
+  }
+}
+@media (max-width: 800px) {
+  .dawah-host-shell,
+  .dawah-host-shell--collapsed {
+    display: block;
+    padding-block-end: 72px;
+  }
+  .dawah-host-shell__sidebar {
+    display: none;
+  }
+  .dawah-host-shell__compact-utility {
+    display: block;
+  }
+  .dawah-bottom-nav {
+    background: var(--surface-card);
+    border-block-start: 1px solid var(--border-default);
+    bottom: 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    inset-inline: 0;
+    padding: 6px max(8px, env(safe-area-inset-right))
+      max(6px, env(safe-area-inset-bottom));
+    position: fixed;
+    z-index: 30;
+  }
+  .dawah-bottom-nav .dawah-host-nav__item {
+    flex-direction: column;
+    font-size: 10px;
+    gap: 2px;
+    justify-content: center;
+    min-height: 54px;
+    padding: 4px;
+    text-align: center;
+  }
+  .dawah-bottom-nav .dawah-host-nav__badge {
+    inset-block-start: 2px;
+    inset-inline-end: 20%;
+    margin: 0;
+    position: absolute;
+  }
+  .dawah-host-shell__main {
+    padding: var(--space-6) var(--space-4);
+  }
+  .dawah-banner {
+    flex-wrap: wrap;
+  }
+  .dawah-banner__actions {
+    justify-content: flex-end;
+    width: 100%;
+  }
+}
+@media (max-width: 480px) {
+  .dawah-guest-shell {
+    align-items: stretch;
+    padding: 0;
+  }
+  .dawah-guest-card {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    max-width: none;
+    min-height: 100dvh;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }

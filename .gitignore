@@ -2,6 +2,9 @@ node_modules/
 .pnpm-store/
 .turbo/
 .next/
+storybook-static/
+playwright-report/
+test-results/
 dist/
 coverage/
 *.tsbuildinfo

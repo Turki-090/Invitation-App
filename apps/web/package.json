@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "build-storybook": "node scripts/run-storybook.mjs build --quiet",
     "dev": "next dev",
     "start": "next start",
-    "test": "vitest run --passWithNoTests",
+    "storybook": "node scripts/run-storybook.mjs dev -p 6006 --no-open",
+    "test:storybook": "playwright test",
+    "test": "vitest run --passWithNoTests --exclude tests/storybook/**",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -25,10 +28,16 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@dawah/typescript-config": "workspace:*",
+    "@playwright/test": "1.63.0",
+    "@storybook/addon-a11y": "10.6.0",
+    "@storybook/addon-docs": "10.6.0",
+    "@storybook/nextjs-vite": "10.6.0",
     "@types/node": "24.10.13",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
+    "storybook": "10.6.0",
     "typescript": "5.9.3",
     "vitest": "3.2.7"
   }

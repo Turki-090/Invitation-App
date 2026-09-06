@@ -93,7 +93,7 @@ These percentages are planning indicators, not delivery estimates.
 - Add reviewed forward migrations; never use `db push` as a release mechanism.
 - Do not advance a stage while its exit gate has blocking failures.
 
-## Ten-stage production roadmap
+## Eleven-stage production roadmap
 
 ### Stage 1 — Harden the engineering baseline
 
@@ -130,6 +130,8 @@ Verification record:
 
 Goal: make the supplied design system the reusable, tested foundation for every host and guest screen.
 
+Status: **Complete** — exit gate verified on 2026-09-06.
+
 Work:
 
 - Port the remaining supplied components, including navigation, selection, table, drawer, toast, banner, progress, timeline, phone, and guest controls.
@@ -143,6 +145,15 @@ Exit gate:
 
 - All components needed by the host dashboard and guest RSVP journey are typed, documented, accessible, and visually verified in RTL and LTR.
 - No critical user journey depends on a missing design-system primitive.
+
+Verification record:
+
+- All 30 supplied component families plus `HostShell`, `Drawer`, and `GuestShell` are exported from the typed `@dawah/ui` package and documented with their responsive and accessibility contracts.
+- Locale-prefixed `ar-SA` and `en` routes, dictionary parity, `Accept-Language` redirects, RTL/LTR document direction, and localized reusable-component copy are implemented and tested.
+- Pinned local Fontsource packages provide the Arabic, Latin, display, and monospaced production fonts without a runtime third-party font dependency.
+- Storybook builds 15 state, catalogue, host, and guest stories; 22 locale-and-viewport axe cases pass with zero violations, and 20 committed RTL/LTR visual baselines pass unchanged.
+- The full suite passes 40 unit/contract tests and 2 real-PostgreSQL integration tests, including keyboard, selection, required-field, responsive action, funnel semantics, locale, and proxy coverage.
+- Frozen installation, generation, format, lint, OpenAPI drift, type checks, production web/API/worker builds, tracked-artifact checks, live startup smoke, production image builds, and API/worker container readiness all pass.
 
 ### Stage 3 — Complete event onboarding and the event workspace
 
@@ -302,6 +313,30 @@ Exit gate:
 - The pilot succeeds without data-isolation, message-duplication, attendance-count, privacy, or recovery failures.
 - Product, engineering, security, operations, and business owners approve general availability.
 
+### Stage 11 — Guest import from Excel / CSV
+
+Goal: add a secure, reviewable bulk guest-import experience after Stage 10 release readiness is complete, without changing the established guest-management architecture.
+
+Status: **Planned** — scheduled after Stage 10.
+
+Work:
+
+- Add an **Import Guests** action alongside manual guest creation, including empty-state guidance and downloadable Arabic and English Excel templates.
+- Support private `.xlsx`, reasonable `.xls`, and UTF-8 CSV uploads (including Arabic and detectable comma/semicolon delimiters), with file type, size, and parser-limit validation.
+- Parse the first relevant worksheet safely, read cell values only, ignore empty rows, and detect Arabic/English name and phone headers; provide worksheet selection and manual column mapping when detection is uncertain.
+- Normalize Saudi numbers to E.164 with an established phone parser while preserving valid international numbers; validate required name and phone fields before any persistence.
+- Show a pre-import preview with totals, ready rows, invalid rows, missing phones, and duplicates; allow row corrections and make skipping duplicates the default.
+- Detect duplicate normalized phone numbers within the upload and against the current event, and provide explicit skip or update behavior for existing guests.
+- Add an authorized backend preview/confirmation flow that validates before insertion and creates accepted guests in a single transaction or bulk operation, never one request per guest.
+- Reuse the existing invitation-group and guest-member models, validation, permissions, audit conventions, and downstream WhatsApp/invitation workflows; add import-batch metadata to support auditing and future undo.
+- Ensure temporary uploaded files are private, never publicly exposed, and deleted once parsing is complete unless a later approved retention policy requires otherwise.
+- Add domain, API, integration, accessibility, RTL/LTR UI, malformed-file, Arabic CSV, duplicate, phone-normalization, authorization, and large-file tests.
+
+Exit gate:
+
+- An authorized owner or manager can upload an Arabic or English Excel/CSV guest list, map uncertain columns, review validation and duplicates, and import valid guests in one confirmed operation.
+- Imported guests immediately behave exactly like manually created guests across guest management, invitations, and WhatsApp workflows, with no public access to original files or cross-event data exposure.
+
 ## Release milestones
 
 | Milestone                          | Required stages                   | Audience                                                        |
@@ -311,8 +346,9 @@ Exit gate:
 | Messaging/RSVP staging beta        | Stages 6–8                        | Selected stakeholders using non-production provider credentials |
 | Controlled real-event pilot        | Stage 9 plus Stage 10 pilot gates | A small number of explicitly supported Saudi events             |
 | Production v1 general availability | All Stage 10 exit criteria        | Public hosts                                                    |
+| Guest import enhancement           | Stage 11                          | Hosts importing existing guest lists after the Stage 10 release |
 | Native host/check-in applications  | Post-release roadmap              | iOS and Android users after the API is stable                   |
 
 ## Immediate next action
 
-Begin Stage 2 by completing the reusable design-system primitives, documenting their RTL/LTR and responsive states in Storybook, and establishing the `ar-SA` and `en` localization and accessibility baselines. Keep the Stage 1 configuration, contract, integration, and runtime gates green while product screens are expanded.
+Begin Stage 3 with event-scoped membership resolution and the event detail, update, archive, status-transition, and dashboard-summary APIs, then build the multi-step onboarding flow and real event workspace on the completed Stage 2 shell. Keep the Stage 1 and Stage 2 gates green as the product surface expands.
