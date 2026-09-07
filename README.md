@@ -80,6 +80,10 @@ The component catalogue, RTL/LTR rules, responsive contract, and accessibility
 verification are documented in
 [`docs/design-system-stage2.md`](docs/design-system-stage2.md).
 
+The Stage 3 event routes, membership boundary, lifecycle matrix, aggregate
+semantics, and date/map safety rules are documented in
+[`docs/event-workspace-stage3.md`](docs/event-workspace-stage3.md).
+
 ## API contract workflow
 
 `openapi/openapi.yaml` is the only public transport-contract source. After a

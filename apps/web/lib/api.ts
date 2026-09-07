@@ -22,6 +22,10 @@ export class ApiClientError extends Error {
 
 type CreateEvent = components["schemas"]["CreateEvent"];
 type EventSummary = components["schemas"]["EventSummary"];
+type UpdateEvent = components["schemas"]["UpdateEvent"];
+type EventDetail = components["schemas"]["EventDetail"];
+type EventDashboardSummary = components["schemas"]["EventDashboardSummary"];
+type EventStatus = components["schemas"]["EventStatus"];
 
 export async function listEvents(
   supabase: SupabaseClient | null,
@@ -40,6 +44,85 @@ export async function createEvent(
   const { data, error, response } = await client.POST("/events", {
     body: input,
   });
+  if (!data) throwApiError(error, response.status);
+  return data;
+}
+
+export async function getEvent(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<EventDetail> {
+  const client = await authenticatedClient(supabase);
+  const { data, error, response } = await client.GET("/events/{eventId}", {
+    params: { path: { eventId } },
+  });
+  if (!data) throwApiError(error, response.status);
+  return data;
+}
+
+export async function getEventDashboard(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<EventDashboardSummary> {
+  const client = await authenticatedClient(supabase);
+  const { data, error, response } = await client.GET(
+    "/events/{eventId}/dashboard",
+    { params: { path: { eventId } } },
+  );
+  if (!data) throwApiError(error, response.status);
+  return data;
+}
+
+export async function updateEvent(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: UpdateEvent,
+): Promise<EventDetail> {
+  const client = await authenticatedClient(supabase);
+  const { data, error, response } = await client.PATCH("/events/{eventId}", {
+    params: { path: { eventId } },
+    body: input,
+  });
+  if (!data) throwApiError(error, response.status);
+  return data;
+}
+
+export async function archiveEvent(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<EventDetail> {
+  const client = await authenticatedClient(supabase);
+  const { data, error, response } = await client.POST(
+    "/events/{eventId}/archive",
+    { params: { path: { eventId } } },
+  );
+  if (!data) throwApiError(error, response.status);
+  return data;
+}
+
+export async function recoverEvent(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<EventDetail> {
+  const client = await authenticatedClient(supabase);
+  const { data, error, response } = await client.POST(
+    "/events/{eventId}/recovery-request",
+    { params: { path: { eventId } } },
+  );
+  if (!data) throwApiError(error, response.status);
+  return data;
+}
+
+export async function transitionEventStatus(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  status: Exclude<EventStatus, "ARCHIVED">,
+): Promise<EventDetail> {
+  const client = await authenticatedClient(supabase);
+  const { data, error, response } = await client.POST(
+    "/events/{eventId}/status-transitions",
+    { params: { path: { eventId } }, body: { status } },
+  );
   if (!data) throwApiError(error, response.status);
   return data;
 }
