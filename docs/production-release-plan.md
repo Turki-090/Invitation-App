@@ -1,6 +1,6 @@
 # Dawah production and release plan
 
-Status date: 2026-09-06
+Status date: 2026-09-07
 
 The “Current position” section preserves the pre-Stage 1 baseline captured on
 2026-09-05. Dated completion records under each roadmap stage are authoritative.
@@ -159,6 +159,8 @@ Verification record:
 
 Goal: deliver the full MVP 2 event lifecycle and a stable place for later modules to live.
 
+Status: **Complete** — exit gate verified on 2026-09-07.
+
 Work:
 
 - Add get, update, archive, recovery-request, status-transition, and dashboard-summary event endpoints.
@@ -172,6 +174,16 @@ Exit gate:
 
 - A host can create, open, edit, switch, and archive events through tested APIs and the responsive UI.
 - User A cannot access or mutate User B's event in automated integration tests.
+
+Verification record:
+
+- The canonical OpenAPI contract, generated TypeScript client, NestJS controller, and runtime Zod schemas cover event detail, update, archive, audited recovery, lifecycle transition, and dashboard summary without generation drift or lint warnings.
+- Every event read and mutation resolves an active event membership and required capability. Missing events, non-members, and revoked members share the anti-enumeration `404` path; active members without permission receive `403`.
+- The localized four-step onboarding wizard, real “Open event” routes, event switcher, responsive overview, settings form, lifecycle controls, archive confirmation, recovery action, and loading/error/zero states are implemented in Arabic RTL and English LTR.
+- PostgreSQL computes explicit invitation-group, named-guest, expected-attendee, and RSVP-group aggregates; calendar dates, local wall-clock times, IANA zones, map destinations, lifecycle edges, and archive recovery semantics have canonical validation and documentation.
+- 51 unit/contract/component tests and 8 real-PostgreSQL integration tests pass. The integration suite denies User A across every read and mutation on User B's event and verifies that no cross-tenant mutation occurs.
+- Format, lint, OpenAPI validation/drift, type checks, production web/API/worker builds, tracked-artifact checks, startup smoke, 42 Storybook accessibility/visual cases, and production API/worker container readiness all pass.
+- Live browser verification passed for the seeded English desktop workspace, English mobile workspace/settings, and Arabic RTL mobile overview/onboarding, with no horizontal overflow or browser-console errors.
 
 ### Stage 4 — Deliver invitation groups and guest management
 
@@ -351,4 +363,4 @@ Exit gate:
 
 ## Immediate next action
 
-Begin Stage 3 with event-scoped membership resolution and the event detail, update, archive, status-transition, and dashboard-summary APIs, then build the multi-step onboarding flow and real event workspace on the completed Stage 2 shell. Keep the Stage 1 and Stage 2 gates green as the product surface expands.
+Begin Stage 4 with invitation-group and guest invariants at the domain and transaction boundaries, then add event-scoped CRUD, search, filtering, pagination, duplicate decisions, phone normalization/masking, and the supplied guest-management UI. Keep all Stage 1–3 gates green while the first high-volume host workflow is added.

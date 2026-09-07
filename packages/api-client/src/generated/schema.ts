@@ -56,6 +56,110 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/events/{eventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** Get an accessible event */
+        get: operations["getEvent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update event settings */
+        patch: operations["updateEvent"];
+        trace?: never;
+    };
+    "/events/{eventId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive an event */
+        post: operations["archiveEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/recovery-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recover an archived event
+         * @description Restores the status captured by the latest archive audit record, or DRAFT when legacy audit metadata is unavailable.
+         */
+        post: operations["recoverEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/status-transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transition an event lifecycle status */
+        post: operations["transitionEventStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** Get server-computed event dashboard aggregates */
+        get: operations["getEventDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -79,46 +183,168 @@ export type components = {
                 redis: "ok";
             };
         };
+        /** @enum {string} */
+        EventType: "WEDDING" | "ENGAGEMENT" | "RECEPTION" | "GRADUATION" | "PRIVATE_EVENT" | "OTHER";
+        /** @enum {string} */
+        EventStatus: "DRAFT" | "ACTIVE" | "RSVP_OPEN" | "RSVP_CLOSED" | "EVENT_DAY" | "COMPLETED" | "ARCHIVED";
+        /** @enum {string} */
+        MembershipRole: "OWNER" | "CO_HOST" | "CHECK_IN_STAFF";
         CreateEvent: {
             nameAr: string;
             nameEn?: string;
-            eventType: string;
+            eventType: components["schemas"]["EventType"];
             /** Format: date */
             eventDate: string;
             startTime: string;
             endTime?: string;
-            /** @example Asia/Riyadh */
+            /**
+             * @description Valid IANA time-zone identifier.
+             * @example Asia/Riyadh
+             */
             timezone: string;
             venueNameAr: string;
             venueNameEn?: string;
             city: string;
-            /** Format: uri */
+            /** Format: double */
+            latitude?: number;
+            /** Format: double */
+            longitude?: number;
+            /**
+             * Format: uri
+             * @description HTTPS Google Maps or Apple Maps URL.
+             */
             mapUrl?: string;
             /** Format: date */
             rsvpDeadline?: string;
             /** @default true */
             allowRsvpEdits: boolean;
+            /** @default false */
+            qrEnabled: boolean;
+        };
+        UpdateEvent: {
+            nameAr?: string;
+            nameEn?: string | null;
+            eventType?: components["schemas"]["EventType"];
+            /** Format: date */
+            eventDate?: string;
+            startTime?: string;
+            endTime?: string | null;
+            /** @description Valid IANA time-zone identifier. */
+            timezone?: string;
+            venueNameAr?: string;
+            venueNameEn?: string | null;
+            city?: string;
+            /** Format: double */
+            latitude?: number | null;
+            /** Format: double */
+            longitude?: number | null;
+            /**
+             * Format: uri
+             * @description HTTPS Google Maps or Apple Maps URL.
+             */
+            mapUrl?: string | null;
+            /** Format: date */
+            rsvpDeadline?: string | null;
+            allowRsvpEdits?: boolean;
+            qrEnabled?: boolean;
         };
         EventSummary: {
             /** Format: uuid */
             id: string;
             nameAr: string;
             nameEn: string | null;
-            eventType: string;
+            eventType: components["schemas"]["EventType"];
             /** Format: date */
             eventDate: string;
             timezone: string;
             venueNameAr: string;
+            venueNameEn: string | null;
             city: string;
+            status: components["schemas"]["EventStatus"];
+            role: components["schemas"]["MembershipRole"];
+        };
+        EventDetail: {
+            /** Format: uuid */
+            id: string;
+            nameAr: string;
+            nameEn: string | null;
+            eventType: components["schemas"]["EventType"];
+            /** Format: date */
+            eventDate: string;
+            startTime: string;
+            endTime: string | null;
+            timezone: string;
+            venueNameAr: string;
+            venueNameEn: string | null;
+            city: string;
+            /** Format: double */
+            latitude: number | null;
+            /** Format: double */
+            longitude: number | null;
+            /** Format: uri */
+            mapUrl: string | null;
+            /** Format: date */
+            rsvpDeadline: string | null;
+            allowRsvpEdits: boolean;
+            qrEnabled: boolean;
+            status: components["schemas"]["EventStatus"];
+            role: components["schemas"]["MembershipRole"];
+            availableTransitions: components["schemas"]["EventStatus"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        TransitionEventStatus: {
             /** @enum {string} */
-            status: "DRAFT" | "ACTIVE" | "RSVP_OPEN" | "RSVP_CLOSED" | "EVENT_DAY" | "COMPLETED" | "ARCHIVED";
-            /** @enum {string} */
-            role: "OWNER" | "CO_HOST" | "CHECK_IN_STAFF";
+            status: "DRAFT" | "ACTIVE" | "RSVP_OPEN" | "RSVP_CLOSED" | "EVENT_DAY" | "COMPLETED";
+        };
+        EventDashboardSummary: {
+            /** Format: uuid */
+            eventId: string;
+            invitationGroups: number;
+            namedGuests: number;
+            expectedAttendees: number;
+            rsvp: {
+                acceptedGroups: number;
+                partialGroups: number;
+                declinedGroups: number;
+                pendingGroups: number;
+            };
         };
     };
     responses: {
         /** @description Missing, invalid, or expired host token. */
         Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ApiError"];
+            };
+        };
+        /** @description The active event membership lacks the required capability. */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ApiError"];
+            };
+        };
+        /** @description The event does not exist or is not accessible to this principal. */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ApiError"];
+            };
+        };
+        /** @description The operation conflicts with the current event lifecycle state. */
+        Conflict: {
             headers: {
                 [name: string]: unknown;
             };
@@ -154,7 +380,10 @@ export type components = {
             };
         };
     };
-    parameters: never;
+    parameters: {
+        /** @description Event UUID. */
+        EventId: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -216,7 +445,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Events available through active event memberships. */
+            /** @description Non-archived events available through active event memberships. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -253,6 +482,182 @@ export interface operations {
             };
             400: components["responses"]["ValidationError"];
             401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Full event settings for an active event member. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    updateEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEvent"];
+            };
+        };
+        responses: {
+            /** @description Updated event settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDetail"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    archiveEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event archived without deleting its operational history. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    recoverEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event recovered and returned to its pre-archive lifecycle status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    transitionEventStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitionEventStatus"];
+            };
+        };
+        responses: {
+            /** @description Event transitioned according to the lifecycle policy. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDetail"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getEventDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Counts exclude cancelled invitation groups and remain explicit by business unit. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDashboardSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
         };
     };

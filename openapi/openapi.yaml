@@ -54,7 +54,7 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Events available through active event memberships.
+          description: Non-archived events available through active event memberships.
           content:
             application/json:
               schema:
@@ -81,15 +81,159 @@ paths:
         "400": { $ref: "#/components/responses/ValidationError" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: Get an accessible event
+      tags: [events]
+      operationId: getEvent
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Full event settings for an active event member.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    patch:
+      summary: Update event settings
+      tags: [events]
+      operationId: updateEvent
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateEvent" }
+      responses:
+        "200":
+          description: Updated event settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventDetail" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/archive:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Archive an event
+      tags: [events]
+      operationId: archiveEvent
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Event archived without deleting its operational history.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/recovery-request:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Recover an archived event
+      description: Restores the status captured by the latest archive audit record, or DRAFT when legacy audit metadata is unavailable.
+      tags: [events]
+      operationId: recoverEvent
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Event recovered and returned to its pre-archive lifecycle status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/status-transitions:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Transition an event lifecycle status
+      tags: [events]
+      operationId: transitionEventStatus
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TransitionEventStatus" }
+      responses:
+        "200":
+          description: Event transitioned according to the lifecycle policy.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventDetail" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/dashboard:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: Get server-computed event dashboard aggregates
+      tags: [events]
+      operationId: getEventDashboard
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Counts exclude cancelled invitation groups and remain explicit by business unit.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventDashboardSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  parameters:
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      description: Event UUID.
+      schema: { type: string, format: uuid }
   responses:
     Unauthorized:
       description: Missing, invalid, or expired host token.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    Forbidden:
+      description: The active event membership lacks the required capability.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    NotFound:
+      description: The event does not exist or is not accessible to this principal.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    Conflict:
+      description: The operation conflicts with the current event lifecycle state.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
@@ -135,6 +279,16 @@ components:
           properties:
             database: { type: string, const: ok }
             redis: { type: string, const: ok }
+    EventType:
+      type: string
+      enum: [WEDDING, ENGAGEMENT, RECEPTION, GRADUATION, PRIVATE_EVENT, OTHER]
+    EventStatus:
+      type: string
+      enum:
+        [DRAFT, ACTIVE, RSVP_OPEN, RSVP_CLOSED, EVENT_DAY, COMPLETED, ARCHIVED]
+    MembershipRole:
+      type: string
+      enum: [OWNER, CO_HOST, CHECK_IN_STAFF]
     CreateEvent:
       type: object
       additionalProperties: false
@@ -148,21 +302,71 @@ components:
           venueNameAr,
           city,
           allowRsvpEdits,
+          qrEnabled,
         ]
       properties:
         nameAr: { type: string, minLength: 2, maxLength: 120 }
         nameEn: { type: string, minLength: 2, maxLength: 120 }
-        eventType: { type: string, minLength: 2, maxLength: 40 }
+        eventType: { $ref: "#/components/schemas/EventType" }
         eventDate: { type: string, format: date }
         startTime: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
         endTime: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
-        timezone: { type: string, example: Asia/Riyadh }
+        timezone:
+          type: string
+          maxLength: 80
+          example: Asia/Riyadh
+          description: Valid IANA time-zone identifier.
         venueNameAr: { type: string, minLength: 2, maxLength: 160 }
         venueNameEn: { type: string, minLength: 2, maxLength: 160 }
         city: { type: string, minLength: 2, maxLength: 80 }
-        mapUrl: { type: string, format: uri }
+        latitude: { type: number, format: double, minimum: -90, maximum: 90 }
+        longitude: { type: number, format: double, minimum: -180, maximum: 180 }
+        mapUrl:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: HTTPS Google Maps or Apple Maps URL.
         rsvpDeadline: { type: string, format: date }
         allowRsvpEdits: { type: boolean, default: true }
+        qrEnabled: { type: boolean, default: false }
+    UpdateEvent:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        nameAr: { type: string, minLength: 2, maxLength: 120 }
+        nameEn: { type: [string, "null"], minLength: 2, maxLength: 120 }
+        eventType: { $ref: "#/components/schemas/EventType" }
+        eventDate: { type: string, format: date }
+        startTime: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+        endTime:
+          type: [string, "null"]
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+        timezone:
+          type: string
+          maxLength: 80
+          description: Valid IANA time-zone identifier.
+        venueNameAr: { type: string, minLength: 2, maxLength: 160 }
+        venueNameEn: { type: [string, "null"], minLength: 2, maxLength: 160 }
+        city: { type: string, minLength: 2, maxLength: 80 }
+        latitude:
+          type: [number, "null"]
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: [number, "null"]
+          format: double
+          minimum: -180
+          maximum: 180
+        mapUrl:
+          type: [string, "null"]
+          format: uri
+          maxLength: 2048
+          description: HTTPS Google Maps or Apple Maps URL.
+        rsvpDeadline: { type: [string, "null"], format: date }
+        allowRsvpEdits: { type: boolean }
+        qrEnabled: { type: boolean }
     EventSummary:
       type: object
       additionalProperties: false
@@ -175,6 +379,7 @@ components:
           eventDate,
           timezone,
           venueNameAr,
+          venueNameEn,
           city,
           status,
           role,
@@ -183,23 +388,98 @@ components:
         id: { type: string, format: uuid }
         nameAr: { type: string }
         nameEn: { type: [string, "null"] }
-        eventType: { type: string }
+        eventType: { $ref: "#/components/schemas/EventType" }
         eventDate: { type: string, format: date }
         timezone: { type: string }
         venueNameAr: { type: string }
+        venueNameEn: { type: [string, "null"] }
         city: { type: string }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        role: { $ref: "#/components/schemas/MembershipRole" }
+    EventDetail:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          nameAr,
+          nameEn,
+          eventType,
+          eventDate,
+          startTime,
+          endTime,
+          timezone,
+          venueNameAr,
+          venueNameEn,
+          city,
+          latitude,
+          longitude,
+          mapUrl,
+          rsvpDeadline,
+          allowRsvpEdits,
+          qrEnabled,
+          status,
+          role,
+          availableTransitions,
+          createdAt,
+          updatedAt,
+          archivedAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        nameAr: { type: string }
+        nameEn: { type: [string, "null"] }
+        eventType: { $ref: "#/components/schemas/EventType" }
+        eventDate: { type: string, format: date }
+        startTime:
+          type: string
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+        endTime:
+          type: [string, "null"]
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+        timezone: { type: string }
+        venueNameAr: { type: string }
+        venueNameEn: { type: [string, "null"] }
+        city: { type: string }
+        latitude: { type: [number, "null"], format: double }
+        longitude: { type: [number, "null"], format: double }
+        mapUrl: { type: [string, "null"], format: uri }
+        rsvpDeadline: { type: [string, "null"], format: date }
+        allowRsvpEdits: { type: boolean }
+        qrEnabled: { type: boolean }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        role: { $ref: "#/components/schemas/MembershipRole" }
+        availableTransitions:
+          type: array
+          items: { $ref: "#/components/schemas/EventStatus" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        archivedAt: { type: [string, "null"], format: date-time }
+    TransitionEventStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
         status:
           type: string
-          enum:
-            [
-              DRAFT,
-              ACTIVE,
-              RSVP_OPEN,
-              RSVP_CLOSED,
-              EVENT_DAY,
-              COMPLETED,
-              ARCHIVED,
-            ]
-        role:
-          type: string
-          enum: [OWNER, CO_HOST, CHECK_IN_STAFF]
+          enum: [DRAFT, ACTIVE, RSVP_OPEN, RSVP_CLOSED, EVENT_DAY, COMPLETED]
+    EventDashboardSummary:
+      type: object
+      additionalProperties: false
+      required:
+        [eventId, invitationGroups, namedGuests, expectedAttendees, rsvp]
+      properties:
+        eventId: { type: string, format: uuid }
+        invitationGroups: { type: integer, minimum: 0 }
+        namedGuests: { type: integer, minimum: 0 }
+        expectedAttendees: { type: integer, minimum: 0 }
+        rsvp:
+          type: object
+          additionalProperties: false
+          required:
+            [acceptedGroups, partialGroups, declinedGroups, pendingGroups]
+          properties:
+            acceptedGroups: { type: integer, minimum: 0 }
+            partialGroups: { type: integer, minimum: 0 }
+            declinedGroups: { type: integer, minimum: 0 }
+            pendingGroups: { type: integer, minimum: 0 }
