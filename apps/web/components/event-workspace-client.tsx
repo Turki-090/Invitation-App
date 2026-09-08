@@ -37,6 +37,7 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LocaleSwitcher } from "./locale-switcher";
+import { GuestManagement } from "./guest-management";
 import type { AppLocale } from "../i18n/config";
 import type { Dictionary } from "../i18n/dictionaries";
 import {
@@ -50,7 +51,7 @@ import {
 } from "../lib/api";
 import { getSupabaseClient } from "../lib/supabase";
 
-type WorkspaceSection = "overview" | "settings";
+type WorkspaceSection = "overview" | "guests" | "settings";
 type EditableEventStatus = Exclude<EventDetail["status"], "ARCHIVED">;
 
 interface EventWorkspaceClientProps {
@@ -58,6 +59,7 @@ interface EventWorkspaceClientProps {
   locale: AppLocale;
   section: WorkspaceSection;
   copy: Dictionary["workspace"];
+  guestsCopy: Dictionary["guests"];
   eventsCopy: Dictionary["events"];
   common: Dictionary["common"];
   shellCopy: Dictionary["shell"];
@@ -85,6 +87,7 @@ export function EventWorkspaceClient({
   locale,
   section,
   copy,
+  guestsCopy,
   eventsCopy,
   common,
   shellCopy,
@@ -133,6 +136,13 @@ export function EventWorkspaceClient({
       active: section === "overview",
     },
     {
+      id: "guests",
+      label: guestsCopy.navigation,
+      href: `/${locale}/events/${eventId}/guests`,
+      icon: "users" as const,
+      active: section === "guests",
+    },
+    {
       id: "settings",
       label: copy.settings,
       href: `/${locale}/events/${eventId}/settings`,
@@ -167,7 +177,11 @@ export function EventWorkspaceClient({
       navigationLabel={copy.navigationLabel}
       topbar={
         <div className="workspace-topbar">
-          <Link className="workspace-all-events" href={`/${locale}/events`}>
+          <Link
+            aria-label={copy.allEvents}
+            className="workspace-all-events"
+            href={`/${locale}/events`}
+          >
             <Icon flipRtl name="arrow-left" size={16} />
             <span>{copy.allEvents}</span>
           </Link>
@@ -226,6 +240,14 @@ export function EventWorkspaceClient({
             description={copy.loadErrorDescription}
             icon="circle-alert"
             title={copy.loadErrorTitle}
+          />
+        ) : section === "guests" ? (
+          <GuestManagement
+            common={common}
+            copy={guestsCopy}
+            eventId={eventId}
+            locale={locale}
+            supabase={supabase}
           />
         ) : section === "settings" ? (
           <EventSettings

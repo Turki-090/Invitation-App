@@ -7,6 +7,21 @@ export interface InvitationStructure {
   maxCompanions: number;
 }
 
+export interface InvitationMemberStructure {
+  isPrimary: boolean;
+}
+
+export interface InvitationAggregateStructure {
+  invitationType: InvitationType;
+  members: readonly InvitationMemberStructure[];
+  maxCompanions: number;
+}
+
+export interface DuplicateInvitationDecision {
+  duplicateInvitationIds: readonly string[];
+  duplicateOverride: boolean;
+}
+
 export interface RsvpCalculationInput extends InvitationStructure {
   attendingMemberCount: number;
   companionCount: number;
@@ -36,6 +51,32 @@ export function maximumAttendance(input: InvitationStructure): number {
   }
 
   return input.memberCount;
+}
+
+export function validateInvitationAggregate(
+  input: InvitationAggregateStructure,
+): InvitationStructure {
+  const structure: InvitationStructure = {
+    invitationType: input.invitationType,
+    memberCount: input.members.length,
+    primaryMemberCount: input.members.filter((member) => member.isPrimary)
+      .length,
+    maxCompanions: input.maxCompanions,
+  };
+
+  validateInvitationStructure(structure);
+  return structure;
+}
+
+export function validateDuplicateInvitationDecision(
+  input: DuplicateInvitationDecision,
+): void {
+  if (input.duplicateInvitationIds.length > 0 && !input.duplicateOverride) {
+    throw new InvitationInvariantError(
+      "DUPLICATE_PHONE_REQUIRES_OVERRIDE",
+      "Another active invitation in this event uses the same contact phone number.",
+    );
+  }
 }
 
 export function validateInvitationStructure(input: InvitationStructure): void {

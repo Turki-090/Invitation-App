@@ -153,6 +153,9 @@ model InvitationGroup {
   @@index([eventId, rsvpStatus])
   @@index([eventId, phoneE164])
   @@index([eventId, displayName])
+  @@index([eventId, cancelledAt, createdAt(sort: Desc), id])
+  @@index([eventId, invitationType, cancelledAt])
+  @@index([eventId, cancelledAt, expectedAttendees])
   @@map("invitation_groups")
 }
 
@@ -169,6 +172,8 @@ model GuestMember {
   rsvpMember      RsvpMember?
 
   @@unique([invitationGroupId, position])
+  // A partial unique primary-member index and deferred aggregate invariants
+  // are maintained by the Stage 4 SQL migration because Prisma cannot model them.
   @@index([invitationGroupId, isPrimary])
   @@map("guest_members")
 }

@@ -10,11 +10,12 @@ import {
   Permission,
   type Permission as PermissionValue,
 } from "@dawah/domain";
-import type { Prisma, User } from "@prisma/client";
+import type { EventMembership, Prisma, User } from "@prisma/client";
 import type { AuthPrincipal } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 
 type EventAccessClient = PrismaService | Prisma.TransactionClient;
+type EventAccessMembership = Pick<EventMembership, "role" | "permissionsJson">;
 
 const knownPermissions = new Set<PermissionValue>(Object.values(Permission));
 
@@ -63,14 +64,7 @@ export class EventAccessService {
       });
     }
 
-    const role = membership.role as MembershipRole;
-    if (
-      !hasPermission(
-        role,
-        permission,
-        this.permissionOverrides(membership.permissionsJson),
-      )
-    ) {
+    if (!this.allows(membership, permission)) {
       throw new ForbiddenException({
         code: "EVENT_PERMISSION_DENIED",
         message: "The event membership lacks the required permission.",
@@ -78,6 +72,22 @@ export class EventAccessService {
     }
 
     return { user, membership, event: membership.event };
+  }
+
+  /**
+   * Evaluates another capability for an already-resolved membership without
+   * turning an optional capability (such as viewing full phone numbers) into
+   * a failed request.
+   */
+  public allows(
+    membership: EventAccessMembership,
+    permission: PermissionValue,
+  ): boolean {
+    return hasPermission(
+      membership.role as MembershipRole,
+      permission,
+      this.permissionOverrides(membership.permissionsJson),
+    );
   }
 
   private permissionOverrides(value: Prisma.JsonValue): PermissionValue[] {

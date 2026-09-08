@@ -14,6 +14,8 @@ tags:
     description: Service health and readiness checks.
   - name: events
     description: Event lifecycle and event-scoped host access.
+  - name: invitations
+    description: Event-scoped invitation groups and named guest management.
 paths:
   /health/live:
     get:
@@ -203,6 +205,183 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/invitations:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: List invitation groups
+      description: Returns page-based results and explicit invitation-group, named-guest, and expected-attendee totals.
+      tags: [invitations]
+      operationId: listInvitations
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: search
+          in: query
+          schema: { type: string, minLength: 1, maxLength: 120 }
+        - name: invitationType
+          in: query
+          schema: { $ref: "#/components/schemas/InvitationType" }
+        - name: rsvpStatus
+          in: query
+          schema: { $ref: "#/components/schemas/RsvpStatus" }
+        - name: cancellationStatus
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, CANCELLED, ALL]
+            default: ACTIVE
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [DISPLAY_NAME, CREATED_AT, UPDATED_AT, EXPECTED_ATTENDEES]
+            default: CREATED_AT
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+      responses:
+        "200":
+          description: A filtered and sorted page of accessible invitation groups.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      summary: Create an invitation group
+      description: Normalizes the contact phone and atomically persists a domain-valid invitation aggregate.
+      tags: [invitations]
+      operationId: createInvitation
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateInvitation" }
+      responses:
+        "201":
+          description: Invitation group and named members created atomically.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationDetail" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: The event is not writable, or an active invitation uses the normalized phone and explicit override was not supplied.
+          content:
+            application/json:
+              schema:
+                { $ref: "#/components/schemas/InvitationMutationConflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/invitations/bulk-cancel:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Cancel selected invitation groups
+      description: Soft-cancels up to 100 event-owned invitations while preserving operational history.
+      tags: [invitations]
+      operationId: bulkCancelInvitations
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkCancelInvitations" }
+      responses:
+        "200":
+          description: Cancellation result including already-cancelled selections.
+          content:
+            application/json:
+              schema:
+                { $ref: "#/components/schemas/BulkCancelInvitationsResult" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/invitations/{invitationId}:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/InvitationId"
+    get:
+      summary: Get an invitation group
+      tags: [invitations]
+      operationId: getInvitation
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Invitation detail with ordered named members and permission-shaped phone fields.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    patch:
+      summary: Update an invitation group
+      description: Applies a partial edit and validates the merged aggregate inside the transaction.
+      tags: [invitations]
+      operationId: updateInvitation
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateInvitation" }
+      responses:
+        "200":
+          description: Updated invitation aggregate.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationDetail" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: The event or invitation is not writable, an RSVP locks structural edits, or a phone duplicate requires explicit override.
+          content:
+            application/json:
+              schema:
+                { $ref: "#/components/schemas/InvitationMutationConflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/invitations/{invitationId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/InvitationId"
+    post:
+      summary: Cancel an invitation group
+      description: Soft-cancels one event-owned invitation while retaining its members, RSVP data, and audit history.
+      tags: [invitations]
+      operationId: cancelInvitation
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Cancelled invitation detail, or the unchanged detail when it was already cancelled.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
 components:
   securitySchemes:
     bearerAuth:
@@ -215,6 +394,12 @@ components:
       in: path
       required: true
       description: Event UUID.
+      schema: { type: string, format: uuid }
+    InvitationId:
+      name: invitationId
+      in: path
+      required: true
+      description: Invitation-group UUID.
       schema: { type: string, format: uuid }
   responses:
     Unauthorized:
@@ -483,3 +668,232 @@ components:
             partialGroups: { type: integer, minimum: 0 }
             declinedGroups: { type: integer, minimum: 0 }
             pendingGroups: { type: integer, minimum: 0 }
+    InvitationType:
+      type: string
+      enum: [SINGLE, NAMED_GROUP, PRIMARY_WITH_COMPANIONS]
+    RsvpStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, PARTIALLY_ACCEPTED, DECLINED]
+    GccPhoneCountry:
+      type: string
+      enum: [SA, AE, BH, KW, OM, QA]
+    InvitationMemberInput:
+      type: object
+      additionalProperties: false
+      required: [name, isPrimary]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        isPrimary: { type: boolean }
+    CreateInvitation:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          displayName,
+          contactName,
+          phoneNumber,
+          phoneCountry,
+          invitationType,
+          maxCompanions,
+          members,
+          duplicateOverride,
+        ]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 160 }
+        contactName: { type: string, minLength: 1, maxLength: 120 }
+        phoneNumber:
+          type: string
+          minLength: 3
+          maxLength: 40
+          description: National or international phone input validated with libphonenumber metadata.
+        phoneCountry: { $ref: "#/components/schemas/GccPhoneCountry" }
+        invitationType: { $ref: "#/components/schemas/InvitationType" }
+        maxCompanions: { type: integer, minimum: 0, maximum: 100 }
+        internalNote: { type: string, maxLength: 1000 }
+        members:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: "#/components/schemas/InvitationMemberInput" }
+        duplicateOverride:
+          type: boolean
+          description: Explicit host decision to allow a known same-event phone duplicate.
+    UpdateInvitation:
+      type: object
+      additionalProperties: false
+      minProperties: 2
+      required: [duplicateOverride]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 160 }
+        contactName: { type: string, minLength: 1, maxLength: 120 }
+        phoneNumber: { type: string, minLength: 3, maxLength: 40 }
+        phoneCountry: { $ref: "#/components/schemas/GccPhoneCountry" }
+        invitationType: { $ref: "#/components/schemas/InvitationType" }
+        maxCompanions: { type: integer, minimum: 0, maximum: 100 }
+        internalNote: { type: [string, "null"], maxLength: 1000 }
+        members:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: "#/components/schemas/InvitationMemberInput" }
+        duplicateOverride:
+          type: boolean
+          description: Explicit host decision if a changed phone duplicates another active invitation.
+    InvitationMember:
+      type: object
+      additionalProperties: false
+      required: [id, name, isPrimary, position]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        isPrimary: { type: boolean }
+        position: { type: integer, minimum: 1 }
+    InvitationListItem:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          eventId,
+          displayName,
+          contactName,
+          phoneE164,
+          phoneMasked,
+          phoneCountry,
+          phoneIsMasked,
+          invitationType,
+          maxCompanions,
+          namedGuestCount,
+          maximumAttendees,
+          expectedAttendees,
+          rsvpStatus,
+          createdAt,
+          updatedAt,
+          cancelledAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        displayName: { type: string }
+        contactName: { type: string }
+        phoneE164: { type: [string, "null"], pattern: "^\\+[1-9]\\d{7,14}$" }
+        phoneMasked: { type: string, minLength: 1 }
+        phoneCountry: { type: string, pattern: "^[A-Z]{2}$" }
+        phoneIsMasked: { type: boolean }
+        invitationType: { $ref: "#/components/schemas/InvitationType" }
+        maxCompanions: { type: integer, minimum: 0 }
+        namedGuestCount: { type: integer, minimum: 1 }
+        maximumAttendees: { type: integer, minimum: 1 }
+        expectedAttendees: { type: integer, minimum: 0 }
+        rsvpStatus: { $ref: "#/components/schemas/RsvpStatus" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        cancelledAt: { type: [string, "null"], format: date-time }
+    InvitationDetail:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: "#/components/schemas/InvitationListItem"
+        - type: object
+          required: [internalNote, members]
+          properties:
+            internalNote: { type: [string, "null"] }
+            members:
+              type: array
+              minItems: 1
+              items: { $ref: "#/components/schemas/InvitationMember" }
+    InvitationListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, totals, pagination]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InvitationListItem" }
+        totals:
+          type: object
+          additionalProperties: false
+          required: [invitationGroups, namedGuests, expectedAttendees]
+          properties:
+            invitationGroups: { type: integer, minimum: 0 }
+            namedGuests: { type: integer, minimum: 0 }
+            expectedAttendees: { type: integer, minimum: 0 }
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, pageSize, totalItems, totalPages]
+          properties:
+            page: { type: integer, minimum: 1 }
+            pageSize: { type: integer, minimum: 1, maximum: 100 }
+            totalItems: { type: integer, minimum: 0 }
+            totalPages: { type: integer, minimum: 0 }
+    BulkCancelInvitations:
+      type: object
+      additionalProperties: false
+      required: [invitationIds]
+      properties:
+        invitationIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { type: string, format: uuid }
+    BulkCancelInvitationsResult:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          requestedCount,
+          cancelledCount,
+          alreadyCancelledCount,
+          cancelledIds,
+          alreadyCancelledIds,
+        ]
+      properties:
+        requestedCount: { type: integer, minimum: 1 }
+        cancelledCount: { type: integer, minimum: 0 }
+        alreadyCancelledCount: { type: integer, minimum: 0 }
+        cancelledIds:
+          type: array
+          items: { type: string, format: uuid }
+        alreadyCancelledIds:
+          type: array
+          items: { type: string, format: uuid }
+    DuplicateInvitationSummary:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, phoneMasked]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        phoneMasked: { type: string, minLength: 1 }
+    DuplicateInvitationConflictDetails:
+      type: object
+      additionalProperties: false
+      required: [duplicateCount, duplicates, overrideRequired]
+      properties:
+        duplicateCount: { type: integer, minimum: 1 }
+        duplicates:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/DuplicateInvitationSummary" }
+        overrideRequired: { type: boolean, const: true }
+    DuplicateInvitationConflict:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, details]
+          properties:
+            code:
+              type: string
+              const: DUPLICATE_PHONE_REQUIRES_OVERRIDE
+            message: { type: string }
+            details:
+              $ref: "#/components/schemas/DuplicateInvitationConflictDetails"
+    InvitationMutationConflict:
+      description: A general lifecycle conflict or the structured duplicate-phone decision response.
+      anyOf:
+        - $ref: "#/components/schemas/DuplicateInvitationConflict"
+        - $ref: "#/components/schemas/ApiError"

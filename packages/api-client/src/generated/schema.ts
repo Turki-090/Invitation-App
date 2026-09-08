@@ -160,6 +160,107 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/events/{eventId}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List invitation groups
+         * @description Returns page-based results and explicit invitation-group, named-guest, and expected-attendee totals.
+         */
+        get: operations["listInvitations"];
+        put?: never;
+        /**
+         * Create an invitation group
+         * @description Normalizes the contact phone and atomically persists a domain-valid invitation aggregate.
+         */
+        post: operations["createInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/invitations/bulk-cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel selected invitation groups
+         * @description Soft-cancels up to 100 event-owned invitations while preserving operational history.
+         */
+        post: operations["bulkCancelInvitations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/invitations/{invitationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-group UUID. */
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        /** Get an invitation group */
+        get: operations["getInvitation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update an invitation group
+         * @description Applies a partial edit and validates the merged aggregate inside the transaction.
+         */
+        patch: operations["updateInvitation"];
+        trace?: never;
+    };
+    "/events/{eventId}/invitations/{invitationId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-group UUID. */
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an invitation group
+         * @description Soft-cancels one event-owned invitation while retaining its members, RSVP data, and audit history.
+         */
+        post: operations["cancelInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -314,6 +415,122 @@ export type components = {
                 pendingGroups: number;
             };
         };
+        /** @enum {string} */
+        InvitationType: "SINGLE" | "NAMED_GROUP" | "PRIMARY_WITH_COMPANIONS";
+        /** @enum {string} */
+        RsvpStatus: "PENDING" | "ACCEPTED" | "PARTIALLY_ACCEPTED" | "DECLINED";
+        /** @enum {string} */
+        GccPhoneCountry: "SA" | "AE" | "BH" | "KW" | "OM" | "QA";
+        InvitationMemberInput: {
+            name: string;
+            isPrimary: boolean;
+        };
+        CreateInvitation: {
+            displayName: string;
+            contactName: string;
+            /** @description National or international phone input validated with libphonenumber metadata. */
+            phoneNumber: string;
+            phoneCountry: components["schemas"]["GccPhoneCountry"];
+            invitationType: components["schemas"]["InvitationType"];
+            maxCompanions: number;
+            internalNote?: string;
+            members: components["schemas"]["InvitationMemberInput"][];
+            /** @description Explicit host decision to allow a known same-event phone duplicate. */
+            duplicateOverride: boolean;
+        };
+        UpdateInvitation: {
+            displayName?: string;
+            contactName?: string;
+            phoneNumber?: string;
+            phoneCountry?: components["schemas"]["GccPhoneCountry"];
+            invitationType?: components["schemas"]["InvitationType"];
+            maxCompanions?: number;
+            internalNote?: string | null;
+            members?: components["schemas"]["InvitationMemberInput"][];
+            /** @description Explicit host decision if a changed phone duplicates another active invitation. */
+            duplicateOverride: boolean;
+        };
+        InvitationMember: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            isPrimary: boolean;
+            position: number;
+        };
+        InvitationListItem: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            displayName: string;
+            contactName: string;
+            phoneE164: string | null;
+            phoneMasked: string;
+            phoneCountry: string;
+            phoneIsMasked: boolean;
+            invitationType: components["schemas"]["InvitationType"];
+            maxCompanions: number;
+            namedGuestCount: number;
+            maximumAttendees: number;
+            expectedAttendees: number;
+            rsvpStatus: components["schemas"]["RsvpStatus"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            cancelledAt: string | null;
+        };
+        InvitationDetail: components["schemas"]["InvitationListItem"] & {
+            internalNote: string | null;
+            members: components["schemas"]["InvitationMember"][];
+        };
+        InvitationListResponse: {
+            items: components["schemas"]["InvitationListItem"][];
+            totals: {
+                invitationGroups: number;
+                namedGuests: number;
+                expectedAttendees: number;
+            };
+            pagination: {
+                page: number;
+                pageSize: number;
+                totalItems: number;
+                totalPages: number;
+            };
+        };
+        BulkCancelInvitations: {
+            invitationIds: string[];
+        };
+        BulkCancelInvitationsResult: {
+            requestedCount: number;
+            cancelledCount: number;
+            alreadyCancelledCount: number;
+            cancelledIds: string[];
+            alreadyCancelledIds: string[];
+        };
+        DuplicateInvitationSummary: {
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+            phoneMasked: string;
+        };
+        DuplicateInvitationConflictDetails: {
+            duplicateCount: number;
+            duplicates: components["schemas"]["DuplicateInvitationSummary"][];
+            /** @constant */
+            overrideRequired: true;
+        };
+        DuplicateInvitationConflict: {
+            error: {
+                /** @constant */
+                code: "DUPLICATE_PHONE_REQUIRES_OVERRIDE";
+                message: string;
+                details: components["schemas"]["DuplicateInvitationConflictDetails"];
+            };
+        };
+        /** @description A general lifecycle conflict or the structured duplicate-phone decision response. */
+        InvitationMutationConflict: components["schemas"]["DuplicateInvitationConflict"] | components["schemas"]["ApiError"];
     };
     responses: {
         /** @description Missing, invalid, or expired host token. */
@@ -383,6 +600,8 @@ export type components = {
     parameters: {
         /** @description Event UUID. */
         EventId: string;
+        /** @description Invitation-group UUID. */
+        InvitationId: string;
     };
     requestBodies: never;
     headers: never;
@@ -658,6 +877,219 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listInvitations: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                invitationType?: components["schemas"]["InvitationType"];
+                rsvpStatus?: components["schemas"]["RsvpStatus"];
+                cancellationStatus?: "ACTIVE" | "CANCELLED" | "ALL";
+                sortBy?: "DISPLAY_NAME" | "CREATED_AT" | "UPDATED_AT" | "EXPECTED_ATTENDEES";
+                sortOrder?: "ASC" | "DESC";
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A filtered and sorted page of accessible invitation groups. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationListResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    createInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInvitation"];
+            };
+        };
+        responses: {
+            /** @description Invitation group and named members created atomically. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationDetail"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The event is not writable, or an active invitation uses the normalized phone and explicit override was not supplied. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationMutationConflict"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    bulkCancelInvitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkCancelInvitations"];
+            };
+        };
+        responses: {
+            /** @description Cancellation result including already-cancelled selections. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkCancelInvitationsResult"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-group UUID. */
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation detail with ordered named members and permission-shaped phone fields. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    updateInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-group UUID. */
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInvitation"];
+            };
+        };
+        responses: {
+            /** @description Updated invitation aggregate. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationDetail"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The event or invitation is not writable, an RSVP locks structural edits, or a phone duplicate requires explicit override. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationMutationConflict"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    cancelInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-group UUID. */
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled invitation detail, or the unchanged detail when it was already cancelled. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
         };
     };
