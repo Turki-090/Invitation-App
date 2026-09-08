@@ -1,6 +1,6 @@
 # Dawah production and release plan
 
-Status date: 2026-09-07
+Status date: 2026-09-08
 
 The “Current position” section preserves the pre-Stage 1 baseline captured on
 2026-09-05. Dated completion records under each roadmap stage are authoritative.
@@ -189,6 +189,8 @@ Verification record:
 
 Goal: complete the stable guest-management core required before WhatsApp sending.
 
+Status: **Complete** — exit gate verified on 2026-09-08.
+
 Work:
 
 - Add Invitations and Guests modules with create, read, edit, cancel, search, filter, sort, pagination, and bulk-selection APIs.
@@ -203,6 +205,17 @@ Exit gate:
 
 - Hosts can reliably manage hundreds of invitation groups without confusing groups, named people, or expected attendance.
 - All invitation invariants, duplicate decisions, authorization paths, and pagination behavior are tested.
+
+Verification record:
+
+- The canonical OpenAPI contract, generated TypeScript client, NestJS invitation module, and runtime Zod schemas cover event-scoped list, create, detail, edit, single cancel, and bulk cancel, with deterministic search, filters, sorting, and pagination.
+- Domain rules and deferred PostgreSQL transaction constraints enforce every `SINGLE`, `NAMED_GROUP`, and `PRIMARY_WITH_COMPANIONS` shape, including primary-member uniqueness, positive positions, companion limits, RSVP-safe structure edits, and atomic rollback on invalid aggregates.
+- GCC and valid international phones normalize to E.164 while retaining country metadata. Event-scoped duplicate detection is concurrency-safe, requires an explicit host override, and writes append-only audit evidence without exposing phone PII.
+- Every invitation read and mutation uses central event access checks for `guest.*` capabilities. Phone search and full phone values are withheld from unauthorized roles, and cross-tenant reads, edits, cancels, bulk actions, and duplicate probes follow the anti-enumeration path.
+- The localized Arabic RTL and English LTR guest workspace provides responsive table and mobile-card views, invitation metrics, search/filter/sort/pagination, selection and bulk cancel, type-aware add/edit/detail drawers, named-member editing, companion counts, duplicate confirmation, and complete loading, empty, and error states.
+- 81 unit/contract/component tests and 17 real-PostgreSQL integration tests pass. Invitation coverage includes all three group types, transaction failures, duplicate override and concurrent same-phone creation, RSVP edit locks, permission masking, all mutations across tenants, and deterministic navigation through a 125-group fixture.
+- Format, lint, OpenAPI validation/drift, type checks, production web/API/worker builds, tracked-artifact checks, startup smoke, 42 Storybook accessibility/visual cases, and production API/worker container readiness all pass.
+- Live browser verification passed the English desktop creation, duplicate-override, populated-table, and drawer flows plus the Arabic RTL mobile flow, with zero axe violations, horizontal overflow, page errors, or browser-console errors.
 
 ### Stage 5 — Build imports, invitation templates, assets, and preparation workflows
 
@@ -363,4 +376,4 @@ Exit gate:
 
 ## Immediate next action
 
-Begin Stage 4 with invitation-group and guest invariants at the domain and transaction boundaries, then add event-scoped CRUD, search, filtering, pagination, duplicate decisions, phone normalization/masking, and the supplied guest-management UI. Keep all Stage 1–3 gates green while the first high-volume host workflow is added.
+Begin Stage 5 with private object storage and import job/row foundations, then add secure `.xlsx`/`.csv` parsing and mapping, row-level validation and confirmation, invitation templates, immutable content snapshots, and preview/readiness workflows. Keep all Stage 1–4 gates green while hosts prepare large invitation lists and approved content for sending.

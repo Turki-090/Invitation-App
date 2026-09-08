@@ -6,6 +6,7 @@ import { validateApiEnvironment } from "@dawah/config";
 import { AuthModule } from "./auth/auth.module";
 import { EventsModule } from "./events/events.module";
 import { HealthModule } from "./health/health.module";
+import { InvitationsModule } from "./invitations/invitations.module";
 import { PrismaModule } from "./prisma/prisma.module";
 
 @Module({
@@ -21,6 +22,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     AuthModule,
     HealthModule,
     EventsModule,
+    InvitationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

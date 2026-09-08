@@ -723,3 +723,419 @@ dialog:has(.event-wizard) {
     inset-inline: 16px;
   }
 }
+
+/* Stage 4 guest management */
+.guest-page-header > div {
+  max-width: 720px;
+}
+.guest-list-card {
+  min-width: 0;
+  overflow: hidden;
+}
+.guest-list-card > .dawah-card__body {
+  padding: 0;
+}
+.guest-list-card .dawah-tabs {
+  padding-inline: var(--card-pad);
+}
+.guest-list-toolbar {
+  align-items: center;
+  border-block-end: 1px solid var(--border-default);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(280px, 1fr) auto;
+  padding: var(--space-4) var(--card-pad);
+}
+.guest-search {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.guest-search .dawah-input {
+  flex: 1;
+  min-width: 0;
+}
+.guest-filter-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.guest-filter-controls .dawah-select {
+  min-width: 150px;
+}
+.guest-bulk-bar {
+  align-items: center;
+  background: var(--accent-soft);
+  border-block-end: 1px solid var(--accent-soft-2);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 8px var(--card-pad);
+}
+.guest-bulk-bar strong {
+  font-size: var(--text-sm);
+}
+.guest-list-card .dawah-table-wrap {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.guest-list-card .dawah-empty-state {
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+}
+.guest-contact-cell,
+.guest-contact-name {
+  align-items: center;
+  display: flex;
+}
+.guest-contact-cell {
+  gap: 10px;
+  min-width: 220px;
+}
+.guest-contact-cell > div:last-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.guest-contact-name {
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.guest-contact-cell strong {
+  overflow-wrap: anywhere;
+}
+.guest-contact-cell > div > span:not(.dawah-phone),
+.guest-contact-cell .dawah-phone {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.guest-mobile-card {
+  display: grid;
+  gap: 12px;
+}
+.guest-mobile-card > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+.guest-mobile-card > div:nth-child(2) {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.guest-mobile-card dl {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+.guest-mobile-card dl div {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-control);
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+}
+.guest-mobile-card dt {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.guest-mobile-card dd {
+  font-weight: var(--weight-semibold);
+  margin: 0;
+}
+.guest-pagination {
+  align-items: center;
+  border-block-start: 1px solid var(--border-default);
+  color: var(--text-muted);
+  display: flex;
+  font-size: var(--text-sm);
+  gap: 16px;
+  justify-content: space-between;
+  min-height: 60px;
+  padding: 10px var(--card-pad);
+}
+.guest-pagination > div {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+.guest-list-loading {
+  display: grid;
+  gap: 10px;
+  padding: var(--card-pad);
+}
+.guest-list-loading .skeleton {
+  border-radius: var(--radius-control);
+  height: 58px;
+}
+.guest-detail-drawer {
+  --drawer-w: 520px;
+}
+.guest-form-drawer {
+  --drawer-w: 640px;
+}
+.guest-detail,
+.guest-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.guest-detail__identity {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+}
+.guest-detail__identity > div:last-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.guest-detail__identity strong {
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+.guest-detail__identity span,
+.guest-detail__identity .dawah-phone {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+.guest-detail__pills {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.guest-detail__metrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.guest-detail__metrics .dawah-card__body {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+}
+.guest-detail__metrics span,
+.guest-detail__metrics small,
+.guest-detail__row > span {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.guest-detail__metrics strong {
+  font-size: var(--text-lg);
+}
+.guest-detail__section {
+  border-block: 1px solid var(--border-default);
+  padding-block: 16px;
+}
+.guest-detail__section h3 {
+  font-size: var(--text-base);
+  margin: 0 0 10px;
+}
+.guest-detail__section ol {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.guest-detail__section li {
+  align-items: center;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-control);
+  display: flex;
+  gap: 9px;
+  padding: 9px 11px;
+}
+.guest-detail__section li svg {
+  color: var(--text-muted);
+  flex: none;
+}
+.guest-detail__row {
+  align-items: start;
+  display: grid;
+  gap: 4px;
+}
+.guest-detail__row strong {
+  overflow-wrap: anywhere;
+}
+.guest-detail__dates {
+  color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--text-xs);
+  gap: 8px 18px;
+}
+.guest-type-choices,
+.guest-member-editor {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+.guest-type-choices legend,
+.guest-member-editor legend {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  margin-block-end: 8px;
+}
+.guest-type-choices > div {
+  display: grid;
+  gap: 9px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.guest-type-choices .dawah-choice-card {
+  align-items: flex-start;
+  height: 100%;
+  padding: 12px;
+}
+.guest-type-choices .dawah-choice-card__icon {
+  display: none;
+}
+.guest-type-choices .dawah-choice-card__check {
+  height: 20px;
+  width: 20px;
+}
+.guest-phone-fields {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(240px, 1.3fr);
+}
+.guest-member-editor {
+  display: grid;
+  gap: 10px;
+}
+.guest-member-row {
+  align-items: start;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.guest-member-row .dawah-icon-button {
+  margin-block-start: 27px;
+}
+.guest-member-editor > .dawah-button {
+  justify-self: start;
+}
+.guest-toast {
+  inset-block-end: 24px;
+  inset-inline-end: 24px;
+  max-width: min(420px, calc(100vw - 32px));
+  position: fixed;
+  z-index: 60;
+}
+
+@media (max-width: 1100px) {
+  .guest-list-toolbar {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+  .guest-filter-controls {
+    justify-content: flex-start;
+  }
+  .guest-filter-controls .dawah-select {
+    flex: 1 1 180px;
+  }
+}
+
+@media (max-width: 700px) {
+  .guest-page-header > .dawah-button {
+    width: 100%;
+  }
+  .guest-list-card {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .guest-list-card .dawah-tabs,
+  .guest-list-toolbar,
+  .guest-bulk-bar,
+  .guest-pagination {
+    background: var(--surface-card);
+  }
+  .guest-list-card .dawah-tabs {
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+    padding-inline: 8px;
+  }
+  .guest-list-toolbar {
+    border-inline: 1px solid var(--border-default);
+    padding: 12px;
+  }
+  .guest-search {
+    align-items: stretch;
+  }
+  .guest-filter-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .guest-filter-controls .dawah-select {
+    max-width: none;
+    width: 100%;
+  }
+  .guest-bulk-bar {
+    border-inline: 1px solid var(--accent-soft-2);
+    padding-inline: 12px;
+  }
+  .guest-pagination {
+    align-items: stretch;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-card);
+    flex-direction: column;
+    margin-block-start: 12px;
+    padding: 12px;
+  }
+  .guest-pagination > div {
+    justify-content: space-between;
+  }
+  .guest-list-loading {
+    background: var(--surface-card);
+    border: 1px solid var(--border-default);
+    border-radius: 0 0 var(--radius-card) var(--radius-card);
+  }
+  .guest-type-choices > div,
+  .guest-phone-fields {
+    grid-template-columns: 1fr;
+  }
+  .guest-detail__metrics {
+    grid-template-columns: 1fr;
+  }
+  .guest-form-drawer > footer,
+  .guest-detail-drawer > footer {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+  .guest-form-drawer > footer .dawah-button,
+  .guest-detail-drawer > footer .dawah-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .guest-search {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .guest-search .dawah-button {
+    width: 100%;
+  }
+  .guest-bulk-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .guest-bulk-bar .dawah-button {
+    width: 100%;
+  }
+  .guest-toast {
+    inset-block-end: 82px;
+    inset-inline: 16px;
+  }
+}

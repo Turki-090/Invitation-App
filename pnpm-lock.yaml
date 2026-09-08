@@ -280,6 +280,10 @@ importers:
   packages/design-tokens: {}
 
   packages/domain:
+    dependencies:
+      libphonenumber-js:
+        specifier: 1.13.12
+        version: 1.13.12
     devDependencies:
       '@dawah/typescript-config':
         specifier: workspace:*

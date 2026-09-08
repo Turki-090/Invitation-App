@@ -112,6 +112,7 @@ function renderWorkspace(section: "overview" | "settings") {
         copy={en.workspace}
         eventId={eventId}
         eventsCopy={en.events}
+        guestsCopy={en.guests}
         locale="en"
         section={section}
         shellCopy={en.shell}

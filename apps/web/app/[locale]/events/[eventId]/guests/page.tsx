@@ -4,21 +4,21 @@ import { EventWorkspaceClient } from "@/components/event-workspace-client";
 import { isAppLocale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/dictionaries";
 
-interface EventSettingsPageProps {
+interface EventGuestsPageProps {
   params: Promise<{ locale: string; eventId: string }>;
 }
 
 export async function generateMetadata({
   params,
-}: EventSettingsPageProps): Promise<Metadata> {
+}: EventGuestsPageProps): Promise<Metadata> {
   const { locale } = await params;
   if (!isAppLocale(locale)) return {};
-  return { title: (await getDictionary(locale)).workspace.settings };
+  return { title: (await getDictionary(locale)).guests.metadataTitle };
 }
 
-export default async function EventSettingsPage({
+export default async function EventGuestsPage({
   params,
-}: EventSettingsPageProps) {
+}: EventGuestsPageProps) {
   const { locale, eventId } = await params;
   if (!isAppLocale(locale)) notFound();
   const dictionary = await getDictionary(locale);
@@ -30,7 +30,7 @@ export default async function EventSettingsPage({
       eventsCopy={dictionary.events}
       guestsCopy={dictionary.guests}
       locale={locale}
-      section="settings"
+      section="guests"
       shellCopy={dictionary.shell}
     />
   );

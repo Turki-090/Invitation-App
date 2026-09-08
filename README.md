@@ -84,6 +84,11 @@ The Stage 3 event routes, membership boundary, lifecycle matrix, aggregate
 semantics, and date/map safety rules are documented in
 [`docs/event-workspace-stage3.md`](docs/event-workspace-stage3.md).
 
+The Stage 4 invitation aggregate, guest-management APIs, phone and duplicate
+policy, permission shaping, pagination, and responsive host workflow are
+documented in
+[`docs/guest-management-stage4.md`](docs/guest-management-stage4.md).
+
 ## API contract workflow
 
 `openapi/openapi.yaml` is the only public transport-contract source. After a
