@@ -2,10 +2,29 @@ import {
   DEVELOPMENT_ACCESS_TOKEN,
   type BulkCancelInvitationsInput,
   type BulkCancelInvitationsResult,
+  type ConfirmImportInput,
+  type ConfirmImportResult,
+  type CreateInvitationTemplateInput,
+  type CreatePreparationSnapshotsInput,
+  type CreatePreparationSnapshotsResult,
   type CreateInvitationInput,
+  type GetImportJobQuery,
+  type ImportJobDetailResponse,
+  type ImportJobSummary,
+  type ImportLimits,
   type InvitationDetail,
   type InvitationListResponse,
+  type InvitationPreview,
+  type InvitationPreviewRequest,
+  type InvitationTemplate,
+  type ListAssetsResponse,
+  type ListImportJobsResponse,
   type ListInvitationsQuery,
+  type ReadinessResponse,
+  type StoredAsset,
+  type UpdateImportMappingInput,
+  type UpdateImportRowInput,
+  type UpdateInvitationTemplateInput,
   type UpdateInvitationInput,
 } from "@dawah/api-contract";
 import { createDawahApiClient, type components } from "@dawah/api-client";
@@ -220,6 +239,262 @@ export async function transitionEventStatus(
   );
   if (!data) throwApiError(error, response.status);
   return data;
+}
+
+export async function getImportLimits(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<ImportLimits> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/imports/limits`,
+  );
+}
+
+export async function listImportJobs(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<ListImportJobsResponse> {
+  return requestAuthenticatedJson(supabase, `/events/${eventId}/imports`);
+}
+
+export async function createImportJob(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  file: File,
+): Promise<ImportJobSummary> {
+  const body = new FormData();
+  body.append("file", file);
+  return requestAuthenticatedJson(supabase, `/events/${eventId}/imports`, {
+    body,
+    method: "POST",
+  });
+}
+
+export async function getImportJob(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  importJobId: string,
+  query: GetImportJobQuery = { page: 1, pageSize: 50 },
+): Promise<ImportJobDetailResponse> {
+  const search = new URLSearchParams({
+    page: String(query.page),
+    pageSize: String(query.pageSize),
+  });
+  if (query.rowStatus) search.set("rowStatus", query.rowStatus);
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/imports/${importJobId}?${search.toString()}`,
+  );
+}
+
+export async function updateImportMapping(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  importJobId: string,
+  input: UpdateImportMappingInput,
+): Promise<ImportJobSummary> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/imports/${importJobId}/mapping`,
+    jsonRequest("PATCH", input),
+  );
+}
+
+export async function updateImportRow(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  importJobId: string,
+  rowId: string,
+  input: UpdateImportRowInput,
+): Promise<ImportJobSummary> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/imports/${importJobId}/rows/${rowId}`,
+    jsonRequest("PATCH", input),
+  );
+}
+
+export async function confirmImportJob(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  importJobId: string,
+  input: ConfirmImportInput,
+): Promise<ConfirmImportResult> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/imports/${importJobId}/confirm`,
+    jsonRequest("POST", input),
+  );
+}
+
+export async function cancelImportJob(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  importJobId: string,
+): Promise<ImportJobSummary> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/imports/${importJobId}/cancel`,
+    { method: "POST" },
+  );
+}
+
+export async function listInvitationAssets(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<ListAssetsResponse> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/assets?kind=INVITATION_ASSET&includeArchived=false`,
+  );
+}
+
+export async function uploadInvitationAsset(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  file: File,
+): Promise<StoredAsset> {
+  const body = new FormData();
+  body.append("kind", "INVITATION_ASSET");
+  body.append("file", file);
+  return requestAuthenticatedJson(supabase, `/events/${eventId}/assets`, {
+    body,
+    method: "POST",
+  });
+}
+
+export async function listInvitationTemplates(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<readonly InvitationTemplate[]> {
+  const response = await requestAuthenticatedJson<
+    { items: InvitationTemplate[] } | InvitationTemplate[]
+  >(supabase, `/events/${eventId}/templates`);
+  return Array.isArray(response) ? response : response.items;
+}
+
+export async function createInvitationTemplate(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: CreateInvitationTemplateInput,
+): Promise<InvitationTemplate> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/templates`,
+    jsonRequest("POST", input),
+  );
+}
+
+export async function updateInvitationTemplate(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  templateId: string,
+  input: UpdateInvitationTemplateInput,
+): Promise<InvitationTemplate> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/templates/${templateId}`,
+    jsonRequest("PATCH", input),
+  );
+}
+
+export async function approveInvitationTemplate(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  templateId: string,
+  expectedVersion: number,
+): Promise<InvitationTemplate> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/templates/${templateId}/approve`,
+    jsonRequest("POST", { expectedVersion }),
+  );
+}
+
+export async function archiveInvitationTemplate(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  templateId: string,
+): Promise<InvitationTemplate> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/templates/${templateId}/archive`,
+    { method: "POST" },
+  );
+}
+
+export async function previewInvitation(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: InvitationPreviewRequest,
+): Promise<InvitationPreview> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/preparation/preview`,
+    jsonRequest("POST", input),
+  );
+}
+
+export async function getPreparationReadiness(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  templateId: string,
+): Promise<ReadinessResponse> {
+  const search = new URLSearchParams({
+    templateId,
+    page: "1",
+    pageSize: "50",
+  });
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/preparation/readiness?${search.toString()}`,
+  );
+}
+
+export async function createPreparationSnapshots(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: CreatePreparationSnapshotsInput,
+): Promise<CreatePreparationSnapshotsResult> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/preparation/snapshots`,
+    jsonRequest("POST", input),
+  );
+}
+
+function jsonRequest(method: "PATCH" | "POST", body: unknown): RequestInit {
+  return {
+    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+    method,
+  };
+}
+
+async function requestAuthenticatedJson<T>(
+  supabase: SupabaseClient | null,
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const accessToken = developmentAuthBypassEnabled
+    ? DEVELOPMENT_ACCESS_TOKEN
+    : (await supabase?.auth.getSession())?.data.session?.access_token;
+  if (!accessToken) {
+    throw new ApiClientError(
+      "AUTH_REQUIRED",
+      "يلزم تسجيل الدخول للمتابعة.",
+      401,
+    );
+  }
+
+  const headers = new Headers(init.headers);
+  headers.set("Accept", "application/json");
+  headers.set("Authorization", `Bearer ${accessToken}`);
+  const response = await fetch(`${apiBaseUrl}${path}`, { ...init, headers });
+  const payload = await response.json().catch(() => undefined);
+  if (!response.ok) throwApiError(payload, response.status);
+  return payload as T;
 }
 
 async function authenticatedClient(supabase: SupabaseClient | null) {

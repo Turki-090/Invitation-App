@@ -38,6 +38,7 @@ import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LocaleSwitcher } from "./locale-switcher";
 import { GuestManagement } from "./guest-management";
+import { EventPreparation } from "./event-preparation";
 import type { AppLocale } from "../i18n/config";
 import type { Dictionary } from "../i18n/dictionaries";
 import {
@@ -51,7 +52,7 @@ import {
 } from "../lib/api";
 import { getSupabaseClient } from "../lib/supabase";
 
-type WorkspaceSection = "overview" | "guests" | "settings";
+type WorkspaceSection = "overview" | "guests" | "preparation" | "settings";
 type EditableEventStatus = Exclude<EventDetail["status"], "ARCHIVED">;
 
 interface EventWorkspaceClientProps {
@@ -60,6 +61,7 @@ interface EventWorkspaceClientProps {
   section: WorkspaceSection;
   copy: Dictionary["workspace"];
   guestsCopy: Dictionary["guests"];
+  preparationCopy: Dictionary["preparation"];
   eventsCopy: Dictionary["events"];
   common: Dictionary["common"];
   shellCopy: Dictionary["shell"];
@@ -88,6 +90,7 @@ export function EventWorkspaceClient({
   section,
   copy,
   guestsCopy,
+  preparationCopy,
   eventsCopy,
   common,
   shellCopy,
@@ -141,6 +144,13 @@ export function EventWorkspaceClient({
       href: `/${locale}/events/${eventId}/guests`,
       icon: "users" as const,
       active: section === "guests",
+    },
+    {
+      id: "preparation",
+      label: preparationCopy.navigation,
+      href: `/${locale}/events/${eventId}/preparation`,
+      icon: "file-text" as const,
+      active: section === "preparation",
     },
     {
       id: "settings",
@@ -245,6 +255,14 @@ export function EventWorkspaceClient({
           <GuestManagement
             common={common}
             copy={guestsCopy}
+            eventId={eventId}
+            locale={locale}
+            supabase={supabase}
+          />
+        ) : section === "preparation" ? (
+          <EventPreparation
+            common={common}
+            copy={preparationCopy}
             eventId={eventId}
             locale={locale}
             supabase={supabase}

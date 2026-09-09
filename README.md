@@ -16,9 +16,10 @@ pnpm dev
 The localized web routes are `/ar-SA` and `/en`. Requests without a locale are
 redirected to the best supported language, falling back to Arabic.
 
-`pnpm dev` uses the safe local defaults in `.env.example`, starts PostgreSQL and
-Redis, generates required sources, deploys migrations, and starts web, API, and
-worker processes. Create a private `.env` only when overriding those defaults.
+`pnpm dev` uses the safe local defaults in `.env.example`, starts PostgreSQL,
+Redis, and initialized private object storage, generates required sources,
+deploys migrations, and starts web, API, and worker processes. Create a private
+`.env` only when overriding those defaults.
 To use the deterministic local login, explicitly set both development-bypass
 flags to `true`; validation prevents those flags from activating outside local
 development.
@@ -88,6 +89,11 @@ The Stage 4 invitation aggregate, guest-management APIs, phone and duplicate
 policy, permission shaping, pagination, and responsive host workflow are
 documented in
 [`docs/guest-management-stage4.md`](docs/guest-management-stage4.md).
+
+The Stage 5 private asset boundary, secure spreadsheet-import state machine,
+template versioning, readiness rules, immutable snapshots, and preparation UI
+are documented in
+[`docs/invitation-preparation-stage5.md`](docs/invitation-preparation-stage5.md).
 
 ## API contract workflow
 

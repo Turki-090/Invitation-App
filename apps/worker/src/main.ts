@@ -1,11 +1,31 @@
 import { createServer, type ServerResponse } from "node:http";
 import { validateWorkerEnvironment } from "@dawah/config";
+import { defaultImportParserLimits } from "@dawah/imports";
 import { createWorkerRedis, queueNames } from "@dawah/queue";
+import { createS3ObjectStorage } from "@dawah/storage";
+import { PrismaClient } from "@prisma/client";
 import { Worker } from "bullmq";
+import {
+  createImportProcessor,
+  type ImportProcessorResult,
+  type ImportQueueJobData,
+  type ImportQueueJobName,
+} from "./import-processor";
+import { PrismaImportProcessorRepository } from "./prisma-import-repository";
 
 const environment = validateWorkerEnvironment(process.env);
 const redis = createWorkerRedis(environment.REDIS_URL, "dawah-worker");
-const worker = new Worker(
+const prisma = new PrismaClient({ datasourceUrl: environment.DATABASE_URL });
+const storage = createS3ObjectStorage({
+  endpoint: environment.STORAGE_ENDPOINT,
+  region: environment.STORAGE_REGION,
+  credentials: {
+    accessKeyId: environment.STORAGE_ACCESS_KEY_ID,
+    secretAccessKey: environment.STORAGE_SECRET_ACCESS_KEY,
+  },
+  forcePathStyle: environment.STORAGE_FORCE_PATH_STYLE,
+});
+const healthWorker = new Worker(
   queueNames.health,
   async (job) => ({ jobId: job.id, checkedAt: new Date().toISOString() }),
   {
@@ -14,9 +34,32 @@ const worker = new Worker(
     prefix: environment.QUEUE_PREFIX,
   },
 );
+const importProcessor = createImportProcessor({
+  limits: {
+    ...defaultImportParserLimits,
+    maximumFileBytes: environment.IMPORT_MAX_FILE_BYTES,
+    maximumRows: environment.IMPORT_MAX_ROWS,
+    maximumColumns: environment.IMPORT_MAX_COLUMNS,
+    maximumCellCharacters: environment.IMPORT_MAX_CELL_CHARACTERS,
+  },
+  repository: new PrismaImportProcessorRepository(prisma),
+  storage,
+});
+const importWorker = new Worker<
+  ImportQueueJobData,
+  ImportProcessorResult,
+  ImportQueueJobName
+>(queueNames.imports, importProcessor, {
+  concurrency: 1,
+  connection: redis,
+  prefix: environment.QUEUE_PREFIX,
+});
 
-worker.on("error", (error) => {
-  console.error("Worker queue connection error:", error.message);
+healthWorker.on("error", (error) => {
+  console.error("Health worker queue connection error:", error.message);
+});
+importWorker.on("error", (error) => {
+  console.error("Import worker queue connection error:", error.message);
 });
 
 const server = createServer(async (request, response) => {
@@ -33,27 +76,47 @@ const server = createServer(async (request, response) => {
   }
 
   if (request.url === "/health/ready") {
-    const [redisReady, workerReady] = await Promise.all([
-      resolvesWithin(
-        redis.ping().then((result) => result === "PONG"),
-        environment.WORKER_READY_TIMEOUT_MS,
-      ),
-      resolvesWithin(
-        worker.waitUntilReady().then(() => worker.isRunning()),
-        environment.WORKER_READY_TIMEOUT_MS,
-      ),
-    ]);
-    const ready = redisReady && workerReady;
+    const [redisReady, databaseReady, healthWorkerReady, importWorkerReady] =
+      await Promise.all([
+        resolvesWithin(
+          redis.ping().then((result) => result === "PONG"),
+          environment.WORKER_READY_TIMEOUT_MS,
+        ),
+        resolvesWithin(
+          prisma.$queryRaw`SELECT 1`.then(() => true),
+          environment.WORKER_READY_TIMEOUT_MS,
+        ),
+        resolvesWithin(
+          healthWorker.waitUntilReady().then(() => healthWorker.isRunning()),
+          environment.WORKER_READY_TIMEOUT_MS,
+        ),
+        resolvesWithin(
+          importWorker.waitUntilReady().then(() => importWorker.isRunning()),
+          environment.WORKER_READY_TIMEOUT_MS,
+        ),
+      ]);
+    const ready =
+      redisReady && databaseReady && healthWorkerReady && importWorkerReady;
     respond(
       response,
       ready ? 200 : 503,
       ready
-        ? { status: "ok", checks: { redis: "ok", worker: "ok" } }
+        ? {
+            status: "ok",
+            checks: {
+              redis: "ok",
+              database: "ok",
+              healthWorker: "ok",
+              importWorker: "ok",
+            },
+          }
         : {
             status: "error",
             checks: {
               redis: redisReady ? "ok" : "error",
-              worker: workerReady ? "ok" : "error",
+              database: databaseReady ? "ok" : "error",
+              healthWorker: healthWorkerReady ? "ok" : "error",
+              importWorker: importWorkerReady ? "ok" : "error",
             },
           },
     );
@@ -78,13 +141,19 @@ const shutdown = async (signal: string): Promise<void> => {
   server.closeIdleConnections();
   const graceful = Promise.allSettled([
     new Promise<void>((resolve) => server.close(() => resolve())),
-    worker.close(),
+    healthWorker.close(),
+    importWorker.close(),
+    prisma.$disconnect(),
     redis.quit(),
   ]).then(() => true);
   const finished = await resolvesWithin(graceful, 10_000);
   if (!finished) {
     server.closeAllConnections();
-    await worker.close(true).catch(() => undefined);
+    await Promise.allSettled([
+      healthWorker.close(true),
+      importWorker.close(true),
+    ]);
+    await prisma.$disconnect().catch(() => undefined);
     redis.disconnect(false);
   }
 };

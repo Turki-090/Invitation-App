@@ -7,7 +7,16 @@ if (!pnpmCli) throw new Error("Run this command through pnpm.");
 
 assertSafeLocalEnvironment();
 
-await run(docker, ["compose", "up", "-d", "--wait", "postgres", "redis"]);
+await run(docker, [
+  "compose",
+  "up",
+  "-d",
+  "--wait",
+  "postgres",
+  "redis",
+  "object-storage",
+  "object-storage-init",
+]);
 await run(process.execPath, [pnpmCli, "generate"]);
 await run(process.execPath, [pnpmCli, "migrate"]);
 

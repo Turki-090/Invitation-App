@@ -11,6 +11,10 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm generate
 RUN pnpm exec turbo run build --filter=@dawah/worker...
 RUN pnpm --filter @dawah/worker deploy --prod /opt/dawah-worker
+RUN mkdir -p /opt/dawah-worker/prisma \
+  && cp /workspace/database/schema.prisma /opt/dawah-worker/prisma/schema.prisma \
+  && cd /opt/dawah-worker \
+  && /workspace/node_modules/.bin/prisma generate --schema prisma/schema.prisma
 
 FROM node:24-alpine AS runtime
 

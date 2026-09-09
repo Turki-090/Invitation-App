@@ -16,6 +16,14 @@ tags:
     description: Event lifecycle and event-scoped host access.
   - name: invitations
     description: Event-scoped invitation groups and named guest management.
+  - name: imports
+    description: Secure, reviewable bulk invitation imports.
+  - name: assets
+    description: Private event imagery and invitation assets.
+  - name: templates
+    description: Versioned invitation message templates.
+  - name: preparation
+    description: Invitation previews, readiness checks, and immutable content snapshots.
 paths:
   /health/live:
     get:
@@ -382,6 +390,521 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/imports/limits:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: Get guest import limits
+      description: Returns the server-enforced file and parser limits before a host uploads a source file.
+      tags: [imports]
+      operationId: getImportLimits
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Current import limits and accepted source formats.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportLimits" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/imports:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: List guest import jobs
+      tags: [imports]
+      operationId: listImportJobs
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/ImportJobStatus" }
+      responses:
+        "200":
+          description: A page of import jobs for the event.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListImportJobsResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      summary: Upload a guest import source
+      description: Validates the source envelope, stores it privately, creates an import job, and queues bounded parsing.
+      tags: [imports]
+      operationId: uploadImportSource
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: A UTF-8 CSV or hardened XLSX source file.
+      responses:
+        "201":
+          description: Import job created and queued for parsing.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJobSummary" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/imports/{importJobId}:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/ImportJobId"
+    get:
+      summary: Get an import job and review rows
+      tags: [imports]
+      operationId: getImportJob
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: rowStatus
+          in: query
+          schema: { $ref: "#/components/schemas/ImportRowStatus" }
+      responses:
+        "200":
+          description: Import state, mappings, validation totals, and a page of review rows.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJobDetailResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/imports/{importJobId}/mapping:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/ImportJobId"
+    patch:
+      summary: Map import columns and queue validation
+      description: Saves a one-to-one source-column mapping under optimistic concurrency and revalidates every row asynchronously.
+      tags: [imports]
+      operationId: updateImportMapping
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateImportMapping" }
+      responses:
+        "200":
+          description: Updated import job summary.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJobSummary" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/imports/{importJobId}/rows/{rowId}:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/ImportJobId"
+      - $ref: "#/components/parameters/ImportRowId"
+    patch:
+      summary: Correct an import row
+      description: Applies explicit corrections, preserves the source row, and revalidates under optimistic job concurrency.
+      tags: [imports]
+      operationId: updateImportRow
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateImportRow" }
+      responses:
+        "200":
+          description: Updated import job summary after row revalidation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJobSummary" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/imports/{importJobId}/confirm:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/ImportJobId"
+    post:
+      summary: Confirm a reviewed guest import
+      description: Atomically creates all accepted invitation groups after an explicit duplicate decision.
+      tags: [imports]
+      operationId: confirmImport
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConfirmImport" }
+      responses:
+        "200":
+          description: Completed import result; repeated confirmation returns the same committed result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfirmImportResult" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/imports/{importJobId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/ImportJobId"
+    post:
+      summary: Cancel a guest import
+      description: Cancels a non-completed import while preserving its file, rows, and audit history.
+      tags: [imports]
+      operationId: cancelImport
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Cancelled import job, or the unchanged job when it was already cancelled.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJobSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/assets:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: List private event assets
+      tags: [assets]
+      operationId: listAssets
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: kind
+          in: query
+          schema: { $ref: "#/components/schemas/AssetKind" }
+        - name: includeArchived
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Event-owned assets filtered by kind and archive state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListAssetsResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      summary: Upload a private event asset
+      description: Verifies the image signature, dimensions, decompression bounds, and checksum before private storage.
+      tags: [assets]
+      operationId: uploadAsset
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/AssetUpload" }
+      responses:
+        "201":
+          description: Validated private asset metadata.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoredAsset" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/assets/{assetId}/content:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/AssetId"
+    get:
+      summary: Download private asset content
+      description: Streams authorized event-owned image bytes with private, no-store caching.
+      tags: [assets]
+      operationId: getAssetContent
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Original validated image bytes.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: "private, no-store" }
+            Content-Length:
+              schema: { type: integer, minimum: 1 }
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+            image/webp:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/assets/{assetId}/archive:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/AssetId"
+    post:
+      summary: Archive a private asset
+      description: Archives an unused asset without deleting its immutable storage record.
+      tags: [assets]
+      operationId: archiveAsset
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Archived asset, or the unchanged asset when it was already archived.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoredAsset" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/templates:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: List invitation templates
+      tags: [templates]
+      operationId: listInvitationTemplates
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Every versioned template owned by the event.
+          content:
+            application/json:
+              schema:
+                { $ref: "#/components/schemas/ListInvitationTemplatesResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      summary: Create an invitation template
+      description: Creates the first immutable version of a locale-specific invitation template.
+      tags: [templates]
+      operationId: createInvitationTemplate
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateInvitationTemplate" }
+      responses:
+        "201":
+          description: Draft invitation template.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationTemplate" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/templates/{templateId}:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/TemplateId"
+    patch:
+      summary: Create a new invitation template version
+      description: Applies an optimistic edit by creating a new immutable draft version and retaining prior versions.
+      tags: [templates]
+      operationId: updateInvitationTemplate
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateInvitationTemplate" }
+      responses:
+        "200":
+          description: Newly created draft template version.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationTemplate" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/templates/{templateId}/approve:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/TemplateId"
+    post:
+      summary: Approve an invitation template version
+      tags: [templates]
+      operationId: approveInvitationTemplate
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApproveInvitationTemplate" }
+      responses:
+        "200":
+          description: Approved template version ready for snapshot preparation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationTemplate" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/templates/{templateId}/archive:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/TemplateId"
+    post:
+      summary: Archive an invitation template version
+      tags: [templates]
+      operationId: archiveInvitationTemplate
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Archived template, or the unchanged template when it was already archived.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationTemplate" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/preparation/preview:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Preview invitation content
+      description: Renders the server-authoritative message, scope text, and reply actions without sending it.
+      tags: [preparation]
+      operationId: previewInvitation
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvitationPreviewRequest" }
+      responses:
+        "200":
+          description: Server-rendered invitation preview.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationPreview" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/preparation/readiness:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: Compute invitation readiness
+      description: Computes every invitation's blocking issues and snapshot freshness against an approved template.
+      tags: [preparation]
+      operationId: getInvitationReadiness
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: templateId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          description: Server-computed readiness summary and invitation page.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadinessResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/preparation/snapshots:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Prepare immutable invitation snapshots
+      description: Atomically creates or reuses reproducible content snapshots for all invitations or an explicit bounded selection.
+      tags: [preparation]
+      operationId: createInvitationSnapshots
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePreparationSnapshots" }
+      responses:
+        "201":
+          description: Snapshot preparation result, including invitations blocked by readiness issues.
+          content:
+            application/json:
+              schema:
+                {
+                  $ref: "#/components/schemas/CreatePreparationSnapshotsResult",
+                }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
 components:
   securitySchemes:
     bearerAuth:
@@ -400,6 +923,30 @@ components:
       in: path
       required: true
       description: Invitation-group UUID.
+      schema: { type: string, format: uuid }
+    ImportJobId:
+      name: importJobId
+      in: path
+      required: true
+      description: Guest import-job UUID.
+      schema: { type: string, format: uuid }
+    ImportRowId:
+      name: rowId
+      in: path
+      required: true
+      description: Import-row UUID.
+      schema: { type: string, format: uuid }
+    AssetId:
+      name: assetId
+      in: path
+      required: true
+      description: Private stored-asset UUID.
+      schema: { type: string, format: uuid }
+    TemplateId:
+      name: templateId
+      in: path
+      required: true
+      description: Invitation-template version UUID.
       schema: { type: string, format: uuid }
   responses:
     Unauthorized:
@@ -424,6 +971,11 @@ components:
           schema: { $ref: "#/components/schemas/ApiError" }
     ValidationError:
       description: Request validation failed.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    PayloadTooLarge:
+      description: The uploaded source exceeds the configured byte limit.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
@@ -897,3 +1449,628 @@ components:
       anyOf:
         - $ref: "#/components/schemas/DuplicateInvitationConflict"
         - $ref: "#/components/schemas/ApiError"
+    ImportJobStatus:
+      type: string
+      enum:
+        [
+          UPLOADED,
+          PARSING,
+          AWAITING_MAPPING,
+          VALIDATING,
+          REVIEWING,
+          READY,
+          IMPORTING,
+          COMPLETED,
+          CANCELLED,
+          FAILED,
+        ]
+    ImportRowStatus:
+      type: string
+      enum: [UNMAPPED, VALID, INVALID, DUPLICATE, SKIPPED, IMPORTED]
+    ImportMappingField:
+      type: string
+      enum:
+        [
+          displayName,
+          contactName,
+          phoneNumber,
+          phoneCountry,
+          invitationType,
+          maxCompanions,
+          members,
+          internalNote,
+        ]
+    ImportColumnMapping:
+      type: object
+      additionalProperties: false
+      required: [displayName, phoneNumber]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 120 }
+        contactName: { type: string, minLength: 1, maxLength: 120 }
+        phoneNumber: { type: string, minLength: 1, maxLength: 120 }
+        phoneCountry: { type: string, minLength: 1, maxLength: 120 }
+        invitationType: { type: string, minLength: 1, maxLength: 120 }
+        maxCompanions: { type: string, minLength: 1, maxLength: 120 }
+        members: { type: string, minLength: 1, maxLength: 120 }
+        internalNote: { type: string, minLength: 1, maxLength: 120 }
+    ImportSuggestedColumnMapping:
+      type: object
+      additionalProperties: false
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 120 }
+        contactName: { type: string, minLength: 1, maxLength: 120 }
+        phoneNumber: { type: string, minLength: 1, maxLength: 120 }
+        phoneCountry: { type: string, minLength: 1, maxLength: 120 }
+        invitationType: { type: string, minLength: 1, maxLength: 120 }
+        maxCompanions: { type: string, minLength: 1, maxLength: 120 }
+        members: { type: string, minLength: 1, maxLength: 120 }
+        internalNote: { type: string, minLength: 1, maxLength: 120 }
+    ImportIssue:
+      type: object
+      additionalProperties: false
+      required: [code, field, message]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 100 }
+        field:
+          oneOf:
+            - $ref: "#/components/schemas/ImportMappingField"
+            - type: string
+              const: row
+        message: { type: string, minLength: 1, maxLength: 500 }
+        duplicateInvitationIds:
+          type: array
+          maxItems: 100
+          items: { type: string, format: uuid }
+        duplicateRowNumbers:
+          type: array
+          maxItems: 100
+          items: { type: integer, minimum: 1 }
+    NormalizedImportMember:
+      type: object
+      additionalProperties: false
+      required: [name, isPrimary]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        isPrimary: { type: boolean }
+    NormalizedImportInvitation:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          displayName,
+          contactName,
+          phoneE164,
+          phoneCountry,
+          invitationType,
+          maxCompanions,
+          members,
+          internalNote,
+        ]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 160 }
+        contactName: { type: string, minLength: 1, maxLength: 120 }
+        phoneE164: { type: string, pattern: "^\\+[1-9]\\d{7,14}$" }
+        phoneCountry: { type: string, pattern: "^[A-Z]{2}$" }
+        invitationType: { $ref: "#/components/schemas/InvitationType" }
+        maxCompanions: { type: integer, minimum: 0, maximum: 100 }
+        members:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: "#/components/schemas/NormalizedImportMember" }
+        internalNote: { type: [string, "null"], maxLength: 1000 }
+    ImportSourceData:
+      type: object
+      additionalProperties:
+        type: [string, number, boolean, "null"]
+    ImportRow:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          rowNumber,
+          status,
+          sourceData,
+          correctedData,
+          normalizedData,
+          errors,
+          warnings,
+          importedInvitationGroupId,
+          updatedAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        rowNumber: { type: integer, minimum: 2 }
+        status: { $ref: "#/components/schemas/ImportRowStatus" }
+        sourceData: { $ref: "#/components/schemas/ImportSourceData" }
+        correctedData:
+          anyOf:
+            - $ref: "#/components/schemas/ImportSourceData"
+            - type: "null"
+        normalizedData:
+          anyOf:
+            - $ref: "#/components/schemas/NormalizedImportInvitation"
+            - type: "null"
+        errors:
+          type: array
+          items: { $ref: "#/components/schemas/ImportIssue" }
+        warnings:
+          type: array
+          items: { $ref: "#/components/schemas/ImportIssue" }
+        importedInvitationGroupId: { type: [string, "null"], format: uuid }
+        updatedAt: { type: string, format: date-time }
+    ImportJobSummary:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          eventId,
+          status,
+          originalFilename,
+          mediaType,
+          fileSizeBytes,
+          worksheetName,
+          totalRows,
+          validRows,
+          invalidRows,
+          duplicateRows,
+          importedRows,
+          skippedRows,
+          version,
+          failureCode,
+          failureMessage,
+          createdAt,
+          updatedAt,
+          completedAt,
+          cancelledAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/ImportJobStatus" }
+        originalFilename: { type: string, minLength: 1, maxLength: 255 }
+        mediaType: { type: string, minLength: 1, maxLength: 160 }
+        fileSizeBytes: { type: integer, minimum: 1 }
+        worksheetName: { type: [string, "null"], maxLength: 120 }
+        totalRows: { type: integer, minimum: 0 }
+        validRows: { type: integer, minimum: 0 }
+        invalidRows: { type: integer, minimum: 0 }
+        duplicateRows: { type: integer, minimum: 0 }
+        importedRows: { type: integer, minimum: 0 }
+        skippedRows: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        failureCode: { type: [string, "null"] }
+        failureMessage: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+        cancelledAt: { type: [string, "null"], format: date-time }
+    ListImportJobsResponse:
+      type: object
+      additionalProperties: false
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ImportJobSummary" }
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, pageSize, totalItems, totalPages]
+          properties:
+            page: { type: integer, minimum: 1 }
+            pageSize: { type: integer, minimum: 1, maximum: 50 }
+            totalItems: { type: integer, minimum: 0 }
+            totalPages: { type: integer, minimum: 0 }
+    ImportJobDetail:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: "#/components/schemas/ImportJobSummary"
+        - type: object
+          required: [headers, suggestedMapping, columnMapping]
+          properties:
+            headers:
+              type: array
+              maxItems: 64
+              items: { type: string, minLength: 1, maxLength: 120 }
+            suggestedMapping:
+              anyOf:
+                - $ref: "#/components/schemas/ImportSuggestedColumnMapping"
+                - type: "null"
+            columnMapping:
+              anyOf:
+                - $ref: "#/components/schemas/ImportColumnMapping"
+                - type: "null"
+    ImportJobDetailResponse:
+      type: object
+      additionalProperties: false
+      required: [job, rows, pagination]
+      properties:
+        job: { $ref: "#/components/schemas/ImportJobDetail" }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/ImportRow" }
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, pageSize, totalItems, totalPages]
+          properties:
+            page: { type: integer, minimum: 1 }
+            pageSize: { type: integer, minimum: 1, maximum: 100 }
+            totalItems: { type: integer, minimum: 0 }
+            totalPages: { type: integer, minimum: 0 }
+    UpdateImportMapping:
+      type: object
+      additionalProperties: false
+      required: [mapping, expectedVersion]
+      properties:
+        mapping: { $ref: "#/components/schemas/ImportColumnMapping" }
+        expectedVersion: { type: integer, minimum: 1 }
+    ImportRowCorrections:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        displayName: { type: [string, number, "null"], maxLength: 1000 }
+        contactName: { type: [string, number, "null"], maxLength: 1000 }
+        phoneNumber: { type: [string, number, "null"], maxLength: 1000 }
+        phoneCountry: { type: [string, number, "null"], maxLength: 1000 }
+        invitationType: { type: [string, number, "null"], maxLength: 1000 }
+        maxCompanions: { type: [string, number, "null"], maxLength: 1000 }
+        members: { type: [string, number, "null"], maxLength: 1000 }
+        internalNote: { type: [string, number, "null"], maxLength: 1000 }
+    UpdateImportRow:
+      type: object
+      additionalProperties: false
+      required: [corrections, expectedJobVersion]
+      properties:
+        corrections: { $ref: "#/components/schemas/ImportRowCorrections" }
+        expectedJobVersion: { type: integer, minimum: 1 }
+    ConfirmImport:
+      type: object
+      additionalProperties: false
+      required: [duplicatePolicy, expectedVersion]
+      properties:
+        duplicatePolicy:
+          type: string
+          enum: [SKIP, IMPORT]
+        expectedVersion: { type: integer, minimum: 1 }
+    ConfirmImportResult:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          importJobId,
+          importedRows,
+          skippedRows,
+          duplicateRowsImported,
+          invitationGroupIds,
+          completedAt,
+        ]
+      properties:
+        importJobId: { type: string, format: uuid }
+        importedRows: { type: integer, minimum: 0 }
+        skippedRows: { type: integer, minimum: 0 }
+        duplicateRowsImported: { type: integer, minimum: 0 }
+        invitationGroupIds:
+          type: array
+          items: { type: string, format: uuid }
+        completedAt: { type: string, format: date-time }
+    ImportLimits:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          acceptedExtensions,
+          maximumFileBytes,
+          maximumRows,
+          maximumColumns,
+          maximumCellCharacters,
+        ]
+      properties:
+        acceptedExtensions:
+          type: array
+          minItems: 2
+          maxItems: 2
+          prefixItems:
+            - type: string
+              const: .xlsx
+            - type: string
+              const: .csv
+        maximumFileBytes: { type: integer, minimum: 1, maximum: 16777216 }
+        maximumRows: { type: integer, minimum: 1 }
+        maximumColumns: { type: integer, minimum: 1 }
+        maximumCellCharacters: { type: integer, minimum: 1 }
+    AssetKind:
+      type: string
+      enum: [EVENT_IMAGE, INVITATION_ASSET]
+    AssetMediaType:
+      type: string
+      enum: [image/jpeg, image/png, image/webp]
+    StoredAsset:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          eventId,
+          kind,
+          originalFilename,
+          mediaType,
+          sizeBytes,
+          checksumSha256,
+          width,
+          height,
+          createdAt,
+          archivedAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        kind: { $ref: "#/components/schemas/AssetKind" }
+        originalFilename: { type: string, minLength: 1, maxLength: 255 }
+        mediaType: { $ref: "#/components/schemas/AssetMediaType" }
+        sizeBytes: { type: integer, minimum: 1 }
+        checksumSha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        archivedAt: { type: [string, "null"], format: date-time }
+    ListAssetsResponse:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/StoredAsset" }
+    AssetUpload:
+      type: object
+      additionalProperties: false
+      required: [kind, file]
+      properties:
+        kind:
+          type: string
+          enum: [EVENT_IMAGE, INVITATION_ASSET]
+        file:
+          type: string
+          format: binary
+          description: A JPEG, PNG, or WebP image whose signature matches its declared media type.
+    TemplateStatus:
+      type: string
+      enum: [DRAFT, APPROVED, ARCHIVED]
+    PreparationLocale:
+      type: string
+      enum: [ar-SA, en]
+    MessageVariable:
+      type: string
+      enum:
+        [
+          guest_name,
+          event_name,
+          event_date,
+          event_time,
+          venue,
+          allowed_companions,
+        ]
+    MessageVariables:
+      type: object
+      additionalProperties: false
+      properties:
+        guest_name: { type: string }
+        event_name: { type: string }
+        event_date: { type: string }
+        event_time: { type: string }
+        venue: { type: string }
+        allowed_companions: { type: string }
+    CreateInvitationTemplate:
+      type: object
+      additionalProperties: false
+      required: [name, locale, body]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        locale: { $ref: "#/components/schemas/PreparationLocale" }
+        body: { type: string, minLength: 1, maxLength: 1500 }
+        extraMessage: { type: string, maxLength: 500 }
+        assetId: { type: [string, "null"], format: uuid }
+    UpdateInvitationTemplate:
+      type: object
+      additionalProperties: false
+      minProperties: 2
+      required: [expectedVersion]
+      anyOf:
+        - required: [name]
+        - required: [locale]
+        - required: [body]
+        - required: [extraMessage]
+        - required: [assetId]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        locale: { $ref: "#/components/schemas/PreparationLocale" }
+        body: { type: string, minLength: 1, maxLength: 1500 }
+        extraMessage: { type: [string, "null"], maxLength: 500 }
+        assetId: { type: [string, "null"], format: uuid }
+        expectedVersion: { type: integer, minimum: 1 }
+    InvitationTemplate:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          eventId,
+          name,
+          locale,
+          body,
+          extraMessage,
+          variableKeys,
+          assetId,
+          assetChecksumSha256,
+          status,
+          version,
+          createdAt,
+          updatedAt,
+          approvedAt,
+          archivedAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        name: { type: string }
+        locale: { $ref: "#/components/schemas/PreparationLocale" }
+        body: { type: string }
+        extraMessage: { type: [string, "null"] }
+        variableKeys:
+          type: array
+          items: { $ref: "#/components/schemas/MessageVariable" }
+        assetId: { type: [string, "null"], format: uuid }
+        assetChecksumSha256:
+          type: [string, "null"]
+          pattern: "^[a-f0-9]{64}$"
+        status: { $ref: "#/components/schemas/TemplateStatus" }
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        approvedAt: { type: [string, "null"], format: date-time }
+        archivedAt: { type: [string, "null"], format: date-time }
+    ListInvitationTemplatesResponse:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InvitationTemplate" }
+    ApproveInvitationTemplate:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+    InvitationPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [templateId, invitationType]
+      properties:
+        templateId: { type: string, format: uuid }
+        invitationType: { $ref: "#/components/schemas/InvitationType" }
+        invitationId: { type: string, format: uuid }
+    InvitationPreview:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          templateId,
+          templateVersion,
+          locale,
+          invitationType,
+          renderedBody,
+          renderedExtraMessage,
+          scopeDescription,
+          replyActions,
+          variables,
+          assetId,
+        ]
+      properties:
+        templateId: { type: string, format: uuid }
+        templateVersion: { type: integer, minimum: 1 }
+        locale: { $ref: "#/components/schemas/PreparationLocale" }
+        invitationType: { $ref: "#/components/schemas/InvitationType" }
+        renderedBody: { type: string }
+        renderedExtraMessage: { type: [string, "null"] }
+        scopeDescription: { type: string }
+        replyActions:
+          type: array
+          minItems: 2
+          maxItems: 102
+          items: { type: string, minLength: 1 }
+        variables: { $ref: "#/components/schemas/MessageVariables" }
+        assetId: { type: [string, "null"], format: uuid }
+    ReadinessIssue:
+      type: object
+      additionalProperties: false
+      required: [code, field, message]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 100 }
+        field: { type: string, minLength: 1, maxLength: 100 }
+        message: { type: string, minLength: 1, maxLength: 500 }
+    InvitationReadinessItem:
+      type: object
+      additionalProperties: false
+      required: [invitationId, ready, issues, sourceHash, latestSnapshotId]
+      properties:
+        invitationId: { type: string, format: uuid }
+        ready: { type: boolean }
+        issues:
+          type: array
+          items: { $ref: "#/components/schemas/ReadinessIssue" }
+        sourceHash: { type: [string, "null"], pattern: "^[a-f0-9]{64}$" }
+        latestSnapshotId: { type: [string, "null"], format: uuid }
+    ReadinessResponse:
+      type: object
+      additionalProperties: false
+      required: [template, summary, items, pagination]
+      properties:
+        template: { $ref: "#/components/schemas/InvitationTemplate" }
+        summary:
+          type: object
+          additionalProperties: false
+          required:
+            [
+              totalInvitations,
+              readyInvitations,
+              blockedInvitations,
+              snapshottedInvitations,
+            ]
+          properties:
+            totalInvitations: { type: integer, minimum: 0 }
+            readyInvitations: { type: integer, minimum: 0 }
+            blockedInvitations: { type: integer, minimum: 0 }
+            snapshottedInvitations: { type: integer, minimum: 0 }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InvitationReadinessItem" }
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, pageSize, totalItems, totalPages]
+          properties:
+            page: { type: integer, minimum: 1 }
+            pageSize: { type: integer, minimum: 1, maximum: 100 }
+            totalItems: { type: integer, minimum: 0 }
+            totalPages: { type: integer, minimum: 0 }
+    CreatePreparationSnapshots:
+      type: object
+      additionalProperties: false
+      required: [templateId]
+      properties:
+        templateId: { type: string, format: uuid }
+        invitationIds:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items: { type: string, format: uuid }
+    CreatePreparationSnapshotsResult:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          templateId,
+          createdCount,
+          reusedCount,
+          blockedCount,
+          snapshotIds,
+          blockedInvitationIds,
+        ]
+      properties:
+        templateId: { type: string, format: uuid }
+        createdCount: { type: integer, minimum: 0 }
+        reusedCount: { type: integer, minimum: 0 }
+        blockedCount: { type: integer, minimum: 0 }
+        snapshotIds:
+          type: array
+          items: { type: string, format: uuid }
+        blockedInvitationIds:
+          type: array
+          items: { type: string, format: uuid }

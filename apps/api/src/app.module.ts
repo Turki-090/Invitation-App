@@ -4,10 +4,13 @@ import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { validateApiEnvironment } from "@dawah/config";
 import { AuthModule } from "./auth/auth.module";
+import { AssetsModule } from "./assets/assets.module";
 import { EventsModule } from "./events/events.module";
 import { HealthModule } from "./health/health.module";
 import { InvitationsModule } from "./invitations/invitations.module";
+import { ImportsModule } from "./imports/imports.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { PreparationModule } from "./preparation/preparation.module";
 
 @Module({
   imports: [
@@ -20,9 +23,12 @@ import { PrismaModule } from "./prisma/prisma.module";
     ThrottlerModule.forRoot([{ name: "default", ttl: 60_000, limit: 120 }]),
     PrismaModule,
     AuthModule,
+    AssetsModule,
     HealthModule,
     EventsModule,
     InvitationsModule,
+    ImportsModule,
+    PreparationModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
