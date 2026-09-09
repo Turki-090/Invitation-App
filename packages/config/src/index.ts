@@ -10,11 +10,31 @@ export const deploymentEnvironments = [
 export type DeploymentEnvironment = (typeof deploymentEnvironments)[number];
 export type NodeEnvironment = "development" | "test" | "production";
 
-export interface ApiEnvironment {
+export interface StorageEnvironment {
+  STORAGE_ENDPOINT: string;
+  STORAGE_REGION: string;
+  STORAGE_ACCESS_KEY_ID: string;
+  STORAGE_SECRET_ACCESS_KEY: string;
+  STORAGE_PRIVATE_BUCKET: string;
+  STORAGE_FORCE_PATH_STYLE: boolean;
+}
+
+export interface ImportAndAssetLimitsEnvironment {
+  IMPORT_MAX_FILE_BYTES: number;
+  IMPORT_MAX_ROWS: number;
+  IMPORT_MAX_COLUMNS: number;
+  IMPORT_MAX_CELL_CHARACTERS: number;
+  ASSET_MAX_FILE_BYTES: number;
+  ASSET_MAX_IMAGE_PIXELS: number;
+}
+
+export interface ApiEnvironment
+  extends StorageEnvironment, ImportAndAssetLimitsEnvironment {
   NODE_ENV: NodeEnvironment;
   DAWAH_ENV: DeploymentEnvironment;
   DATABASE_URL: string;
   REDIS_URL: string;
+  QUEUE_PREFIX: string;
   SUPABASE_URL?: string;
   SUPABASE_JWT_AUDIENCE: string;
   DAWAH_DEV_AUTH_BYPASS: boolean;
@@ -24,9 +44,11 @@ export interface ApiEnvironment {
   API_READY_TIMEOUT_MS: number;
 }
 
-export interface WorkerEnvironment {
+export interface WorkerEnvironment
+  extends StorageEnvironment, ImportAndAssetLimitsEnvironment {
   NODE_ENV: NodeEnvironment;
   DAWAH_ENV: DeploymentEnvironment;
+  DATABASE_URL: string;
   REDIS_URL: string;
   QUEUE_PREFIX: string;
   WORKER_PORT: number;
@@ -64,6 +86,29 @@ const optionalText = z.preprocess(
   emptyToUndefined,
   z.string().trim().min(1).optional(),
 );
+const requiredText = z.string().trim().min(1);
+
+const storageShape = {
+  STORAGE_ENDPOINT: z.url({ protocol: /^https?$/ }),
+  STORAGE_REGION: requiredText,
+  STORAGE_ACCESS_KEY_ID: requiredText,
+  STORAGE_SECRET_ACCESS_KEY: requiredText,
+  STORAGE_PRIVATE_BUCKET: requiredText,
+  STORAGE_FORCE_PATH_STYLE: environmentBoolean,
+} as const;
+
+const importAndAssetLimitsShape = {
+  IMPORT_MAX_FILE_BYTES: positiveInteger
+    .max(16 * 1024 * 1024)
+    .default(8 * 1024 * 1024),
+  IMPORT_MAX_ROWS: positiveInteger.default(5_000),
+  IMPORT_MAX_COLUMNS: positiveInteger.default(64),
+  IMPORT_MAX_CELL_CHARACTERS: positiveInteger.default(1_000),
+  ASSET_MAX_FILE_BYTES: positiveInteger
+    .max(16 * 1024 * 1024)
+    .default(8 * 1024 * 1024),
+  ASSET_MAX_IMAGE_PIXELS: positiveInteger.default(24_000_000),
+} as const;
 
 const runtimeShape = {
   NODE_ENV: z
@@ -75,8 +120,11 @@ const runtimeShape = {
 const apiEnvironmentSchema = z
   .object({
     ...runtimeShape,
+    ...storageShape,
+    ...importAndAssetLimitsShape,
     DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }),
+    QUEUE_PREFIX: optionalText,
     SUPABASE_URL: optionalUrl,
     SUPABASE_JWT_AUDIENCE: z.string().trim().min(1).default("authenticated"),
     DAWAH_DEV_AUTH_BYPASS: environmentBoolean,
@@ -110,6 +158,7 @@ const apiEnvironmentSchema = z
 
     validateRemotePostgres(environment.DATABASE_URL, context);
     validateSecureRedis(environment.REDIS_URL, context);
+    validateDeployedStorage(environment, context);
     validateRequiredRemoteHttpsUrl(
       environment.SUPABASE_URL,
       "SUPABASE_URL",
@@ -126,11 +175,18 @@ const apiEnvironmentSchema = z
         break;
       }
     }
-  });
+  })
+  .transform((environment) => ({
+    ...environment,
+    QUEUE_PREFIX: environment.QUEUE_PREFIX ?? `dawah:${environment.DAWAH_ENV}`,
+  }));
 
 const workerEnvironmentSchema = z
   .object({
     ...runtimeShape,
+    ...storageShape,
+    ...importAndAssetLimitsShape,
+    DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }),
     QUEUE_PREFIX: optionalText,
     WORKER_PORT: port.default(4_001),
@@ -140,7 +196,9 @@ const workerEnvironmentSchema = z
   .superRefine((environment, context) => {
     validateRuntimeMode(environment, context);
     if (isDeployedEnvironment(environment.DAWAH_ENV)) {
+      validateRemotePostgres(environment.DATABASE_URL, context);
       validateSecureRedis(environment.REDIS_URL, context);
+      validateDeployedStorage(environment, context);
     }
   })
   .transform((environment) => ({
@@ -329,6 +387,48 @@ function validateSecureRedis(value: string, context: z.RefinementCtx): void {
       context,
       "REDIS_URL",
       "Deployed Redis must use a remote rediss:// endpoint.",
+    );
+  }
+}
+
+function validateDeployedStorage(
+  environment: Pick<
+    StorageEnvironment,
+    "STORAGE_ENDPOINT" | "STORAGE_ACCESS_KEY_ID" | "STORAGE_SECRET_ACCESS_KEY"
+  >,
+  context: z.RefinementCtx,
+): void {
+  validateRequiredRemoteHttpsUrl(
+    environment.STORAGE_ENDPOINT,
+    "STORAGE_ENDPOINT",
+    context,
+  );
+  validateNonPlaceholderSecret(
+    environment.STORAGE_ACCESS_KEY_ID,
+    "STORAGE_ACCESS_KEY_ID",
+    context,
+  );
+  validateNonPlaceholderSecret(
+    environment.STORAGE_SECRET_ACCESS_KEY,
+    "STORAGE_SECRET_ACCESS_KEY",
+    context,
+  );
+}
+
+function validateNonPlaceholderSecret(
+  value: string,
+  path: string,
+  context: z.RefinementCtx,
+): void {
+  if (
+    looksLikePlaceholder(value) ||
+    value.startsWith("dawah-local-") ||
+    value.startsWith("dawah-test-")
+  ) {
+    addIssue(
+      context,
+      path,
+      "Deployed storage credentials must be non-placeholder secrets.",
     );
   }
 }

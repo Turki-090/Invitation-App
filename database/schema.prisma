@@ -54,21 +54,82 @@ enum RsvpSource {
   SYSTEM
 }
 
-model User {
-  id             String   @id @default(uuid()) @db.Uuid
-  authProviderId String   @unique @map("auth_provider_id")
-  displayName    String?  @map("display_name")
-  email          String?
-  phoneE164      String?  @map("phone_e164")
-  preferredLocale UserLocale @default(ar_SA) @map("preferred_locale")
-  timezone       String   @default("Asia/Riyadh")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+enum AssetKind {
+  IMPORT_SOURCE
+  EVENT_IMAGE
+  INVITATION_ASSET
+  GENERATED_FILE
+}
 
-  ownedEvents        Event[]           @relation("EventOwner")
-  memberships       EventMembership[]
-  createdInvitations InvitationGroup[] @relation("InvitationCreator")
-  auditLogs         AuditLog[]         @relation("AuditActor")
+enum StoredAssetStatus {
+  PENDING_UPLOAD
+  UPLOADED
+  READY
+  QUARANTINED
+  DELETED
+}
+
+enum ImportFileFormat {
+  XLSX
+  CSV
+}
+
+enum ImportJobStatus {
+  UPLOADED
+  PARSING
+  AWAITING_MAPPING
+  VALIDATING
+  REVIEWING
+  READY
+  IMPORTING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum ImportRowStatus {
+  UNMAPPED
+  VALID
+  INVALID
+  DUPLICATE
+  SKIPPED
+  IMPORTED
+}
+
+enum ImportDuplicateResolution {
+  SKIP
+  IMPORT_AS_NEW
+  UPDATE_EXISTING
+}
+
+enum TemplateStatus {
+  DRAFT
+  APPROVED
+  ARCHIVED
+}
+
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  authProviderId  String     @unique @map("auth_provider_id")
+  displayName     String?    @map("display_name")
+  email           String?
+  phoneE164       String?    @map("phone_e164")
+  preferredLocale UserLocale @default(ar_SA) @map("preferred_locale")
+  timezone        String     @default("Asia/Riyadh")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  ownedEvents         Event[]                     @relation("EventOwner")
+  memberships         EventMembership[]
+  createdInvitations  InvitationGroup[]           @relation("InvitationCreator")
+  auditLogs           AuditLog[]                  @relation("AuditActor")
+  createdAssets       StoredAsset[]               @relation("StoredAssetCreator")
+  createdImportJobs   ImportJob[]                 @relation("ImportJobCreator")
+  confirmedImports    ImportJob[]                 @relation("ImportJobConfirmer")
+  cancelledImports    ImportJob[]                 @relation("ImportJobCanceller")
+  correctedImportRows ImportRow[]                 @relation("ImportRowCorrector")
+  createdTemplates    InvitationTemplate[]        @relation("InvitationTemplateCreator")
+  createdSnapshots    InvitationContentSnapshot[] @relation("InvitationSnapshotCreator")
 
   @@map("users")
 }
@@ -97,10 +158,15 @@ model Event {
   updatedAt      DateTime    @updatedAt @map("updated_at")
   archivedAt     DateTime?   @map("archived_at")
 
-  owner             User              @relation("EventOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  memberships       EventMembership[]
-  invitationGroups  InvitationGroup[]
-  auditLogs         AuditLog[]
+  owner                      User                        @relation("EventOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  memberships                EventMembership[]
+  invitationGroups           InvitationGroup[]
+  auditLogs                  AuditLog[]
+  storedAssets               StoredAsset[]
+  importJobs                 ImportJob[]
+  importRows                 ImportRow[]
+  invitationTemplates        InvitationTemplate[]
+  invitationContentSnapshots InvitationContentSnapshot[]
 
   @@index([ownerUserId])
   @@index([status, eventDate])
@@ -143,13 +209,17 @@ model InvitationGroup {
   updatedAt         DateTime       @updatedAt @map("updated_at")
   cancelledAt       DateTime?      @map("cancelled_at")
 
-  event        Event                      @relation(fields: [eventId], references: [id], onDelete: Restrict)
-  creator      User                       @relation("InvitationCreator", fields: [createdBy], references: [id], onDelete: Restrict)
-  members      GuestMember[]
-  rsvp         Rsvp?
-  publicAccess PublicInvitationCapability?
-  rsvpHistory  RsvpHistory[]
+  event               Event                       @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  creator             User                        @relation("InvitationCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  members             GuestMember[]
+  rsvp                Rsvp?
+  publicAccess        PublicInvitationCapability?
+  rsvpHistory         RsvpHistory[]
+  duplicateImportRows ImportRow[]                 @relation("ImportRowExistingDuplicate")
+  importedFromRow     ImportRow?                  @relation("ImportRowImportedInvitation")
+  contentSnapshots    InvitationContentSnapshot[]
 
+  @@unique([id, eventId], map: "invitation_groups_id_event_key")
   @@index([eventId, rsvpStatus])
   @@index([eventId, phoneE164])
   @@index([eventId, displayName])
@@ -157,6 +227,218 @@ model InvitationGroup {
   @@index([eventId, invitationType, cancelledAt])
   @@index([eventId, cancelledAt, expectedAttendees])
   @@map("invitation_groups")
+}
+
+model StoredAsset {
+  id               String            @id @default(uuid()) @db.Uuid
+  eventId          String            @map("event_id") @db.Uuid
+  createdBy        String            @map("created_by") @db.Uuid
+  kind             AssetKind
+  status           StoredAssetStatus @default(PENDING_UPLOAD)
+  storageProvider  String            @map("storage_provider") @db.VarChar(64)
+  bucket           String            @db.VarChar(128)
+  objectKey        String            @map("object_key") @db.VarChar(1024)
+  originalFilename String            @map("original_filename") @db.VarChar(255)
+  contentType      String?           @map("content_type") @db.VarChar(255)
+  byteSize         Int?              @map("byte_size")
+  sha256           String?           @db.Char(64)
+  imageWidth       Int?              @map("image_width")
+  imageHeight      Int?              @map("image_height")
+  isPrivate        Boolean           @default(true) @map("is_private")
+  metadata         Json              @default("{}")
+  expiresAt        DateTime?         @map("expires_at")
+  uploadedAt       DateTime?         @map("uploaded_at")
+  validatedAt      DateTime?         @map("validated_at")
+  quarantinedAt    DateTime?         @map("quarantined_at")
+  deletedAt        DateTime?         @map("deleted_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  event     Event                       @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  creator   User                        @relation("StoredAssetCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  importJob ImportJob?
+  templates InvitationTemplate[]
+  snapshots InvitationContentSnapshot[]
+
+  @@unique([id, eventId], map: "stored_assets_id_event_key")
+  @@unique([storageProvider, bucket, objectKey], map: "stored_assets_object_key")
+  @@index([eventId, kind, status, createdAt(sort: Desc), id], map: "stored_assets_event_kind_status_created_id_idx")
+  @@index([status, expiresAt], map: "stored_assets_status_expires_idx")
+  @@map("stored_assets")
+}
+
+model ImportJob {
+  id                  String           @id @default(uuid()) @db.Uuid
+  eventId             String           @map("event_id") @db.Uuid
+  sourceAssetId       String           @map("source_asset_id") @db.Uuid
+  createdBy           String           @map("created_by") @db.Uuid
+  confirmedBy         String?          @map("confirmed_by") @db.Uuid
+  cancelledBy         String?          @map("cancelled_by") @db.Uuid
+  fileFormat          ImportFileFormat @map("file_format")
+  status              ImportJobStatus  @default(UPLOADED)
+  selectedWorksheet   String?          @map("selected_worksheet") @db.VarChar(255)
+  availableWorksheets Json             @default("[]") @map("available_worksheets")
+  detectedHeaders     Json             @default("[]") @map("detected_headers")
+  suggestedMapping    Json?            @map("suggested_mapping")
+  columnMapping       Json?            @map("column_mapping")
+  csvDelimiter        String?          @map("csv_delimiter") @db.VarChar(1)
+  detectedEncoding    String?          @map("detected_encoding") @db.VarChar(64)
+  parserVersion       String?          @map("parser_version") @db.VarChar(64)
+  revision            Int              @default(1)
+  totalRows           Int              @default(0) @map("total_rows")
+  validRows           Int              @default(0) @map("valid_rows")
+  invalidRows         Int              @default(0) @map("invalid_rows")
+  duplicateRows       Int              @default(0) @map("duplicate_rows")
+  skippedRows         Int              @default(0) @map("skipped_rows")
+  importedRows        Int              @default(0) @map("imported_rows")
+  queuedAt            DateTime?        @map("queued_at")
+  parsingStartedAt    DateTime?        @map("parsing_started_at")
+  parsedAt            DateTime?        @map("parsed_at")
+  validatedAt         DateTime?        @map("validated_at")
+  reviewingAt         DateTime?        @map("reviewing_at")
+  readyAt             DateTime?        @map("ready_at")
+  importStartedAt     DateTime?        @map("import_started_at")
+  confirmedAt         DateTime?        @map("confirmed_at")
+  completedAt         DateTime?        @map("completed_at")
+  failedAt            DateTime?        @map("failed_at")
+  cancelledAt         DateTime?        @map("cancelled_at")
+  failureCode         String?          @map("failure_code") @db.VarChar(80)
+  failureMessage      String?          @map("failure_message") @db.VarChar(1000)
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  sourceAsset StoredAsset @relation(fields: [sourceAssetId, eventId], references: [id, eventId], onDelete: Restrict)
+  creator     User        @relation("ImportJobCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  confirmer   User?       @relation("ImportJobConfirmer", fields: [confirmedBy], references: [id], onDelete: Restrict)
+  canceller   User?       @relation("ImportJobCanceller", fields: [cancelledBy], references: [id], onDelete: Restrict)
+  rows        ImportRow[]
+
+  @@unique([id, eventId], map: "import_jobs_id_event_key")
+  @@unique([sourceAssetId, eventId], map: "import_jobs_source_asset_key")
+  @@index([eventId, status, createdAt(sort: Desc), id], map: "import_jobs_event_status_created_id_idx")
+  @@index([createdBy, createdAt(sort: Desc)], map: "import_jobs_creator_created_idx")
+  @@map("import_jobs")
+}
+
+model ImportRow {
+  id                         String                     @id @default(uuid()) @db.Uuid
+  importJobId                String                     @map("import_job_id") @db.Uuid
+  eventId                    String                     @map("event_id") @db.Uuid
+  sourceRowNumber            Int                        @map("source_row_number")
+  sourceData                 Json                       @map("source_data")
+  correctedData              Json?                      @map("corrected_data")
+  displayName                String?                    @map("display_name") @db.VarChar(160)
+  contactName                String?                    @map("contact_name") @db.VarChar(120)
+  phoneInput                 String?                    @map("phone_input") @db.VarChar(40)
+  phoneCountry               String?                    @map("phone_country") @db.Char(2)
+  phoneE164                  String?                    @map("phone_e164") @db.VarChar(16)
+  invitationType             InvitationType?            @map("invitation_type")
+  maxCompanions              Int?                       @map("max_companions")
+  members                    Json                       @default("[]")
+  internalNote               String?                    @map("internal_note") @db.VarChar(1000)
+  status                     ImportRowStatus            @default(UNMAPPED)
+  validationErrors           Json                       @default("[]") @map("validation_errors")
+  validationWarnings         Json                       @default("[]") @map("validation_warnings")
+  normalizedHash             String?                    @map("normalized_hash") @db.Char(64)
+  duplicateResolution        ImportDuplicateResolution? @map("duplicate_resolution")
+  duplicateOfRowId           String?                    @map("duplicate_of_row_id") @db.Uuid
+  duplicateInvitationGroupId String?                    @map("duplicate_invitation_group_id") @db.Uuid
+  importedInvitationGroupId  String?                    @map("imported_invitation_group_id") @db.Uuid
+  correctedBy                String?                    @map("corrected_by") @db.Uuid
+  revision                   Int                        @default(1)
+  validatedAt                DateTime?                  @map("validated_at")
+  correctedAt                DateTime?                  @map("corrected_at")
+  skippedAt                  DateTime?                  @map("skipped_at")
+  importedAt                 DateTime?                  @map("imported_at")
+  createdAt                  DateTime                   @default(now()) @map("created_at")
+  updatedAt                  DateTime                   @updatedAt @map("updated_at")
+
+  event               Event            @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  importJob           ImportJob        @relation(fields: [importJobId, eventId], references: [id, eventId], onDelete: Restrict)
+  corrector           User?            @relation("ImportRowCorrector", fields: [correctedBy], references: [id], onDelete: Restrict)
+  duplicateOf         ImportRow?       @relation("ImportRowDuplicate", fields: [duplicateOfRowId, importJobId], references: [id, importJobId], onDelete: Restrict)
+  duplicateRows       ImportRow[]      @relation("ImportRowDuplicate")
+  duplicateInvitation InvitationGroup? @relation("ImportRowExistingDuplicate", fields: [duplicateInvitationGroupId, eventId], references: [id, eventId], onDelete: Restrict)
+  importedInvitation  InvitationGroup? @relation("ImportRowImportedInvitation", fields: [importedInvitationGroupId, eventId], references: [id, eventId], onDelete: Restrict)
+
+  @@unique([id, importJobId], map: "import_rows_id_job_key")
+  @@unique([importJobId, sourceRowNumber], map: "import_rows_source_row_key")
+  @@unique([importedInvitationGroupId, eventId], map: "import_rows_imported_invitation_key")
+  @@index([importJobId, status, sourceRowNumber], map: "import_rows_job_status_source_row_idx")
+  @@index([importJobId, normalizedHash], map: "import_rows_job_normalized_hash_idx")
+  @@index([eventId, phoneE164], map: "import_rows_event_phone_idx")
+  @@index([duplicateInvitationGroupId], map: "import_rows_duplicate_invitation_idx")
+  @@map("import_rows")
+}
+
+model InvitationTemplate {
+  id                    String         @id @default(uuid()) @db.Uuid
+  eventId               String         @map("event_id") @db.Uuid
+  assetId               String?        @map("asset_id") @db.Uuid
+  createdBy             String         @map("created_by") @db.Uuid
+  templateKey           String         @map("template_key") @db.VarChar(80)
+  version               Int
+  locale                UserLocale
+  status                TemplateStatus @default(DRAFT)
+  displayName           String         @map("display_name") @db.VarChar(120)
+  provider              String         @default("META_WHATSAPP") @db.VarChar(64)
+  providerTemplateName  String?        @map("provider_template_name") @db.VarChar(255)
+  bodyTemplate          String         @map("body_template") @db.Text
+  extraMessageTemplate  String?        @map("extra_message_template") @db.Text
+  variableSchema        Json           @default("[]") @map("variable_schema")
+  interactiveComponents Json           @default("[]") @map("interactive_components")
+  contentHash           String         @map("content_hash") @db.Char(64)
+  isDefault             Boolean        @default(false) @map("is_default")
+  approvedAt            DateTime?      @map("approved_at")
+  archivedAt            DateTime?      @map("archived_at")
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+
+  event     Event                       @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  asset     StoredAsset?                @relation(fields: [assetId, eventId], references: [id, eventId], onDelete: Restrict)
+  creator   User                        @relation("InvitationTemplateCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  snapshots InvitationContentSnapshot[]
+
+  @@unique([id, eventId], map: "invitation_templates_id_event_key")
+  @@unique([id, eventId, version, locale], map: "invitation_template_snapshot_ref_key")
+  @@unique([eventId, templateKey, locale, version], map: "invitation_template_version_key")
+  @@index([eventId, locale, status, createdAt(sort: Desc), id], map: "invitation_templates_event_locale_status_created_id_idx")
+  @@map("invitation_templates")
+}
+
+model InvitationContentSnapshot {
+  id                   String     @id @default(uuid()) @db.Uuid
+  eventId              String     @map("event_id") @db.Uuid
+  invitationGroupId    String     @map("invitation_group_id") @db.Uuid
+  templateId           String     @map("template_id") @db.Uuid
+  templateVersion      Int        @map("template_version")
+  locale               UserLocale
+  assetId              String?    @map("asset_id") @db.Uuid
+  createdBy            String     @map("created_by") @db.Uuid
+  variables            Json
+  renderedBody         String     @map("rendered_body") @db.Text
+  renderedExtraMessage String?    @map("rendered_extra_message") @db.Text
+  renderedContent      Json       @map("rendered_content")
+  readinessResult      Json       @map("readiness_result")
+  isReady              Boolean    @map("is_ready")
+  sourceHash           String     @map("source_hash") @db.Char(64)
+  contentHash          String     @map("content_hash") @db.Char(64)
+  assetSha256          String?    @map("asset_sha256") @db.Char(64)
+  assetMetadata        Json?      @map("asset_metadata")
+  createdAt            DateTime   @default(now()) @map("created_at")
+
+  event           Event              @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  invitationGroup InvitationGroup    @relation(fields: [invitationGroupId, eventId], references: [id, eventId], onDelete: Restrict)
+  template        InvitationTemplate @relation(fields: [templateId, eventId, templateVersion, locale], references: [id, eventId, version, locale], onDelete: Restrict, onUpdate: Restrict)
+  asset           StoredAsset?       @relation(fields: [assetId, eventId], references: [id, eventId], onDelete: Restrict)
+  creator         User               @relation("InvitationSnapshotCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@unique([invitationGroupId, contentHash], map: "invitation_snapshots_content_key")
+  @@unique([invitationGroupId, sourceHash], map: "invitation_snapshots_source_hash_key")
+  @@index([eventId, isReady, createdAt(sort: Desc), id], map: "invitation_snapshots_event_ready_created_id_idx")
+  @@index([templateId, createdAt(sort: Desc), id], map: "invitation_snapshots_template_created_id_idx")
+  @@map("invitation_content_snapshots")
 }
 
 model GuestMember {

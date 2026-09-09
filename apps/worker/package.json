@@ -12,7 +12,11 @@
   },
   "dependencies": {
     "@dawah/config": "workspace:*",
+    "@dawah/domain": "workspace:*",
+    "@dawah/imports": "workspace:*",
     "@dawah/queue": "workspace:*",
+    "@dawah/storage": "workspace:*",
+    "@prisma/client": "6.19.3",
     "bullmq": "6.3.4"
   },
   "devDependencies": {

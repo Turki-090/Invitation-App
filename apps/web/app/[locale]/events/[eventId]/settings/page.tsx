@@ -30,6 +30,7 @@ export default async function EventSettingsPage({
       eventsCopy={dictionary.events}
       guestsCopy={dictionary.guests}
       locale={locale}
+      preparationCopy={dictionary.preparation}
       section="settings"
       shellCopy={dictionary.shell}
     />

@@ -114,6 +114,7 @@ function renderWorkspace(section: "overview" | "settings") {
         eventsCopy={en.events}
         guestsCopy={en.guests}
         locale="en"
+        preparationCopy={en.preparation}
         section={section}
         shellCopy={en.shell}
       />
@@ -170,6 +171,11 @@ describe("event workspace", () => {
         .getByRole("link", { name: en.workspace.openMap })
         .getAttribute("href"),
     ).toBe(event.mapUrl);
+    expect(
+      screen
+        .getAllByRole("link", { name: en.preparation.navigation })[0]
+        ?.getAttribute("href"),
+    ).toBe(`/en/events/${eventId}/preparation`);
 
     await user.selectOptions(
       screen.getByLabelText(en.workspace.switchEvent),

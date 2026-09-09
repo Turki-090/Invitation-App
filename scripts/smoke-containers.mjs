@@ -3,9 +3,24 @@ import { spawn } from "node:child_process";
 const docker = process.platform === "win32" ? "docker.exe" : "docker";
 const databaseUrl = process.env.DATABASE_URL;
 const redisUrl = process.env.REDIS_URL;
-if (!databaseUrl || !redisUrl) {
+const storageEndpoint = process.env.STORAGE_ENDPOINT;
+const storageRegion = process.env.STORAGE_REGION;
+const storageAccessKeyId = process.env.STORAGE_ACCESS_KEY_ID;
+const storageSecretAccessKey = process.env.STORAGE_SECRET_ACCESS_KEY;
+const storagePrivateBucket = process.env.STORAGE_PRIVATE_BUCKET;
+const storageForcePathStyle = process.env.STORAGE_FORCE_PATH_STYLE;
+if (
+  !databaseUrl ||
+  !redisUrl ||
+  !storageEndpoint ||
+  !storageRegion ||
+  !storageAccessKeyId ||
+  !storageSecretAccessKey ||
+  !storagePrivateBucket ||
+  !storageForcePathStyle
+) {
   throw new Error(
-    "DATABASE_URL and REDIS_URL are required for container smoke tests.",
+    "Database, Redis, and private object-storage settings are required for container smoke tests.",
   );
 }
 
@@ -33,6 +48,20 @@ try {
     "--env",
     `REDIS_URL=${containerReachableUrl(redisUrl)}`,
     "--env",
+    `QUEUE_PREFIX=dawah:container-smoke:${suffix}`,
+    "--env",
+    `STORAGE_ENDPOINT=${containerReachableUrl(storageEndpoint)}`,
+    "--env",
+    `STORAGE_REGION=${storageRegion}`,
+    "--env",
+    `STORAGE_ACCESS_KEY_ID=${storageAccessKeyId}`,
+    "--env",
+    `STORAGE_SECRET_ACCESS_KEY=${storageSecretAccessKey}`,
+    "--env",
+    `STORAGE_PRIVATE_BUCKET=${storagePrivateBucket}`,
+    "--env",
+    `STORAGE_FORCE_PATH_STYLE=${storageForcePathStyle}`,
+    "--env",
     "API_PORT=4200",
     "--env",
     "API_CORS_ORIGINS=http://127.0.0.1:3100",
@@ -58,7 +87,21 @@ try {
     "--env",
     `REDIS_URL=${containerReachableUrl(redisUrl)}`,
     "--env",
+    `DATABASE_URL=${containerReachableUrl(databaseUrl)}`,
+    "--env",
     `QUEUE_PREFIX=dawah:container-smoke:${suffix}`,
+    "--env",
+    `STORAGE_ENDPOINT=${containerReachableUrl(storageEndpoint)}`,
+    "--env",
+    `STORAGE_REGION=${storageRegion}`,
+    "--env",
+    `STORAGE_ACCESS_KEY_ID=${storageAccessKeyId}`,
+    "--env",
+    `STORAGE_SECRET_ACCESS_KEY=${storageSecretAccessKey}`,
+    "--env",
+    `STORAGE_PRIVATE_BUCKET=${storagePrivateBucket}`,
+    "--env",
+    `STORAGE_FORCE_PATH_STYLE=${storageForcePathStyle}`,
     "--env",
     "WORKER_PORT=4201",
     "dawah-worker:stage1",

@@ -221,6 +221,8 @@ Verification record:
 
 Goal: let hosts prepare large, valid invitation lists and approved invitation content before sending.
 
+Status: **Complete** — exit gate verified on 2026-09-09.
+
 Work:
 
 - Add object storage abstraction and private buckets/keys for imports, event imagery, invitation assets, and generated files.
@@ -235,6 +237,15 @@ Exit gate:
 
 - A representative large spreadsheet can be imported with row-level errors and no partial silent corruption.
 - Every invitation has a server-computed readiness result and a reproducible content snapshot before send.
+
+Verification record:
+
+- Private object storage now uses strict tenant/event-scoped keys for import sources, event imagery, invitation assets, and generated files. Uploads enforce extension, MIME, byte, filename/control-character, image-dimension, decoding, and parser limits; image assets are decoded and re-encoded before storage.
+- PostgreSQL-backed import jobs and rows, BullMQ worker processing, and the localized preparation workspace implement upload, mapping, validation, paged error review, optional-field correction, explicit duplicate decisions, revalidation, atomic confirmation, cancellation cleanup, and append-only audit evidence for UTF-8 CSV and hardened XLSX input.
+- The representative PostgreSQL integration fixture parses 1,003 rows, preserves row-level parser findings, corrects and revalidates recoverable errors, imports 1,001 groups atomically, explicitly skips two duplicates, rejects cross-tenant access, and proves idempotent confirmation without partial or silent corruption.
+- Versioned invitation templates support lifecycle and locale-family locking. Server preview/readiness covers every active invitation, while immutable content snapshots retain source hashes and rendered variables so approved output remains reproducible after later guest or template edits.
+- The Arabic RTL and English LTR preparation route provides asset management, CSV/XLSX import and review, template editing/approval, invitation and WhatsApp previews, readiness issues, and snapshot creation with responsive loading, empty, and error states.
+- 194 unit, contract, component, parser, storage, API, and worker tests plus 19 real-PostgreSQL integration tests pass. Format, lint, OpenAPI validation/drift, Prisma validation/drift, type checks, production builds, startup smoke, 42 Storybook accessibility/visual cases, a live S3-compatible storage round trip, and production API/worker container readiness all pass.
 
 ### Stage 6 — Implement WhatsApp messaging and the reliable worker
 
@@ -376,4 +387,4 @@ Exit gate:
 
 ## Immediate next action
 
-Begin Stage 5 with private object storage and import job/row foundations, then add secure `.xlsx`/`.csv` parsing and mapping, row-level validation and confirmation, invitation templates, immutable content snapshots, and preview/readiness workflows. Keep all Stage 1–4 gates green while hosts prepare large invitation lists and approved content for sending.
+Begin Stage 6 with the WhatsApp provider abstraction, immutable message-attempt and send-batch persistence, idempotent queueing, retry/failure classification, signed webhook ingestion, and sending-center progress. Preserve the Stage 5 readiness and content-snapshot boundary so no unapproved or stale invitation content can enter a send batch.

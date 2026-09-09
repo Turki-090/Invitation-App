@@ -38,6 +38,12 @@ jobs:
       DATABASE_URL: postgresql://dawah_test:dawah_test@localhost:5432/dawah_test?schema=public
       REDIS_URL: redis://localhost:6379
       QUEUE_PREFIX: dawah:ci
+      STORAGE_ENDPOINT: http://localhost:7070
+      STORAGE_REGION: us-east-1
+      STORAGE_ACCESS_KEY_ID: dawah-test-access-key
+      STORAGE_SECRET_ACCESS_KEY: dawah-test-secret-key
+      STORAGE_PRIVATE_BUCKET: dawah-private-test
+      STORAGE_FORCE_PATH_STYLE: "true"
       DAWAH_DEV_AUTH_BYPASS: "false"
       NEXT_PUBLIC_DAWAH_DEV_AUTH_BYPASS: "false"
       API_PORT: "4100"

@@ -261,6 +261,413 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/events/{eventId}/imports/limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Get guest import limits
+         * @description Returns the server-enforced file and parser limits before a host uploads a source file.
+         */
+        get: operations["getImportLimits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** List guest import jobs */
+        get: operations["listImportJobs"];
+        put?: never;
+        /**
+         * Upload a guest import source
+         * @description Validates the source envelope, stores it privately, creates an import job, and queues bounded parsing.
+         */
+        post: operations["uploadImportSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/imports/{importJobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Guest import-job UUID. */
+                importJobId: components["parameters"]["ImportJobId"];
+            };
+            cookie?: never;
+        };
+        /** Get an import job and review rows */
+        get: operations["getImportJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/imports/{importJobId}/mapping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Guest import-job UUID. */
+                importJobId: components["parameters"]["ImportJobId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Map import columns and queue validation
+         * @description Saves a one-to-one source-column mapping under optimistic concurrency and revalidates every row asynchronously.
+         */
+        patch: operations["updateImportMapping"];
+        trace?: never;
+    };
+    "/events/{eventId}/imports/{importJobId}/rows/{rowId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Guest import-job UUID. */
+                importJobId: components["parameters"]["ImportJobId"];
+                /** @description Import-row UUID. */
+                rowId: components["parameters"]["ImportRowId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Correct an import row
+         * @description Applies explicit corrections, preserves the source row, and revalidates under optimistic job concurrency.
+         */
+        patch: operations["updateImportRow"];
+        trace?: never;
+    };
+    "/events/{eventId}/imports/{importJobId}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Guest import-job UUID. */
+                importJobId: components["parameters"]["ImportJobId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a reviewed guest import
+         * @description Atomically creates all accepted invitation groups after an explicit duplicate decision.
+         */
+        post: operations["confirmImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/imports/{importJobId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Guest import-job UUID. */
+                importJobId: components["parameters"]["ImportJobId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a guest import
+         * @description Cancels a non-completed import while preserving its file, rows, and audit history.
+         */
+        post: operations["cancelImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** List private event assets */
+        get: operations["listAssets"];
+        put?: never;
+        /**
+         * Upload a private event asset
+         * @description Verifies the image signature, dimensions, decompression bounds, and checksum before private storage.
+         */
+        post: operations["uploadAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/assets/{assetId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Private stored-asset UUID. */
+                assetId: components["parameters"]["AssetId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Download private asset content
+         * @description Streams authorized event-owned image bytes with private, no-store caching.
+         */
+        get: operations["getAssetContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/assets/{assetId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Private stored-asset UUID. */
+                assetId: components["parameters"]["AssetId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive a private asset
+         * @description Archives an unused asset without deleting its immutable storage record.
+         */
+        post: operations["archiveAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** List invitation templates */
+        get: operations["listInvitationTemplates"];
+        put?: never;
+        /**
+         * Create an invitation template
+         * @description Creates the first immutable version of a locale-specific invitation template.
+         */
+        post: operations["createInvitationTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/templates/{templateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-template version UUID. */
+                templateId: components["parameters"]["TemplateId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Create a new invitation template version
+         * @description Applies an optimistic edit by creating a new immutable draft version and retaining prior versions.
+         */
+        patch: operations["updateInvitationTemplate"];
+        trace?: never;
+    };
+    "/events/{eventId}/templates/{templateId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-template version UUID. */
+                templateId: components["parameters"]["TemplateId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve an invitation template version */
+        post: operations["approveInvitationTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/templates/{templateId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-template version UUID. */
+                templateId: components["parameters"]["TemplateId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive an invitation template version */
+        post: operations["archiveInvitationTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/preparation/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview invitation content
+         * @description Renders the server-authoritative message, scope text, and reply actions without sending it.
+         */
+        post: operations["previewInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/preparation/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Compute invitation readiness
+         * @description Computes every invitation's blocking issues and snapshot freshness against an approved template.
+         */
+        get: operations["getInvitationReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/preparation/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prepare immutable invitation snapshots
+         * @description Atomically creates or reuses reproducible content snapshots for all invitations or an explicit bounded selection.
+         */
+        post: operations["createInvitationSnapshots"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -531,6 +938,325 @@ export type components = {
         };
         /** @description A general lifecycle conflict or the structured duplicate-phone decision response. */
         InvitationMutationConflict: components["schemas"]["DuplicateInvitationConflict"] | components["schemas"]["ApiError"];
+        /** @enum {string} */
+        ImportJobStatus: "UPLOADED" | "PARSING" | "AWAITING_MAPPING" | "VALIDATING" | "REVIEWING" | "READY" | "IMPORTING" | "COMPLETED" | "CANCELLED" | "FAILED";
+        /** @enum {string} */
+        ImportRowStatus: "UNMAPPED" | "VALID" | "INVALID" | "DUPLICATE" | "SKIPPED" | "IMPORTED";
+        /** @enum {string} */
+        ImportMappingField: "displayName" | "contactName" | "phoneNumber" | "phoneCountry" | "invitationType" | "maxCompanions" | "members" | "internalNote";
+        ImportColumnMapping: {
+            displayName: string;
+            contactName?: string;
+            phoneNumber: string;
+            phoneCountry?: string;
+            invitationType?: string;
+            maxCompanions?: string;
+            members?: string;
+            internalNote?: string;
+        };
+        ImportSuggestedColumnMapping: {
+            displayName?: string;
+            contactName?: string;
+            phoneNumber?: string;
+            phoneCountry?: string;
+            invitationType?: string;
+            maxCompanions?: string;
+            members?: string;
+            internalNote?: string;
+        };
+        ImportIssue: {
+            code: string;
+            field: components["schemas"]["ImportMappingField"] | "row";
+            message: string;
+            duplicateInvitationIds?: string[];
+            duplicateRowNumbers?: number[];
+        };
+        NormalizedImportMember: {
+            name: string;
+            isPrimary: boolean;
+        };
+        NormalizedImportInvitation: {
+            displayName: string;
+            contactName: string;
+            phoneE164: string;
+            phoneCountry: string;
+            invitationType: components["schemas"]["InvitationType"];
+            maxCompanions: number;
+            members: components["schemas"]["NormalizedImportMember"][];
+            internalNote: string | null;
+        };
+        ImportSourceData: {
+            [key: string]: string | number | boolean | null;
+        };
+        ImportRow: {
+            /** Format: uuid */
+            id: string;
+            rowNumber: number;
+            status: components["schemas"]["ImportRowStatus"];
+            sourceData: components["schemas"]["ImportSourceData"];
+            correctedData: components["schemas"]["ImportSourceData"] | null;
+            normalizedData: components["schemas"]["NormalizedImportInvitation"] | null;
+            errors: components["schemas"]["ImportIssue"][];
+            warnings: components["schemas"]["ImportIssue"][];
+            /** Format: uuid */
+            importedInvitationGroupId: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ImportJobSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            status: components["schemas"]["ImportJobStatus"];
+            originalFilename: string;
+            mediaType: string;
+            fileSizeBytes: number;
+            worksheetName: string | null;
+            totalRows: number;
+            validRows: number;
+            invalidRows: number;
+            duplicateRows: number;
+            importedRows: number;
+            skippedRows: number;
+            version: number;
+            failureCode: string | null;
+            failureMessage: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            completedAt: string | null;
+            /** Format: date-time */
+            cancelledAt: string | null;
+        };
+        ListImportJobsResponse: {
+            items: components["schemas"]["ImportJobSummary"][];
+            pagination: {
+                page: number;
+                pageSize: number;
+                totalItems: number;
+                totalPages: number;
+            };
+        };
+        ImportJobDetail: components["schemas"]["ImportJobSummary"] & {
+            headers: string[];
+            suggestedMapping: components["schemas"]["ImportSuggestedColumnMapping"] | null;
+            columnMapping: components["schemas"]["ImportColumnMapping"] | null;
+        };
+        ImportJobDetailResponse: {
+            job: components["schemas"]["ImportJobDetail"];
+            rows: components["schemas"]["ImportRow"][];
+            pagination: {
+                page: number;
+                pageSize: number;
+                totalItems: number;
+                totalPages: number;
+            };
+        };
+        UpdateImportMapping: {
+            mapping: components["schemas"]["ImportColumnMapping"];
+            expectedVersion: number;
+        };
+        ImportRowCorrections: {
+            displayName?: string | number | null;
+            contactName?: string | number | null;
+            phoneNumber?: string | number | null;
+            phoneCountry?: string | number | null;
+            invitationType?: string | number | null;
+            maxCompanions?: string | number | null;
+            members?: string | number | null;
+            internalNote?: string | number | null;
+        };
+        UpdateImportRow: {
+            corrections: components["schemas"]["ImportRowCorrections"];
+            expectedJobVersion: number;
+        };
+        ConfirmImport: {
+            /** @enum {string} */
+            duplicatePolicy: "SKIP" | "IMPORT";
+            expectedVersion: number;
+        };
+        ConfirmImportResult: {
+            /** Format: uuid */
+            importJobId: string;
+            importedRows: number;
+            skippedRows: number;
+            duplicateRowsImported: number;
+            invitationGroupIds: string[];
+            /** Format: date-time */
+            completedAt: string;
+        };
+        ImportLimits: {
+            acceptedExtensions: [
+                ".xlsx",
+                ".csv"
+            ];
+            maximumFileBytes: number;
+            maximumRows: number;
+            maximumColumns: number;
+            maximumCellCharacters: number;
+        };
+        /** @enum {string} */
+        AssetKind: "EVENT_IMAGE" | "INVITATION_ASSET";
+        /** @enum {string} */
+        AssetMediaType: "image/jpeg" | "image/png" | "image/webp";
+        StoredAsset: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            kind: components["schemas"]["AssetKind"];
+            originalFilename: string;
+            mediaType: components["schemas"]["AssetMediaType"];
+            sizeBytes: number;
+            checksumSha256: string;
+            width: number;
+            height: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        ListAssetsResponse: {
+            items: components["schemas"]["StoredAsset"][];
+        };
+        AssetUpload: {
+            /** @enum {string} */
+            kind: "EVENT_IMAGE" | "INVITATION_ASSET";
+            /**
+             * Format: binary
+             * @description A JPEG, PNG, or WebP image whose signature matches its declared media type.
+             */
+            file: string;
+        };
+        /** @enum {string} */
+        TemplateStatus: "DRAFT" | "APPROVED" | "ARCHIVED";
+        /** @enum {string} */
+        PreparationLocale: "ar-SA" | "en";
+        /** @enum {string} */
+        MessageVariable: "guest_name" | "event_name" | "event_date" | "event_time" | "venue" | "allowed_companions";
+        MessageVariables: {
+            guest_name?: string;
+            event_name?: string;
+            event_date?: string;
+            event_time?: string;
+            venue?: string;
+            allowed_companions?: string;
+        };
+        CreateInvitationTemplate: {
+            name: string;
+            locale: components["schemas"]["PreparationLocale"];
+            body: string;
+            extraMessage?: string;
+            /** Format: uuid */
+            assetId?: string | null;
+        };
+        UpdateInvitationTemplate: {
+            name?: string;
+            locale?: components["schemas"]["PreparationLocale"];
+            body?: string;
+            extraMessage?: string | null;
+            /** Format: uuid */
+            assetId?: string | null;
+            expectedVersion: number;
+        } | unknown | unknown | unknown | unknown | unknown;
+        InvitationTemplate: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            name: string;
+            locale: components["schemas"]["PreparationLocale"];
+            body: string;
+            extraMessage: string | null;
+            variableKeys: components["schemas"]["MessageVariable"][];
+            /** Format: uuid */
+            assetId: string | null;
+            assetChecksumSha256: string | null;
+            status: components["schemas"]["TemplateStatus"];
+            version: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            approvedAt: string | null;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        ListInvitationTemplatesResponse: {
+            items: components["schemas"]["InvitationTemplate"][];
+        };
+        ApproveInvitationTemplate: {
+            expectedVersion: number;
+        };
+        InvitationPreviewRequest: {
+            /** Format: uuid */
+            templateId: string;
+            invitationType: components["schemas"]["InvitationType"];
+            /** Format: uuid */
+            invitationId?: string;
+        };
+        InvitationPreview: {
+            /** Format: uuid */
+            templateId: string;
+            templateVersion: number;
+            locale: components["schemas"]["PreparationLocale"];
+            invitationType: components["schemas"]["InvitationType"];
+            renderedBody: string;
+            renderedExtraMessage: string | null;
+            scopeDescription: string;
+            replyActions: string[];
+            variables: components["schemas"]["MessageVariables"];
+            /** Format: uuid */
+            assetId: string | null;
+        };
+        ReadinessIssue: {
+            code: string;
+            field: string;
+            message: string;
+        };
+        InvitationReadinessItem: {
+            /** Format: uuid */
+            invitationId: string;
+            ready: boolean;
+            issues: components["schemas"]["ReadinessIssue"][];
+            sourceHash: string | null;
+            /** Format: uuid */
+            latestSnapshotId: string | null;
+        };
+        ReadinessResponse: {
+            template: components["schemas"]["InvitationTemplate"];
+            summary: {
+                totalInvitations: number;
+                readyInvitations: number;
+                blockedInvitations: number;
+                snapshottedInvitations: number;
+            };
+            items: components["schemas"]["InvitationReadinessItem"][];
+            pagination: {
+                page: number;
+                pageSize: number;
+                totalItems: number;
+                totalPages: number;
+            };
+        };
+        CreatePreparationSnapshots: {
+            /** Format: uuid */
+            templateId: string;
+            invitationIds?: string[];
+        };
+        CreatePreparationSnapshotsResult: {
+            /** Format: uuid */
+            templateId: string;
+            createdCount: number;
+            reusedCount: number;
+            blockedCount: number;
+            snapshotIds: string[];
+            blockedInvitationIds: string[];
+        };
     };
     responses: {
         /** @description Missing, invalid, or expired host token. */
@@ -578,6 +1304,15 @@ export type components = {
                 "application/json": components["schemas"]["ApiError"];
             };
         };
+        /** @description The uploaded source exceeds the configured byte limit. */
+        PayloadTooLarge: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ApiError"];
+            };
+        };
         /** @description The request rate limit was exceeded. */
         TooManyRequests: {
             headers: {
@@ -602,6 +1337,14 @@ export type components = {
         EventId: string;
         /** @description Invitation-group UUID. */
         InvitationId: string;
+        /** @description Guest import-job UUID. */
+        ImportJobId: string;
+        /** @description Import-row UUID. */
+        ImportRowId: string;
+        /** @description Private stored-asset UUID. */
+        AssetId: string;
+        /** @description Invitation-template version UUID. */
+        TemplateId: string;
     };
     requestBodies: never;
     headers: never;
@@ -1086,6 +1829,663 @@ export interface operations {
                     "application/json": components["schemas"]["InvitationDetail"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getImportLimits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current import limits and accepted source formats. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportLimits"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listImportJobs: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                status?: components["schemas"]["ImportJobStatus"];
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of import jobs for the event. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListImportJobsResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    uploadImportSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description A UTF-8 CSV or hardened XLSX source file.
+                     */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Import job created and queued for parsing. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobSummary"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getImportJob: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                rowStatus?: components["schemas"]["ImportRowStatus"];
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Guest import-job UUID. */
+                importJobId: components["parameters"]["ImportJobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Import state, mappings, validation totals, and a page of review rows. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobDetailResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    updateImportMapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Guest import-job UUID. */
+                importJobId: components["parameters"]["ImportJobId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateImportMapping"];
+            };
+        };
+        responses: {
+            /** @description Updated import job summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobSummary"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    updateImportRow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Guest import-job UUID. */
+                importJobId: components["parameters"]["ImportJobId"];
+                /** @description Import-row UUID. */
+                rowId: components["parameters"]["ImportRowId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateImportRow"];
+            };
+        };
+        responses: {
+            /** @description Updated import job summary after row revalidation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobSummary"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    confirmImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Guest import-job UUID. */
+                importJobId: components["parameters"]["ImportJobId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmImport"];
+            };
+        };
+        responses: {
+            /** @description Completed import result; repeated confirmation returns the same committed result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmImportResult"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    cancelImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Guest import-job UUID. */
+                importJobId: components["parameters"]["ImportJobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled import job, or the unchanged job when it was already cancelled. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listAssets: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["AssetKind"];
+                includeArchived?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event-owned assets filtered by kind and archive state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAssetsResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    uploadAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["AssetUpload"];
+            };
+        };
+        responses: {
+            /** @description Validated private asset metadata. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoredAsset"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getAssetContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Private stored-asset UUID. */
+                assetId: components["parameters"]["AssetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Original validated image bytes. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "private, no-store";
+                    "Content-Length"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    archiveAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Private stored-asset UUID. */
+                assetId: components["parameters"]["AssetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archived asset, or the unchanged asset when it was already archived. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoredAsset"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listInvitationTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every versioned template owned by the event. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListInvitationTemplatesResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    createInvitationTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInvitationTemplate"];
+            };
+        };
+        responses: {
+            /** @description Draft invitation template. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationTemplate"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    updateInvitationTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-template version UUID. */
+                templateId: components["parameters"]["TemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInvitationTemplate"];
+            };
+        };
+        responses: {
+            /** @description Newly created draft template version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationTemplate"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    approveInvitationTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-template version UUID. */
+                templateId: components["parameters"]["TemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveInvitationTemplate"];
+            };
+        };
+        responses: {
+            /** @description Approved template version ready for snapshot preparation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationTemplate"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    archiveInvitationTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-template version UUID. */
+                templateId: components["parameters"]["TemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archived template, or the unchanged template when it was already archived. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationTemplate"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    previewInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitationPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Server-rendered invitation preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationPreview"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getInvitationReadiness: {
+        parameters: {
+            query: {
+                templateId: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-computed readiness summary and invitation page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    createInvitationSnapshots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePreparationSnapshots"];
+            };
+        };
+        responses: {
+            /** @description Snapshot preparation result, including invitations blocked by readiness issues. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatePreparationSnapshotsResult"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

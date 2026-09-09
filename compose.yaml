@@ -45,6 +45,45 @@ services:
       timeout: 5s
       retries: 10
 
+  object-storage:
+    image: versity/versitygw:v1.7.0
+    environment:
+      ROOT_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-dawah-local-access-key}
+      ROOT_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-dawah-local-secret-key}
+      VGW_BACKEND: posix
+      VGW_BACKEND_ARGS: /mnt/data
+      VGW_PORT: ":7070"
+      VGW_HEALTH: /_/health
+    ports:
+      - "7070:7070"
+    volumes:
+      - dawah-object-storage:/mnt/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:7070/_/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  object-storage-init:
+    image: amazon/aws-cli:2.36.40
+    environment:
+      AWS_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-dawah-local-access-key}
+      AWS_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-dawah-local-secret-key}
+      AWS_DEFAULT_REGION: ${STORAGE_REGION:-us-east-1}
+      AWS_EC2_METADATA_DISABLED: "true"
+      PRIVATE_BUCKET: ${STORAGE_PRIVATE_BUCKET:-dawah-private}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        aws --endpoint-url http://object-storage:7070 s3api head-bucket
+        --bucket "$$PRIVATE_BUCKET" >/dev/null 2>&1 ||
+        aws --endpoint-url http://object-storage:7070 s3api create-bucket
+        --bucket "$$PRIVATE_BUCKET"
+    depends_on:
+      object-storage:
+        condition: service_healthy
+
   api:
     profiles: ["app"]
     build:
@@ -55,6 +94,19 @@ services:
       DAWAH_ENV: local
       DATABASE_URL: postgresql://dawah:dawah@postgres:5432/dawah?schema=public
       REDIS_URL: redis://redis:6379
+      QUEUE_PREFIX: dawah:local
+      STORAGE_ENDPOINT: http://object-storage:7070
+      STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-dawah-local-access-key}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-dawah-local-secret-key}
+      STORAGE_PRIVATE_BUCKET: ${STORAGE_PRIVATE_BUCKET:-dawah-private}
+      STORAGE_FORCE_PATH_STYLE: "true"
+      IMPORT_MAX_FILE_BYTES: ${IMPORT_MAX_FILE_BYTES:-8388608}
+      IMPORT_MAX_ROWS: ${IMPORT_MAX_ROWS:-5000}
+      IMPORT_MAX_COLUMNS: ${IMPORT_MAX_COLUMNS:-64}
+      IMPORT_MAX_CELL_CHARACTERS: ${IMPORT_MAX_CELL_CHARACTERS:-1000}
+      ASSET_MAX_FILE_BYTES: ${ASSET_MAX_FILE_BYTES:-8388608}
+      ASSET_MAX_IMAGE_PIXELS: ${ASSET_MAX_IMAGE_PIXELS:-24000000}
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_JWT_AUDIENCE: ${SUPABASE_JWT_AUDIENCE:-authenticated}
       DAWAH_DEV_AUTH_BYPASS: "false"
@@ -69,6 +121,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      object-storage:
+        condition: service_healthy
+      object-storage-init:
+        condition: service_completed_successfully
 
   worker:
     profiles: ["app"]
@@ -78,16 +134,36 @@ services:
     environment:
       NODE_ENV: production
       DAWAH_ENV: local
+      DATABASE_URL: postgresql://dawah:dawah@postgres:5432/dawah?schema=public
       REDIS_URL: redis://redis:6379
       QUEUE_PREFIX: dawah:local
+      STORAGE_ENDPOINT: http://object-storage:7070
+      STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-dawah-local-access-key}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-dawah-local-secret-key}
+      STORAGE_PRIVATE_BUCKET: ${STORAGE_PRIVATE_BUCKET:-dawah-private}
+      STORAGE_FORCE_PATH_STYLE: "true"
+      IMPORT_MAX_FILE_BYTES: ${IMPORT_MAX_FILE_BYTES:-8388608}
+      IMPORT_MAX_ROWS: ${IMPORT_MAX_ROWS:-5000}
+      IMPORT_MAX_COLUMNS: ${IMPORT_MAX_COLUMNS:-64}
+      IMPORT_MAX_CELL_CHARACTERS: ${IMPORT_MAX_CELL_CHARACTERS:-1000}
+      ASSET_MAX_FILE_BYTES: ${ASSET_MAX_FILE_BYTES:-8388608}
+      ASSET_MAX_IMAGE_PIXELS: ${ASSET_MAX_IMAGE_PIXELS:-24000000}
       WORKER_PORT: "4001"
       WORKER_READY_TIMEOUT_MS: "2000"
     ports:
       - "4001:4001"
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
+      object-storage:
+        condition: service_healthy
+      object-storage-init:
+        condition: service_completed_successfully
 
 volumes:
   dawah-postgres:
   dawah-redis:
+  dawah-object-storage:
