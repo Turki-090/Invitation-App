@@ -95,6 +95,12 @@ template versioning, readiness rules, immutable snapshots, and preparation UI
 are documented in
 [`docs/invitation-preparation-stage5.md`](docs/invitation-preparation-stage5.md).
 
+The Stage 6 WhatsApp provider boundary, confirmed and idempotent send batches,
+immutable message evidence, bounded worker behavior, signed webhook reduction,
+deterministic queue recovery, checksum-bound private invitation-image delivery,
+capability-aware localized UI, and current-snapshot safe-resend contract are documented in
+[`docs/whatsapp-messaging-stage6.md`](docs/whatsapp-messaging-stage6.md).
+
 ## API contract workflow
 
 `openapi/openapi.yaml` is the only public transport-contract source. After a

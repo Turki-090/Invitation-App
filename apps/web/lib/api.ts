@@ -21,6 +21,15 @@ import {
   type ListImportJobsResponse,
   type ListInvitationsQuery,
   type ReadinessResponse,
+  type CreateSendBatchInput,
+  type ListSendBatchesResponse,
+  type MessageListQuery,
+  type ResendMessageInput,
+  type ResendReadinessResponse,
+  type SendBatch,
+  type SendBatchDetail,
+  type SendReadinessRequest,
+  type SendReadinessResponse,
   type StoredAsset,
   type UpdateImportMappingInput,
   type UpdateImportRowInput,
@@ -464,10 +473,95 @@ export async function createPreparationSnapshots(
   );
 }
 
-function jsonRequest(method: "PATCH" | "POST", body: unknown): RequestInit {
+export async function getSendReadiness(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: SendReadinessRequest,
+): Promise<SendReadinessResponse> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/sending/readiness`,
+    jsonRequest("POST", input),
+  );
+}
+
+export async function createSendBatch(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: CreateSendBatchInput,
+  idempotencyKey: string,
+): Promise<SendBatch> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/send-batches`,
+    jsonRequest("POST", input, { "Idempotency-Key": idempotencyKey }),
+  );
+}
+
+export async function listSendBatches(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<ListSendBatchesResponse> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/send-batches?page=1&pageSize=20`,
+  );
+}
+
+export async function getSendBatch(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  batchId: string,
+  query: MessageListQuery = { page: 1, pageSize: 100 },
+): Promise<SendBatchDetail> {
+  const search = new URLSearchParams({
+    page: String(query.page),
+    pageSize: String(query.pageSize),
+  });
+  if (query.status) search.set("status", query.status);
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/send-batches/${batchId}?${search.toString()}`,
+  );
+}
+
+export async function getResendReadiness(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  messageId: string,
+): Promise<ResendReadinessResponse> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/messages/${messageId}/resend-readiness`,
+    { method: "POST" },
+  );
+}
+
+export async function resendMessage(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  messageId: string,
+  input: ResendMessageInput,
+  idempotencyKey: string,
+): Promise<SendBatch> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/messages/${messageId}/resend`,
+    jsonRequest("POST", input, { "Idempotency-Key": idempotencyKey }),
+  );
+}
+
+function jsonRequest(
+  method: "PATCH" | "POST",
+  body: unknown,
+  additionalHeaders?: HeadersInit,
+): RequestInit {
   return {
     body: JSON.stringify(body),
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...Object.fromEntries(new Headers(additionalHeaders)),
+    },
     method,
   };
 }

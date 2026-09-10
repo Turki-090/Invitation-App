@@ -9,6 +9,7 @@ import { EventsModule } from "./events/events.module";
 import { HealthModule } from "./health/health.module";
 import { InvitationsModule } from "./invitations/invitations.module";
 import { ImportsModule } from "./imports/imports.module";
+import { MessagingModule } from "./messaging/messaging.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PreparationModule } from "./preparation/preparation.module";
 
@@ -28,6 +29,7 @@ import { PreparationModule } from "./preparation/preparation.module";
     EventsModule,
     InvitationsModule,
     ImportsModule,
+    MessagingModule,
     PreparationModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

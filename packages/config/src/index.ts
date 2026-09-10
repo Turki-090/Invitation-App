@@ -28,8 +28,17 @@ export interface ImportAndAssetLimitsEnvironment {
   ASSET_MAX_IMAGE_PIXELS: number;
 }
 
+export interface WhatsappMediaEnvironment {
+  META_WHATSAPP_MEDIA_PUBLIC_BASE_URL: string;
+  META_WHATSAPP_MEDIA_SIGNING_SECRET: string;
+  META_WHATSAPP_MEDIA_URL_TTL_SECONDS: number;
+}
+
 export interface ApiEnvironment
-  extends StorageEnvironment, ImportAndAssetLimitsEnvironment {
+  extends
+    StorageEnvironment,
+    ImportAndAssetLimitsEnvironment,
+    WhatsappMediaEnvironment {
   NODE_ENV: NodeEnvironment;
   DAWAH_ENV: DeploymentEnvironment;
   DATABASE_URL: string;
@@ -42,10 +51,16 @@ export interface ApiEnvironment
   API_CORS_ORIGINS: string[];
   API_BODY_LIMIT_BYTES: number;
   API_READY_TIMEOUT_MS: number;
+  META_WHATSAPP_APP_SECRET: string;
+  META_WHATSAPP_WEBHOOK_VERIFY_TOKEN: string;
+  META_WHATSAPP_PHONE_NUMBER_ID: string;
 }
 
 export interface WorkerEnvironment
-  extends StorageEnvironment, ImportAndAssetLimitsEnvironment {
+  extends
+    StorageEnvironment,
+    ImportAndAssetLimitsEnvironment,
+    WhatsappMediaEnvironment {
   NODE_ENV: NodeEnvironment;
   DAWAH_ENV: DeploymentEnvironment;
   DATABASE_URL: string;
@@ -53,6 +68,13 @@ export interface WorkerEnvironment
   QUEUE_PREFIX: string;
   WORKER_PORT: number;
   WORKER_READY_TIMEOUT_MS: number;
+  META_WHATSAPP_ACCESS_TOKEN: string;
+  META_WHATSAPP_PHONE_NUMBER_ID: string;
+  META_WHATSAPP_GRAPH_API_VERSION: string;
+  META_WHATSAPP_REQUEST_TIMEOUT_MS: number;
+  META_WHATSAPP_SEND_CONCURRENCY: number;
+  META_WHATSAPP_MAX_SENDS_PER_SECOND: number;
+  META_WHATSAPP_MAX_ATTEMPTS: number;
 }
 
 export interface WebEnvironment {
@@ -110,6 +132,26 @@ const importAndAssetLimitsShape = {
   ASSET_MAX_IMAGE_PIXELS: positiveInteger.default(24_000_000),
 } as const;
 
+const whatsappMediaShape = {
+  META_WHATSAPP_MEDIA_PUBLIC_BASE_URL: z
+    .url({ protocol: /^https?$/ })
+    .refine(isWhatsappMediaApiBaseUrl, {
+      message:
+        "The WhatsApp media base URL must end in /api/v1 and cannot contain credentials, a query, or a fragment.",
+    })
+    .default("http://localhost:4000/api/v1"),
+  META_WHATSAPP_MEDIA_SIGNING_SECRET: z
+    .string()
+    .min(32)
+    .default("dawah-local-meta-media-signing-secret"),
+  META_WHATSAPP_MEDIA_URL_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60)
+    .default(15 * 60),
+} as const;
+
 const runtimeShape = {
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -122,6 +164,7 @@ const apiEnvironmentSchema = z
     ...runtimeShape,
     ...storageShape,
     ...importAndAssetLimitsShape,
+    ...whatsappMediaShape,
     DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }),
     QUEUE_PREFIX: optionalText,
@@ -143,6 +186,18 @@ const apiEnvironmentSchema = z
       .max(10 * 1024 * 1024)
       .default(1024 * 1024),
     API_READY_TIMEOUT_MS: positiveInteger.max(30_000).default(2_000),
+    META_WHATSAPP_APP_SECRET: z
+      .string()
+      .min(16)
+      .default("dawah-local-meta-app-secret"),
+    META_WHATSAPP_WEBHOOK_VERIFY_TOKEN: z
+      .string()
+      .min(16)
+      .default("dawah-local-meta-verify-token"),
+    META_WHATSAPP_PHONE_NUMBER_ID: z
+      .string()
+      .regex(/^\d{6,32}$/)
+      .default("000000000000000"),
   })
   .passthrough()
   .superRefine((environment, context) => {
@@ -164,6 +219,33 @@ const apiEnvironmentSchema = z
       "SUPABASE_URL",
       context,
     );
+    validateNonPlaceholderSecret(
+      environment.META_WHATSAPP_APP_SECRET,
+      "META_WHATSAPP_APP_SECRET",
+      context,
+    );
+    validateNonPlaceholderSecret(
+      environment.META_WHATSAPP_WEBHOOK_VERIFY_TOKEN,
+      "META_WHATSAPP_WEBHOOK_VERIFY_TOKEN",
+      context,
+    );
+    validateRequiredRemoteHttpsUrl(
+      environment.META_WHATSAPP_MEDIA_PUBLIC_BASE_URL,
+      "META_WHATSAPP_MEDIA_PUBLIC_BASE_URL",
+      context,
+    );
+    validateNonPlaceholderSecret(
+      environment.META_WHATSAPP_MEDIA_SIGNING_SECRET,
+      "META_WHATSAPP_MEDIA_SIGNING_SECRET",
+      context,
+    );
+    if (/^0+$/.test(environment.META_WHATSAPP_PHONE_NUMBER_ID)) {
+      addIssue(
+        context,
+        "META_WHATSAPP_PHONE_NUMBER_ID",
+        "A production Meta phone-number ID is required when deployed.",
+      );
+    }
 
     for (const origin of environment.API_CORS_ORIGINS) {
       if (!isRemoteHttpsUrl(origin)) {
@@ -186,11 +268,30 @@ const workerEnvironmentSchema = z
     ...runtimeShape,
     ...storageShape,
     ...importAndAssetLimitsShape,
+    ...whatsappMediaShape,
     DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }),
     QUEUE_PREFIX: optionalText,
     WORKER_PORT: port.default(4_001),
     WORKER_READY_TIMEOUT_MS: positiveInteger.max(30_000).default(2_000),
+    META_WHATSAPP_ACCESS_TOKEN: z
+      .string()
+      .min(16)
+      .default("dawah-local-meta-access-token"),
+    META_WHATSAPP_PHONE_NUMBER_ID: z
+      .string()
+      .regex(/^\d{6,32}$/)
+      .default("000000000000000"),
+    META_WHATSAPP_GRAPH_API_VERSION: z
+      .string()
+      .regex(/^v\d+\.\d+$/)
+      .default("v25.0"),
+    META_WHATSAPP_REQUEST_TIMEOUT_MS: positiveInteger
+      .max(60_000)
+      .default(10_000),
+    META_WHATSAPP_SEND_CONCURRENCY: positiveInteger.max(32).default(4),
+    META_WHATSAPP_MAX_SENDS_PER_SECOND: positiveInteger.max(80).default(10),
+    META_WHATSAPP_MAX_ATTEMPTS: positiveInteger.max(10).default(5),
   })
   .passthrough()
   .superRefine((environment, context) => {
@@ -199,6 +300,28 @@ const workerEnvironmentSchema = z
       validateRemotePostgres(environment.DATABASE_URL, context);
       validateSecureRedis(environment.REDIS_URL, context);
       validateDeployedStorage(environment, context);
+      validateNonPlaceholderSecret(
+        environment.META_WHATSAPP_ACCESS_TOKEN,
+        "META_WHATSAPP_ACCESS_TOKEN",
+        context,
+      );
+      validateRequiredRemoteHttpsUrl(
+        environment.META_WHATSAPP_MEDIA_PUBLIC_BASE_URL,
+        "META_WHATSAPP_MEDIA_PUBLIC_BASE_URL",
+        context,
+      );
+      validateNonPlaceholderSecret(
+        environment.META_WHATSAPP_MEDIA_SIGNING_SECRET,
+        "META_WHATSAPP_MEDIA_SIGNING_SECRET",
+        context,
+      );
+      if (/^0+$/.test(environment.META_WHATSAPP_PHONE_NUMBER_ID)) {
+        addIssue(
+          context,
+          "META_WHATSAPP_PHONE_NUMBER_ID",
+          "A production Meta phone-number ID is required when deployed.",
+        );
+      }
     }
   })
   .transform((environment) => ({
@@ -450,6 +573,21 @@ function validateRequiredRemoteHttpsUrl(
 function isRemoteHttpsUrl(value: string): boolean {
   const url = new URL(value);
   return url.protocol === "https:" && !isLoopbackHostname(url.hostname);
+}
+
+function isWhatsappMediaApiBaseUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.username === "" &&
+      url.password === "" &&
+      url.search === "" &&
+      url.hash === "" &&
+      url.pathname.replace(/\/+$/, "").endsWith("/api/v1")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isLoopbackHostname(hostname: string): boolean {

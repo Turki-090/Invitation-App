@@ -25,6 +25,12 @@ const safeProductionApiEnvironment = {
   SUPABASE_URL: "https://auth.dawah.sa",
   API_CORS_ORIGINS: "https://app.dawah.sa",
   DAWAH_DEV_AUTH_BYPASS: "false",
+  META_WHATSAPP_APP_SECRET: "prod-meta-app-secret-7f3a9c",
+  META_WHATSAPP_WEBHOOK_VERIFY_TOKEN: "prod-meta-verify-token-2e7b8d",
+  META_WHATSAPP_PHONE_NUMBER_ID: "123456789012345",
+  META_WHATSAPP_MEDIA_PUBLIC_BASE_URL: "https://api.dawah.sa/api/v1",
+  META_WHATSAPP_MEDIA_SIGNING_SECRET:
+    "prod-meta-media-signing-secret-2e7b8d4f1a6c",
   ...safeProductionStorageEnvironment,
 };
 
@@ -33,6 +39,11 @@ const safeProductionWorkerEnvironment = {
   DAWAH_ENV: "production",
   DATABASE_URL: safeProductionDatabaseUrl,
   REDIS_URL: "rediss://cache.dawah.sa:6380",
+  META_WHATSAPP_ACCESS_TOKEN: "prod-meta-access-token-7f3a9c",
+  META_WHATSAPP_PHONE_NUMBER_ID: "123456789012345",
+  META_WHATSAPP_MEDIA_PUBLIC_BASE_URL: "https://api.dawah.sa/api/v1",
+  META_WHATSAPP_MEDIA_SIGNING_SECRET:
+    "prod-meta-media-signing-secret-2e7b8d4f1a6c",
   ...safeProductionStorageEnvironment,
 };
 
@@ -150,6 +161,33 @@ describe("environment validation", () => {
     ).toThrow(
       /STORAGE_ENDPOINT|STORAGE_ACCESS_KEY_ID|STORAGE_SECRET_ACCESS_KEY/,
     );
+  });
+
+  it("rejects insecure or placeholder messaging media capabilities when deployed", () => {
+    expect(() =>
+      validateWorkerEnvironment({
+        ...safeProductionWorkerEnvironment,
+        META_WHATSAPP_MEDIA_PUBLIC_BASE_URL: "http://localhost:4000/api/v1",
+        META_WHATSAPP_MEDIA_SIGNING_SECRET:
+          "dawah-local-meta-media-signing-secret",
+      }),
+    ).toThrow(
+      /META_WHATSAPP_MEDIA_PUBLIC_BASE_URL|META_WHATSAPP_MEDIA_SIGNING_SECRET/,
+    );
+  });
+
+  it.each([
+    "https://api.dawah.sa",
+    "https://api.dawah.sa/api/v1?token=leaked",
+    "https://user:password@api.dawah.sa/api/v1",
+    "https://api.dawah.sa/api/v1#fragment",
+  ])("rejects a malformed messaging media API base URL: %s", (value) => {
+    expect(() =>
+      validateWorkerEnvironment({
+        ...safeProductionWorkerEnvironment,
+        META_WHATSAPP_MEDIA_PUBLIC_BASE_URL: value,
+      }),
+    ).toThrow(/META_WHATSAPP_MEDIA_PUBLIC_BASE_URL/);
   });
 
   it("requires the worker database configuration", () => {

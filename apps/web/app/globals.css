@@ -1162,6 +1162,233 @@ dialog:has(.event-wizard) {
   }
 }
 
+/* Stage 6 WhatsApp sending center */
+.sending-page,
+.sending-compose,
+.sending-batch-detail {
+  display: flex;
+  flex-direction: column;
+}
+.sending-page {
+  gap: 14px;
+}
+.sending-page-header > div {
+  max-width: 800px;
+}
+.sending-compose,
+.sending-batch-detail {
+  gap: 14px;
+}
+.sending-template-row {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(260px, 460px) auto;
+}
+.sending-stat-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.sending-stat-grid .dawah-stat-card {
+  box-shadow: none;
+}
+.sending-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.sending-help {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  margin: 0;
+}
+.sending-activity-grid {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(240px, 0.34fr) minmax(0, 1fr);
+}
+.sending-batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sending-batch-item {
+  align-items: center;
+  background: var(--surface-sunken);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-body);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 64px;
+  padding: 10px 12px;
+  text-align: start;
+  width: 100%;
+}
+.sending-batch-item:hover,
+.sending-batch-item[aria-current="true"] {
+  background: var(--surface-card);
+  border-color: var(--border-strong);
+}
+.sending-batch-item:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: 0;
+}
+.sending-batch-item > span:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.sending-batch-item strong,
+.sending-batch-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sending-batch-item strong {
+  font-size: var(--text-sm);
+}
+.sending-batch-item small {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.sending-batch-heading,
+.sending-failures-heading {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+.sending-batch-heading h3,
+.sending-failures-heading h3 {
+  font-size: var(--text-base);
+  margin: 0;
+}
+.sending-batch-heading p,
+.sending-failures-heading p {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  margin: 3px 0 0;
+}
+.sending-progress-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 18px;
+}
+.sending-progress-counts span {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+.sending-progress-counts strong {
+  color: var(--text-body);
+  margin-inline-start: 3px;
+}
+.sending-failures-heading {
+  border-block-start: 1px solid var(--border-default);
+  margin-block-start: 4px;
+  padding-block-start: 16px;
+}
+.sending-empty-row {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+  padding: 18px;
+  text-align: center;
+}
+.sending-pagination {
+  align-items: center;
+  border-block-start: 1px solid var(--border-default);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-block-start: 12px;
+}
+.sending-failure-mobile {
+  display: grid;
+  gap: 3px;
+}
+.sending-failure-mobile span,
+.sending-failure-mobile small {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.sending-failure-details {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.sending-failure-details div {
+  border-block-end: 1px solid var(--border-default);
+  display: grid;
+  gap: 3px;
+  padding-block-end: 10px;
+}
+.sending-failure-details dt {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.sending-failure-details dd {
+  margin: 0;
+}
+.sending-confirmation-summary {
+  display: grid;
+  gap: 6px;
+}
+.sending-confirmation-summary p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+.sending-loading {
+  display: grid;
+  gap: 10px;
+}
+.sending-loading__line {
+  border-radius: var(--radius-control);
+  height: 38px;
+  max-width: 460px;
+}
+.sending-loading__panel {
+  border-radius: var(--radius-card);
+  height: 130px;
+}
+
+@media (max-width: 1120px) {
+  .sending-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .sending-activity-grid {
+    grid-template-columns: 1fr;
+  }
+  .sending-batch-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .sending-template-row,
+  .sending-stat-grid,
+  .sending-batch-list {
+    grid-template-columns: 1fr;
+  }
+  .sending-template-row > .dawah-button,
+  .sending-actions .dawah-button {
+    width: 100%;
+  }
+  .sending-batch-heading,
+  .sending-failures-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .sending-pagination {
+    justify-content: space-between;
+  }
+}
+
 /* Stage 4 guest management */
 .guest-page-header > div {
   max-width: 720px;

@@ -21,6 +21,17 @@ import type {
   InvitationMemberInput,
   UpdateInvitationInput,
 } from "./invitations";
+import type {
+  CreateSendBatchInput,
+  ListSendBatchesResponse,
+  MessageSummary,
+  ResendReadinessResponse,
+  SendBatch,
+  SendBatchDetail,
+  SendReadinessRequest,
+  SendReadinessResponse,
+  WhatsappWebhookAcknowledgement,
+} from "./messaging";
 
 type OpenApiCreateEvent = components["schemas"]["CreateEvent"];
 type OpenApiUpdateEvent = components["schemas"]["UpdateEvent"];
@@ -47,6 +58,20 @@ type OpenApiDuplicateInvitationConflict =
   components["schemas"]["DuplicateInvitationConflict"];
 type OpenApiError = components["schemas"]["ApiError"];
 type OpenApiReadiness = components["schemas"]["Readiness"];
+type OpenApiSendReadinessRequest =
+  components["schemas"]["SendReadinessRequest"];
+type OpenApiSendReadinessResponse =
+  components["schemas"]["SendReadinessResponse"];
+type OpenApiCreateSendBatch = components["schemas"]["CreateSendBatch"];
+type OpenApiSendBatch = components["schemas"]["SendBatch"];
+type OpenApiListSendBatchesResponse =
+  components["schemas"]["ListSendBatchesResponse"];
+type OpenApiMessageSummary = components["schemas"]["MessageSummary"];
+type OpenApiSendBatchDetail = components["schemas"]["SendBatchDetail"];
+type OpenApiResendReadinessResponse =
+  components["schemas"]["ResendReadinessResponse"];
+type OpenApiWebhookAcknowledgement =
+  components["schemas"]["WhatsappWebhookAcknowledgement"];
 
 function assertAssignable<Expected, _Actual extends Expected>(): void {}
 
@@ -121,5 +146,32 @@ describe("OpenAPI runtime contract compatibility", () => {
   it("keeps API readiness aligned", () => {
     expectTypeOf<Readiness>().toMatchTypeOf<OpenApiReadiness>();
     expectTypeOf<OpenApiReadiness>().toMatchTypeOf<Readiness>();
+  });
+
+  it("keeps Stage 6 messaging contracts aligned", () => {
+    assertAssignable<OpenApiSendReadinessRequest, SendReadinessRequest>();
+    assertAssignable<SendReadinessRequest, OpenApiSendReadinessRequest>();
+    assertAssignable<OpenApiSendReadinessResponse, SendReadinessResponse>();
+    assertAssignable<SendReadinessResponse, OpenApiSendReadinessResponse>();
+    assertAssignable<OpenApiCreateSendBatch, CreateSendBatchInput>();
+    assertAssignable<CreateSendBatchInput, OpenApiCreateSendBatch>();
+    assertAssignable<OpenApiSendBatch, SendBatch>();
+    assertAssignable<SendBatch, OpenApiSendBatch>();
+    assertAssignable<OpenApiListSendBatchesResponse, ListSendBatchesResponse>();
+    assertAssignable<ListSendBatchesResponse, OpenApiListSendBatchesResponse>();
+    assertAssignable<OpenApiMessageSummary, MessageSummary>();
+    assertAssignable<MessageSummary, OpenApiMessageSummary>();
+    assertAssignable<OpenApiSendBatchDetail, SendBatchDetail>();
+    assertAssignable<SendBatchDetail, OpenApiSendBatchDetail>();
+    assertAssignable<OpenApiResendReadinessResponse, ResendReadinessResponse>();
+    assertAssignable<ResendReadinessResponse, OpenApiResendReadinessResponse>();
+    assertAssignable<
+      OpenApiWebhookAcknowledgement,
+      WhatsappWebhookAcknowledgement
+    >();
+    assertAssignable<
+      WhatsappWebhookAcknowledgement,
+      OpenApiWebhookAcknowledgement
+    >();
   });
 });

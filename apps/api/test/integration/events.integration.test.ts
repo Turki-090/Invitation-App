@@ -82,6 +82,7 @@ describe("EventsService PostgreSQL integration", () => {
     const result = await events.list({ subject: host.authProviderId });
 
     expect(result.map((event) => event.id)).toEqual([accessible.id]);
+    expect(result[0]?.canSendInvitations).toBe(true);
   });
 
   it("creates the event, owner membership, and audit record atomically", async () => {
@@ -115,8 +116,10 @@ describe("EventsService PostgreSQL integration", () => {
       longitude: 46.6753,
       mapUrl: createInput.mapUrl,
       qrEnabled: false,
+      canSendInvitations: true,
       availableTransitions: ["ACTIVE"],
     });
+    expect(created.canSendInvitations).toBe(true);
   });
 
   it("updates settings transactionally, validates merged dates, and audits field names", async () => {
@@ -134,6 +137,7 @@ describe("EventsService PostgreSQL integration", () => {
       rsvpDeadline: "2027-03-01",
       mapUrl: null,
       qrEnabled: true,
+      canSendInvitations: true,
     });
     await expect(
       events.update({ subject: "auth-owner" }, created.id, {
@@ -183,6 +187,7 @@ describe("EventsService PostgreSQL integration", () => {
     );
 
     expect(active.availableTransitions).toContain("RSVP_OPEN");
+    expect(active.canSendInvitations).toBe(true);
     expect(open.status).toBe("RSVP_OPEN");
     expect(closed.availableTransitions).toContain("RSVP_OPEN");
     expect(
@@ -206,6 +211,7 @@ describe("EventsService PostgreSQL integration", () => {
       created.id,
     );
     expect(archived.status).toBe("ARCHIVED");
+    expect(archived.canSendInvitations).toBe(true);
     expect(archived.archivedAt).not.toBeNull();
     expect(await events.list({ subject: "auth-owner" })).toEqual([]);
     await expect(
@@ -217,6 +223,7 @@ describe("EventsService PostgreSQL integration", () => {
       created.id,
     );
     expect(recovered).toMatchObject({ status: "RSVP_OPEN", archivedAt: null });
+    expect(recovered.canSendInvitations).toBe(true);
     expect((await events.list({ subject: "auth-owner" }))[0]?.id).toBe(
       created.id,
     );
@@ -374,6 +381,9 @@ describe("EventsService PostgreSQL integration", () => {
     const revoked = await createUserFixture(prisma, {
       authProviderId: "auth-revoked",
     });
+    const checkInStaff = await createUserFixture(prisma, {
+      authProviderId: "auth-check-in",
+    });
     const event = await createEventFixture(prisma, owner);
     const coHostMembership = await prisma.eventMembership.create({
       data: {
@@ -392,10 +402,25 @@ describe("EventsService PostgreSQL integration", () => {
         status: "REVOKED",
       },
     });
+    const checkInMembership = await prisma.eventMembership.create({
+      data: {
+        eventId: event.id,
+        userId: checkInStaff.id,
+        role: "CHECK_IN_STAFF",
+        status: "ACTIVE",
+        acceptedAt: new Date(),
+      },
+    });
 
     expect(
-      (await events.get({ subject: coHost.authProviderId }, event.id)).id,
-    ).toBe(event.id);
+      await events.get({ subject: coHost.authProviderId }, event.id),
+    ).toMatchObject({ id: event.id, canSendInvitations: true });
+    expect(
+      await events.get({ subject: checkInStaff.authProviderId }, event.id),
+    ).toMatchObject({ id: event.id, canSendInvitations: false });
+    expect(
+      (await events.list({ subject: checkInStaff.authProviderId }))[0],
+    ).toMatchObject({ id: event.id, canSendInvitations: false });
     await expect(
       events.update({ subject: coHost.authProviderId }, event.id, {
         city: "جدة",
@@ -418,5 +443,16 @@ describe("EventsService PostgreSQL integration", () => {
         })
       ).city,
     ).toBe("جدة");
+
+    await prisma.eventMembership.update({
+      where: { id: checkInMembership.id },
+      data: { permissionsJson: [Permission.INVITATION_SEND] },
+    });
+    expect(
+      await events.get({ subject: checkInStaff.authProviderId }, event.id),
+    ).toMatchObject({ canSendInvitations: true });
+    expect(
+      (await events.list({ subject: checkInStaff.authProviderId }))[0],
+    ).toMatchObject({ canSendInvitations: true });
   });
 });

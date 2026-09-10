@@ -39,6 +39,7 @@ import { useForm } from "react-hook-form";
 import { LocaleSwitcher } from "./locale-switcher";
 import { GuestManagement } from "./guest-management";
 import { EventPreparation } from "./event-preparation";
+import { EventSending } from "./event-sending";
 import type { AppLocale } from "../i18n/config";
 import type { Dictionary } from "../i18n/dictionaries";
 import {
@@ -52,7 +53,8 @@ import {
 } from "../lib/api";
 import { getSupabaseClient } from "../lib/supabase";
 
-type WorkspaceSection = "overview" | "guests" | "preparation" | "settings";
+type WorkspaceSection =
+  "overview" | "guests" | "preparation" | "sending" | "settings";
 type EditableEventStatus = Exclude<EventDetail["status"], "ARCHIVED">;
 
 interface EventWorkspaceClientProps {
@@ -62,6 +64,7 @@ interface EventWorkspaceClientProps {
   copy: Dictionary["workspace"];
   guestsCopy: Dictionary["guests"];
   preparationCopy: Dictionary["preparation"];
+  sendingCopy: Dictionary["sending"];
   eventsCopy: Dictionary["events"];
   common: Dictionary["common"];
   shellCopy: Dictionary["shell"];
@@ -91,6 +94,7 @@ export function EventWorkspaceClient({
   copy,
   guestsCopy,
   preparationCopy,
+  sendingCopy,
   eventsCopy,
   common,
   shellCopy,
@@ -152,6 +156,17 @@ export function EventWorkspaceClient({
       icon: "file-text" as const,
       active: section === "preparation",
     },
+    ...(event.data?.canSendInvitations === false
+      ? []
+      : [
+          {
+            id: "sending",
+            label: sendingCopy.navigation,
+            href: `/${locale}/events/${eventId}/sending`,
+            icon: "send" as const,
+            active: section === "sending",
+          },
+        ]),
     {
       id: "settings",
       label: copy.settings,
@@ -263,6 +278,20 @@ export function EventWorkspaceClient({
           <EventPreparation
             common={common}
             copy={preparationCopy}
+            eventId={eventId}
+            locale={locale}
+            supabase={supabase}
+          />
+        ) : section === "sending" && !event.data.canSendInvitations ? (
+          <EmptyState
+            description={sendingCopy.permissionDeniedDescription}
+            icon="circle-alert"
+            title={sendingCopy.permissionDeniedTitle}
+          />
+        ) : section === "sending" ? (
+          <EventSending
+            common={common}
+            copy={sendingCopy}
             eventId={eventId}
             locale={locale}
             supabase={supabase}

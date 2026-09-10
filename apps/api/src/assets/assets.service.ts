@@ -223,10 +223,17 @@ export class AssetsService {
       const inUse = await transaction.invitationTemplate.count({
         where: { assetId, eventId, status: { not: "ARCHIVED" } },
       });
-      if (inUse > 0) {
+      const retainedBySnapshots =
+        await transaction.invitationContentSnapshot.count({
+          where: { assetId, eventId },
+        });
+      if (inUse > 0 || retainedBySnapshots > 0) {
         throw new ConflictException({
           code: "ASSET_IN_USE",
-          message: "Archive templates that use this image before archiving it.",
+          message:
+            retainedBySnapshots > 0
+              ? "This image is retained by immutable invitation snapshots and cannot be archived."
+              : "Archive templates that use this image before archiving it.",
         });
       }
       const archived = await transaction.storedAsset.update({

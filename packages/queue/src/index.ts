@@ -19,6 +19,41 @@ export const defaultJobOptions = {
   removeOnFail: { age: 7 * 24 * 60 * 60, count: 5_000 },
 } satisfies JobsOptions;
 
+export type WhatsappSendJobData =
+  | { readonly operation: "DISPATCH_BATCH"; readonly batchId: string }
+  | { readonly operation: "SEND_MESSAGE"; readonly messageId: string };
+
+export interface WhatsappWebhookJobData {
+  readonly webhookEventId: string;
+}
+
+export function whatsappBatchJobId(batchId: string): string {
+  return `batch-${batchId}`;
+}
+
+export function whatsappMessageJobId(messageId: string): string {
+  return `message-${messageId}`;
+}
+
+export function whatsappMessageJobs(
+  messageIds: readonly string[],
+  maximumAttempts: number,
+) {
+  return messageIds.map((messageId) => ({
+    name: "send" as const,
+    data: { operation: "SEND_MESSAGE" as const, messageId },
+    opts: {
+      jobId: whatsappMessageJobId(messageId),
+      attempts: maximumAttempts,
+      backoff: defaultJobOptions.backoff,
+    },
+  }));
+}
+
+export function whatsappWebhookJobId(webhookEventId: string): string {
+  return `webhook-${webhookEventId}`;
+}
+
 export function createProducerRedis(
   redisUrl: string,
   connectionName: string,
