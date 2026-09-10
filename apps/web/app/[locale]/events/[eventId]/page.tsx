@@ -31,6 +31,7 @@ export default async function EventWorkspacePage({
       guestsCopy={dictionary.guests}
       locale={locale}
       preparationCopy={dictionary.preparation}
+      sendingCopy={dictionary.sending}
       section="overview"
       shellCopy={dictionary.shell}
     />

@@ -668,6 +668,157 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/events/{eventId}/sending/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review invitation send readiness
+         * @description Produces a short-lived server confirmation over current immutable snapshots, prior sends, and the credit-unit estimate.
+         */
+        post: operations["reviewSendReadiness"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/send-batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** List WhatsApp send batches */
+        get: operations["listSendBatches"];
+        put?: never;
+        /**
+         * Confirm and queue an invitation send batch
+         * @description Revalidates the short-lived confirmation in a transaction, persists one immutable logical message per ready invitation, and returns before provider delivery.
+         */
+        post: operations["createSendBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/send-batches/{batchId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Send-batch UUID. */
+                batchId: components["parameters"]["SendBatchId"];
+            };
+            cookie?: never;
+        };
+        /** Get send-batch progress and messages */
+        get: operations["getSendBatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/messages/{messageId}/resend-readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Logical-message UUID. */
+                messageId: components["parameters"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review a failed message for safe resend */
+        post: operations["reviewMessageResend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/messages/{messageId}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Logical-message UUID. */
+                messageId: components["parameters"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm and queue a safe message resend */
+        post: operations["resendMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messaging/media/{snapshotId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve a short-lived invitation image capability for WhatsApp
+         * @description Serves checksum-verified bytes from private storage only when the expiry-bounded HMAC capability matches the immutable invitation snapshot.
+         */
+        get: operations["getWhatsappMessageMedia"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/whatsapp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Complete the Meta webhook verification challenge */
+        get: operations["verifyWhatsappWebhook"];
+        put?: never;
+        /** Authenticate and persist Meta WhatsApp webhook events */
+        post: operations["receiveWhatsappWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -770,6 +921,8 @@ export type components = {
             city: string;
             status: components["schemas"]["EventStatus"];
             role: components["schemas"]["MembershipRole"];
+            /** @description Whether the current membership can send invitations, including additive permission overrides. */
+            canSendInvitations: boolean;
         };
         EventDetail: {
             /** Format: uuid */
@@ -797,6 +950,8 @@ export type components = {
             qrEnabled: boolean;
             status: components["schemas"]["EventStatus"];
             role: components["schemas"]["MembershipRole"];
+            /** @description Whether the current membership can send invitations, including additive permission overrides. */
+            canSendInvitations: boolean;
             availableTransitions: components["schemas"]["EventStatus"][];
             /** Format: date-time */
             createdAt: string;
@@ -1152,6 +1307,7 @@ export type components = {
             extraMessage?: string;
             /** Format: uuid */
             assetId?: string | null;
+            providerTemplateName?: string;
         };
         UpdateInvitationTemplate: {
             name?: string;
@@ -1160,8 +1316,9 @@ export type components = {
             extraMessage?: string | null;
             /** Format: uuid */
             assetId?: string | null;
+            providerTemplateName?: string | null;
             expectedVersion: number;
-        } | unknown | unknown | unknown | unknown | unknown;
+        } | unknown | unknown | unknown | unknown | unknown | unknown;
         InvitationTemplate: {
             /** Format: uuid */
             id: string;
@@ -1175,6 +1332,7 @@ export type components = {
             /** Format: uuid */
             assetId: string | null;
             assetChecksumSha256: string | null;
+            providerTemplateName: string | null;
             status: components["schemas"]["TemplateStatus"];
             version: number;
             /** Format: date-time */
@@ -1256,6 +1414,146 @@ export type components = {
             blockedCount: number;
             snapshotIds: string[];
             blockedInvitationIds: string[];
+        };
+        /** @enum {string} */
+        SendBatchStatus: "QUEUED" | "DISPATCHING" | "IN_PROGRESS" | "COMPLETED" | "PARTIALLY_FAILED" | "FAILED" | "CANCELLED";
+        /** @enum {string} */
+        MessageType: "INVITATION" | "REMINDER" | "RSVP_CONFIRMATION" | "ENTRY_PASS" | "MANUAL";
+        /** @enum {string} */
+        MessageStatus: "QUEUED" | "SENDING" | "SENT" | "DELIVERED" | "READ" | "RESPONDED" | "FAILED" | "CANCELLED";
+        /** @enum {string} */
+        MessagingFailureClass: "TRANSIENT" | "PERMANENT" | "AMBIGUOUS";
+        SendReadinessRequest: {
+            /** Format: uuid */
+            templateId: string;
+            invitationIds?: string[];
+        };
+        SendReadinessResponse: {
+            /** Format: uuid */
+            templateId: string;
+            confirmationToken: string;
+            /** Format: date-time */
+            expiresAt: string;
+            summary: {
+                selectedInvitations: number;
+                readyInvitations: number;
+                alreadySentInvitations: number;
+                blockedInvitations: number;
+                estimatedCreditUnits: number;
+            };
+            blocked: {
+                /** Format: uuid */
+                invitationId: string;
+                issues: components["schemas"]["ReadinessIssue"][];
+            }[];
+            alreadySentInvitationIds: string[];
+        };
+        CreateSendBatch: {
+            /** Format: uuid */
+            templateId: string;
+            invitationIds?: string[];
+            confirmationToken: string;
+        };
+        SendBatchProgress: {
+            queued: number;
+            sending: number;
+            sent: number;
+            delivered: number;
+            read: number;
+            responded: number;
+            failed: number;
+            cancelled: number;
+            completed: number;
+        };
+        SendBatch: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            status: components["schemas"]["SendBatchStatus"];
+            messageType: components["schemas"]["MessageType"];
+            totalMessages: number;
+            estimatedCreditUnits: number;
+            progress: components["schemas"]["SendBatchProgress"];
+            /** Format: date-time */
+            queuedAt: string;
+            /** Format: date-time */
+            startedAt: string | null;
+            /** Format: date-time */
+            completedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ListSendBatchesResponse: {
+            items: components["schemas"]["SendBatch"][];
+            pagination: {
+                page: number;
+                pageSize: number;
+                totalItems: number;
+                totalPages: number;
+            };
+        };
+        MessageSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            invitationGroupId: string;
+            invitationDisplayName: string;
+            maskedPhone: string;
+            status: components["schemas"]["MessageStatus"];
+            locale: components["schemas"]["PreparationLocale"];
+            providerMessageId: string | null;
+            attemptCount: number;
+            failureClass: components["schemas"]["MessagingFailureClass"] | null;
+            failureCode: string | null;
+            failureReason: string | null;
+            canResend: boolean;
+            /** Format: date-time */
+            queuedAt: string;
+            /** Format: date-time */
+            sentAt: string | null;
+            /** Format: date-time */
+            deliveredAt: string | null;
+            /** Format: date-time */
+            readAt: string | null;
+            /** Format: date-time */
+            failedAt: string | null;
+        };
+        SendBatchDetail: {
+            batch: components["schemas"]["SendBatch"];
+            messages: components["schemas"]["MessageSummary"][];
+            pagination: {
+                page: number;
+                pageSize: number;
+                totalItems: number;
+                totalPages: number;
+            };
+        };
+        ResendReadinessResponse: {
+            /** Format: uuid */
+            messageId: string;
+            /** Format: uuid */
+            invitationGroupId: string;
+            eligible: boolean;
+            estimatedCreditUnits: number;
+            confirmationToken: string | null;
+            /** Format: date-time */
+            expiresAt: string | null;
+            /**
+             * @description Stable machine-readable reason when the resend is ineligible; null when eligible.
+             * @enum {string|null}
+             */
+            reasonCode: "NOT_FAILED" | "AMBIGUOUS_OUTCOME" | "ALREADY_RESENT" | "TEMPLATE_NOT_APPROVED" | "SNAPSHOT_STALE" | null;
+            reason: string | null;
+        };
+        ResendMessage: {
+            confirmationToken: string;
+        };
+        WhatsappWebhookAcknowledgement: {
+            /** @constant */
+            accepted: true;
+            queuedEvents: number;
+            duplicateEvents: number;
         };
     };
     responses: {
@@ -1345,6 +1643,12 @@ export type components = {
         AssetId: string;
         /** @description Invitation-template version UUID. */
         TemplateId: string;
+        /** @description Send-batch UUID. */
+        SendBatchId: string;
+        /** @description Logical-message UUID. */
+        MessageId: string;
+        /** @description Caller-generated visible ASCII key unique to this logical mutation. */
+        IdempotencyKey: string;
     };
     requestBodies: never;
     headers: never;
@@ -2491,6 +2795,299 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
+        };
+    };
+    reviewSendReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendReadinessRequest"];
+            };
+        };
+        responses: {
+            /** @description Current server-authoritative send summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendReadinessResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listSendBatches: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paged send batches with derived delivery progress. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListSendBatchesResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    createSendBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated visible ASCII key unique to this logical mutation. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSendBatch"];
+            };
+        };
+        responses: {
+            /** @description Durable send batch accepted for asynchronous dispatch. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendBatch"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getSendBatch: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                status?: components["schemas"]["MessageStatus"];
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Send-batch UUID. */
+                batchId: components["parameters"]["SendBatchId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Batch totals and a page of recipient-safe message summaries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendBatchDetail"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    reviewMessageResend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Logical-message UUID. */
+                messageId: components["parameters"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current resend eligibility and short-lived confirmation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResendReadinessResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    resendMessage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated visible ASCII key unique to this logical mutation. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Logical-message UUID. */
+                messageId: components["parameters"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResendMessage"];
+            };
+        };
+        responses: {
+            /** @description Immutable resend accepted as a new logical message and credit unit. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendBatch"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getWhatsappMessageMedia: {
+        parameters: {
+            query: {
+                checksum: string;
+                expires: number;
+                signature: string;
+            };
+            header?: never;
+            path: {
+                snapshotId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Checksum-verified invitation image bytes. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "private, no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    verifyWhatsappWebhook: {
+        parameters: {
+            query: {
+                "hub.mode": "subscribe";
+                "hub.verify_token": string;
+                "hub.challenge": string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact challenge value as plain text. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    receiveWhatsappWebhook: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Hub-Signature-256": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Authenticated events durably persisted and queued for asynchronous reduction. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsappWebhookAcknowledgement"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
 }

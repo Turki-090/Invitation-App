@@ -51,6 +51,9 @@ importers:
       '@dawah/imports':
         specifier: workspace:*
         version: link:../../packages/imports
+      '@dawah/messaging':
+        specifier: workspace:*
+        version: link:../../packages/messaging
       '@dawah/queue':
         specifier: workspace:*
         version: link:../../packages/queue
@@ -224,6 +227,9 @@ importers:
       '@dawah/imports':
         specifier: workspace:*
         version: link:../../packages/imports
+      '@dawah/messaging':
+        specifier: workspace:*
+        version: link:../../packages/messaging
       '@dawah/queue':
         specifier: workspace:*
         version: link:../../packages/queue
@@ -333,6 +339,25 @@ importers:
       exceljs-hardened:
         specifier: 5.0.0
         version: 5.0.0
+    devDependencies:
+      '@dawah/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 24.10.13
+        version: 24.10.13
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/node@24.10.13)(jiti@2.7.0)(jsdom@30.0.1)(supports-color@10.2.2)(tsx@4.21.0)(yaml@2.9.0)
+
+  packages/messaging:
+    dependencies:
+      '@dawah/domain':
+        specifier: workspace:*
+        version: link:../domain
     devDependencies:
       '@dawah/typescript-config':
         specifier: workspace:*

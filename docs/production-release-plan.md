@@ -1,6 +1,6 @@
 # Dawah production and release plan
 
-Status date: 2026-09-08
+Status date: 2026-09-10
 
 The “Current position” section preserves the pre-Stage 1 baseline captured on
 2026-09-05. Dated completion records under each roadmap stage are authoritative.
@@ -251,6 +251,11 @@ Verification record:
 
 Goal: complete MVP 4 with safe, observable, asynchronous Meta WhatsApp delivery.
 
+Status: **Repository complete; staging exercise pending** — implementation, the
+localized sending-center experience, and the complete repository validation
+gate pass. A live non-production Meta provider/webhook exercise still requires
+deployed credentials and provider-side configuration.
+
 Work:
 
 - Add provider abstraction and `MetaWhatsAppProvider` with approved Arabic and English templates.
@@ -266,6 +271,61 @@ Exit gate:
 
 - A 2,000-invitation test batch queues without blocking the API, double-sending, or double-charging.
 - Delivery states reconcile from verified webhooks and permanent failures are actionable without PII in logs.
+
+Implementation record:
+
+- A provider-neutral messaging package and Meta WhatsApp adapter send approved,
+  locale-specific template snapshots and persist the returned provider message
+  identifier. Provider timeouts and network breaks are classified as ambiguous
+  instead of being retried blindly.
+- The forward Stage 6 migration adds tenant-bound send batches, immutable logical
+  messages, numbered attempts, deduplicated webhook evidence, and event-scoped
+  idempotency records. Constraints and triggers protect one initial invitation
+  send, logical credit identity, snapshot fidelity, provider correlation, and
+  completed evidence from mutation.
+- Authenticated readiness and batch APIs revalidate current Stage 5 snapshots,
+  issue confirmations valid for at least five and at most ten minutes, hash
+  idempotency keys, persist under `ReadCommitted` advisory/row locks, and enqueue
+  deterministic batch and message jobs. A saved or dispatch-exhausted batch can
+  be recovered by replaying the identical request with the same key.
+- The worker applies configurable concurrency and sends-per-second limits,
+  bounded exponential retries, provider `Retry-After`, permanent failure
+  classification, and conservative ambiguous-outcome handling for bare HTTP
+  408/5xx, timeouts, and network breaks. Database row claims and attempt fencing
+  prevent stale worker completion from overwriting newer evidence.
+- The raw-body webhook endpoint verifies HMAC signatures, rejects malformed
+  payloads and mismatched configured phone-number IDs, deduplicates stable
+  provider event IDs, persists evidence before queueing, and handles early and
+  out-of-order states through provider-ID or logical callback-ID correlation.
+  `FAILED` outranks `SENT` but not delivered/read/responded evidence. Host-facing
+  batch detail masks phone numbers, and safe resend copies a corrected current
+  snapshot into a separately confirmed successor instead of rewriting history.
+- Image-backed templates use a short-lived HMAC URL bound to the immutable
+  snapshot ID, asset checksum, and expiry. The API validates the capability
+  before lookup, reads only from private storage, and rechecks MIME, length,
+  configured size, and SHA-256 before streaming. Deployed environments require a
+  remote HTTPS base URL and a non-placeholder secret shared by API and worker;
+  media capability query strings must be redacted from infrastructure logs.
+  Assets referenced by immutable snapshots are retention-locked in both the API
+  and database so template archival cannot strand queued image delivery.
+- The event API exposes the caller's actual `canSendInvitations` capability. The
+  localized sending center hides or denies the route accordingly and maps stable
+  failure/resend codes to Arabic and English guidance without surfacing provider
+  prose.
+- Focused tests and a real-PostgreSQL 2,000-invitation integration scenario cover
+  the provider contract, conservative retry/status policy, concurrent
+  idempotency, stale worker completion, signed early/out-of-order webhooks,
+  queue-exhaustion and redelivery recovery, permanent failure, logical credit
+  count, corrected resend linkage, and an image-backed template capability. The
+  same scenario fans out through an isolated real Redis/BullMQ prefix twice and
+  proves exactly 2,000 unique deterministic waiting jobs.
+- Verification recorded on 2026-09-10: all 250 unit, contract, component,
+  provider, storage, API, and worker tests; all 21 real PostgreSQL/Redis
+  integration tests; format; lint; OpenAPI validation and drift; Prisma
+  validation; type checks; production builds; tracked-artifact checks; startup
+  smoke; 42 Storybook accessibility/visual cases; and production API/worker
+  container readiness passed. The repository exit gate is closed; the live
+  non-production Meta exercise remains a staging promotion requirement.
 
 ### Stage 7 — Deliver accountless public invitations and RSVP
 
@@ -387,4 +447,8 @@ Exit gate:
 
 ## Immediate next action
 
-Begin Stage 6 with the WhatsApp provider abstraction, immutable message-attempt and send-batch persistence, idempotent queueing, retry/failure classification, signed webhook ingestion, and sending-center progress. Preserve the Stage 5 readiness and content-snapshot boundary so no unapproved or stale invitation content can enter a send batch.
+Exercise the provider/webhook contract in staging with approved non-production
+Meta credentials, including a real image-template fetch through the signed media
+route. Preserve the recorded Stage 6 evidence for duplicate logical-send and
+credit-unit prevention, monotonic webhook reconciliation, deterministic queue
+recovery, and PII-safe failure review.

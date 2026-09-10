@@ -23,7 +23,7 @@ import {
 } from "@dawah/domain";
 import type {
   Event,
-  EventMembershipRole,
+  EventMembership,
   EventStatus,
   Prisma,
 } from "@prisma/client";
@@ -31,8 +31,13 @@ import type { AuthPrincipal } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { EventAccessService } from "./event-access.service";
 
-type EventWithRole = Event & {
-  memberships: Array<{ role: EventMembershipRole }>;
+type EventCapabilityMembership = Pick<
+  EventMembership,
+  "role" | "permissionsJson"
+>;
+
+type EventWithMembership = Event & {
+  memberships: EventCapabilityMembership[];
 };
 
 @Injectable()
@@ -50,7 +55,10 @@ export class EventsService {
         archivedAt: null,
       },
       include: {
-        memberships: { where: { userId: user.id }, select: { role: true } },
+        memberships: {
+          where: { userId: user.id, status: "ACTIVE" },
+          select: { role: true, permissionsJson: true },
+        },
       },
       orderBy: [{ eventDate: "asc" }, { createdAt: "asc" }],
     });
@@ -94,7 +102,10 @@ export class EventsService {
           },
         },
         include: {
-          memberships: { where: { userId: user.id }, select: { role: true } },
+          memberships: {
+            where: { userId: user.id, status: "ACTIVE" },
+            select: { role: true, permissionsJson: true },
+          },
         },
       });
       await transaction.auditLog.create({
@@ -121,7 +132,7 @@ export class EventsService {
       eventId,
       Permission.EVENT_VIEW,
     );
-    return this.toDetail(event, membership.role);
+    return this.toDetail(event, membership);
   }
 
   public update(
@@ -154,7 +165,7 @@ export class EventsService {
           metadata: { changedFields: Object.keys(input).sort() },
         },
       });
-      return this.toDetail(updated, membership.role);
+      return this.toDetail(updated, membership);
     });
   }
 
@@ -191,7 +202,7 @@ export class EventsService {
           metadata: { previousStatus: event.status },
         },
       });
-      return this.toDetail(updated, membership.role);
+      return this.toDetail(updated, membership);
     });
   }
 
@@ -237,7 +248,7 @@ export class EventsService {
           metadata: { restoredStatus: previousStatus },
         },
       });
-      return this.toDetail(updated, membership.role);
+      return this.toDetail(updated, membership);
     });
   }
 
@@ -281,7 +292,7 @@ export class EventsService {
           metadata: { previousStatus: event.status, newStatus: input.status },
         },
       });
-      return this.toDetail(updated, membership.role);
+      return this.toDetail(updated, membership);
     });
   }
 
@@ -438,7 +449,7 @@ export class EventsService {
     return "DRAFT";
   }
 
-  private toSummary(event: EventWithRole): EventSummary {
+  private toSummary(event: EventWithMembership): EventSummary {
     const membership = event.memberships[0];
     if (!membership) {
       throw new Error(
@@ -457,10 +468,17 @@ export class EventsService {
       city: event.city,
       status: event.status,
       role: membership.role,
+      canSendInvitations: this.access.allows(
+        membership,
+        Permission.INVITATION_SEND,
+      ),
     };
   }
 
-  private toDetail(event: Event, role: EventMembershipRole): EventDetail {
+  private toDetail(
+    event: Event,
+    membership: EventCapabilityMembership,
+  ): EventDetail {
     return {
       id: event.id,
       nameAr: event.nameAr,
@@ -482,7 +500,11 @@ export class EventsService {
       allowRsvpEdits: event.allowRsvpEdits,
       qrEnabled: event.qrEnabled,
       status: event.status,
-      role,
+      role: membership.role,
+      canSendInvitations: this.access.allows(
+        membership,
+        Permission.INVITATION_SEND,
+      ),
       availableTransitions: [...allowedEventStatusTransitions(event.status)],
       createdAt: event.createdAt.toISOString(),
       updatedAt: event.updatedAt.toISOString(),

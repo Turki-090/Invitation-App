@@ -2,7 +2,7 @@ import "reflect-metadata";
 import type { ApiEnvironment } from "@dawah/config";
 import { NestFactory } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
-import { json, urlencoded } from "express";
+import { json, type Request, urlencoded } from "express";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { ApiExceptionFilter } from "./shared/api-exception.filter";
@@ -16,7 +16,16 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix("api/v1");
   app.use(helmet());
-  app.use(json({ limit: config.get("API_BODY_LIMIT_BYTES", { infer: true }) }));
+  app.use(
+    json({
+      limit: config.get("API_BODY_LIMIT_BYTES", { infer: true }),
+      verify: (request: Request & { rawBody?: Buffer }, _response, body) => {
+        if (request.originalUrl.includes("/webhooks/whatsapp")) {
+          request.rawBody = Buffer.from(body);
+        }
+      },
+    }),
+  );
   app.use(
     urlencoded({
       extended: true,

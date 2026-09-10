@@ -58,6 +58,7 @@ const template: InvitationTemplate = {
   id: templateId,
   locale: "en",
   name: "Formal invitation",
+  providerTemplateName: "wedding_invitation_en",
   status: "APPROVED",
   updatedAt: "2026-09-08T00:05:00.000Z",
   variableKeys: ["guest_name", "event_name"],

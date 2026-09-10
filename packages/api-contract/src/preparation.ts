@@ -19,6 +19,12 @@ export const messageVariableSchema = z.enum(MESSAGE_VARIABLES);
 const templateNameSchema = z.string().trim().min(1).max(120);
 const templateBodySchema = z.string().trim().min(1).max(1_500);
 const extraMessageSchema = z.string().trim().max(500);
+const providerTemplateNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(255)
+  .regex(/^[a-z0-9_]+$/);
 
 export const createInvitationTemplateSchema = z.object({
   name: templateNameSchema,
@@ -26,6 +32,7 @@ export const createInvitationTemplateSchema = z.object({
   body: templateBodySchema,
   extraMessage: extraMessageSchema.optional(),
   assetId: z.uuid().nullable().optional(),
+  providerTemplateName: providerTemplateNameSchema.optional(),
 });
 
 export type CreateInvitationTemplateInput = z.infer<
@@ -39,6 +46,9 @@ export const updateInvitationTemplateSchema = z
     body: templateBodySchema.optional(),
     extraMessage: z.union([extraMessageSchema, z.null()]).optional(),
     assetId: z.uuid().nullable().optional(),
+    providerTemplateName: z
+      .union([providerTemplateNameSchema, z.null()])
+      .optional(),
     expectedVersion: z.number().int().positive(),
   })
   .refine(
@@ -63,6 +73,7 @@ export const invitationTemplateSchema = z.object({
     .string()
     .regex(/^[a-f0-9]{64}$/)
     .nullable(),
+  providerTemplateName: z.string().nullable(),
   status: templateStatusSchema,
   version: z.number().int().positive(),
   createdAt: z.string(),

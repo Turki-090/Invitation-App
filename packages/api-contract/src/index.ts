@@ -3,5 +3,6 @@ export * from "./auth";
 export * from "./events";
 export * from "./imports";
 export * from "./invitations";
+export * from "./messaging";
 export * from "./preparation";
 export * from "./shared";

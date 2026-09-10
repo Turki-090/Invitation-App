@@ -24,6 +24,10 @@ tags:
     description: Versioned invitation message templates.
   - name: preparation
     description: Invitation previews, readiness checks, and immutable content snapshots.
+  - name: messaging
+    description: Idempotent WhatsApp send batches, delivery progress, and safe resend review.
+  - name: webhooks
+    description: Authenticated provider callbacks processed asynchronously.
 paths:
   /health/live:
     get:
@@ -905,6 +909,255 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/sending/readiness:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Review invitation send readiness
+      description: Produces a short-lived server confirmation over current immutable snapshots, prior sends, and the credit-unit estimate.
+      tags: [messaging]
+      operationId: reviewSendReadiness
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SendReadinessRequest" }
+      responses:
+        "200":
+          description: Current server-authoritative send summary.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SendReadinessResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/send-batches:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: List WhatsApp send batches
+      tags: [messaging]
+      operationId: listSendBatches
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Paged send batches with derived delivery progress.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListSendBatchesResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      summary: Confirm and queue an invitation send batch
+      description: Revalidates the short-lived confirmation in a transaction, persists one immutable logical message per ready invitation, and returns before provider delivery.
+      tags: [messaging]
+      operationId: createSendBatch
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSendBatch" }
+      responses:
+        "202":
+          description: Durable send batch accepted for asynchronous dispatch.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SendBatch" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /events/{eventId}/send-batches/{batchId}:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/SendBatchId"
+    get:
+      summary: Get send-batch progress and messages
+      tags: [messaging]
+      operationId: getSendBatch
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/MessageStatus" }
+      responses:
+        "200":
+          description: Batch totals and a page of recipient-safe message summaries.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SendBatchDetail" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/messages/{messageId}/resend-readiness:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/MessageId"
+    post:
+      summary: Review a failed message for safe resend
+      tags: [messaging]
+      operationId: reviewMessageResend
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Current resend eligibility and short-lived confirmation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResendReadinessResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/messages/{messageId}/resend:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/MessageId"
+    post:
+      summary: Confirm and queue a safe message resend
+      tags: [messaging]
+      operationId: resendMessage
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResendMessage" }
+      responses:
+        "202":
+          description: Immutable resend accepted as a new logical message and credit unit.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SendBatch" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /messaging/media/{snapshotId}:
+    get:
+      summary: Resolve a short-lived invitation image capability for WhatsApp
+      description: Serves checksum-verified bytes from private storage only when the expiry-bounded HMAC capability matches the immutable invitation snapshot.
+      tags: [messaging]
+      operationId: getWhatsappMessageMedia
+      security: []
+      parameters:
+        - name: snapshotId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: checksum
+          in: query
+          required: true
+          schema: { type: string, pattern: "^[a-f0-9]{64}$" }
+        - name: expires
+          in: query
+          required: true
+          schema: { type: integer, format: int64, minimum: 1000000000 }
+        - name: signature
+          in: query
+          required: true
+          schema: { type: string, pattern: "^[a-f0-9]{64}$" }
+      responses:
+        "200":
+          description: Checksum-verified invitation image bytes.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: "private, no-store" }
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+            image/webp:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /webhooks/whatsapp:
+    get:
+      summary: Complete the Meta webhook verification challenge
+      tags: [webhooks]
+      operationId: verifyWhatsappWebhook
+      security: []
+      parameters:
+        - name: hub.mode
+          in: query
+          required: true
+          schema: { type: string, const: subscribe }
+        - name: hub.verify_token
+          in: query
+          required: true
+          schema: { type: string }
+        - name: hub.challenge
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Exact challenge value as plain text.
+          content:
+            text/plain:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      summary: Authenticate and persist Meta WhatsApp webhook events
+      tags: [webhooks]
+      operationId: receiveWhatsappWebhook
+      security: []
+      parameters:
+        - name: X-Hub-Signature-256
+          in: header
+          required: true
+          schema: { type: string, pattern: "^sha256=[a-fA-F0-9]{64}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: Authenticated events durably persisted and queued for asynchronous reduction.
+          content:
+            application/json:
+              schema:
+                { $ref: "#/components/schemas/WhatsappWebhookAcknowledgement" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
 components:
   securitySchemes:
     bearerAuth:
@@ -948,6 +1201,28 @@ components:
       required: true
       description: Invitation-template version UUID.
       schema: { type: string, format: uuid }
+    SendBatchId:
+      name: batchId
+      in: path
+      required: true
+      description: Send-batch UUID.
+      schema: { type: string, format: uuid }
+    MessageId:
+      name: messageId
+      in: path
+      required: true
+      description: Logical-message UUID.
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Caller-generated visible ASCII key unique to this logical mutation.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 200
+        pattern: "^[!-~]+$"
   responses:
     Unauthorized:
       description: Missing, invalid, or expired host token.
@@ -1120,6 +1395,7 @@ components:
           city,
           status,
           role,
+          canSendInvitations,
         ]
       properties:
         id: { type: string, format: uuid }
@@ -1133,6 +1409,9 @@ components:
         city: { type: string }
         status: { $ref: "#/components/schemas/EventStatus" }
         role: { $ref: "#/components/schemas/MembershipRole" }
+        canSendInvitations:
+          type: boolean
+          description: Whether the current membership can send invitations, including additive permission overrides.
     EventDetail:
       type: object
       additionalProperties: false
@@ -1157,6 +1436,7 @@ components:
           qrEnabled,
           status,
           role,
+          canSendInvitations,
           availableTransitions,
           createdAt,
           updatedAt,
@@ -1186,6 +1466,9 @@ components:
         qrEnabled: { type: boolean }
         status: { $ref: "#/components/schemas/EventStatus" }
         role: { $ref: "#/components/schemas/MembershipRole" }
+        canSendInvitations:
+          type: boolean
+          description: Whether the current membership can send invitations, including additive permission overrides.
         availableTransitions:
           type: array
           items: { $ref: "#/components/schemas/EventStatus" }
@@ -1875,6 +2158,11 @@ components:
         body: { type: string, minLength: 1, maxLength: 1500 }
         extraMessage: { type: string, maxLength: 500 }
         assetId: { type: [string, "null"], format: uuid }
+        providerTemplateName:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: "^[a-z0-9_]+$"
     UpdateInvitationTemplate:
       type: object
       additionalProperties: false
@@ -1886,12 +2174,18 @@ components:
         - required: [body]
         - required: [extraMessage]
         - required: [assetId]
+        - required: [providerTemplateName]
       properties:
         name: { type: string, minLength: 1, maxLength: 120 }
         locale: { $ref: "#/components/schemas/PreparationLocale" }
         body: { type: string, minLength: 1, maxLength: 1500 }
         extraMessage: { type: [string, "null"], maxLength: 500 }
         assetId: { type: [string, "null"], format: uuid }
+        providerTemplateName:
+          type: [string, "null"]
+          minLength: 1
+          maxLength: 255
+          pattern: "^[a-z0-9_]+$"
         expectedVersion: { type: integer, minimum: 1 }
     InvitationTemplate:
       type: object
@@ -1907,6 +2201,7 @@ components:
           variableKeys,
           assetId,
           assetChecksumSha256,
+          providerTemplateName,
           status,
           version,
           createdAt,
@@ -1928,6 +2223,7 @@ components:
         assetChecksumSha256:
           type: [string, "null"]
           pattern: "^[a-f0-9]{64}$"
+        providerTemplateName: { type: [string, "null"] }
         status: { $ref: "#/components/schemas/TemplateStatus" }
         version: { type: integer, minimum: 1 }
         createdAt: { type: string, format: date-time }
@@ -2074,3 +2370,276 @@ components:
         blockedInvitationIds:
           type: array
           items: { type: string, format: uuid }
+    SendBatchStatus:
+      type: string
+      enum:
+        [
+          QUEUED,
+          DISPATCHING,
+          IN_PROGRESS,
+          COMPLETED,
+          PARTIALLY_FAILED,
+          FAILED,
+          CANCELLED,
+        ]
+    MessageType:
+      type: string
+      enum: [INVITATION, REMINDER, RSVP_CONFIRMATION, ENTRY_PASS, MANUAL]
+    MessageStatus:
+      type: string
+      enum:
+        [QUEUED, SENDING, SENT, DELIVERED, READ, RESPONDED, FAILED, CANCELLED]
+    MessagingFailureClass:
+      type: string
+      enum: [TRANSIENT, PERMANENT, AMBIGUOUS]
+    SendReadinessRequest:
+      type: object
+      additionalProperties: false
+      required: [templateId]
+      properties:
+        templateId: { type: string, format: uuid }
+        invitationIds:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items: { type: string, format: uuid }
+    SendReadinessResponse:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          templateId,
+          confirmationToken,
+          expiresAt,
+          summary,
+          blocked,
+          alreadySentInvitationIds,
+        ]
+      properties:
+        templateId: { type: string, format: uuid }
+        confirmationToken: { type: string, pattern: "^[a-f0-9]{64}$" }
+        expiresAt: { type: string, format: date-time }
+        summary:
+          type: object
+          additionalProperties: false
+          required:
+            [
+              selectedInvitations,
+              readyInvitations,
+              alreadySentInvitations,
+              blockedInvitations,
+              estimatedCreditUnits,
+            ]
+          properties:
+            selectedInvitations: { type: integer, minimum: 0 }
+            readyInvitations: { type: integer, minimum: 0 }
+            alreadySentInvitations: { type: integer, minimum: 0 }
+            blockedInvitations: { type: integer, minimum: 0 }
+            estimatedCreditUnits: { type: integer, minimum: 0 }
+        blocked:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [invitationId, issues]
+            properties:
+              invitationId: { type: string, format: uuid }
+              issues:
+                type: array
+                items: { $ref: "#/components/schemas/ReadinessIssue" }
+        alreadySentInvitationIds:
+          type: array
+          items: { type: string, format: uuid }
+    CreateSendBatch:
+      type: object
+      additionalProperties: false
+      required: [templateId, confirmationToken]
+      properties:
+        templateId: { type: string, format: uuid }
+        invitationIds:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items: { type: string, format: uuid }
+        confirmationToken: { type: string, pattern: "^[a-f0-9]{64}$" }
+    SendBatchProgress:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          queued,
+          sending,
+          sent,
+          delivered,
+          read,
+          responded,
+          failed,
+          cancelled,
+          completed,
+        ]
+      properties:
+        queued: { type: integer, minimum: 0 }
+        sending: { type: integer, minimum: 0 }
+        sent: { type: integer, minimum: 0 }
+        delivered: { type: integer, minimum: 0 }
+        read: { type: integer, minimum: 0 }
+        responded: { type: integer, minimum: 0 }
+        failed: { type: integer, minimum: 0 }
+        cancelled: { type: integer, minimum: 0 }
+        completed: { type: integer, minimum: 0 }
+    SendBatch:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          eventId,
+          status,
+          messageType,
+          totalMessages,
+          estimatedCreditUnits,
+          progress,
+          queuedAt,
+          startedAt,
+          completedAt,
+          createdAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/SendBatchStatus" }
+        messageType: { $ref: "#/components/schemas/MessageType" }
+        totalMessages: { type: integer, minimum: 1 }
+        estimatedCreditUnits: { type: integer, minimum: 1 }
+        progress: { $ref: "#/components/schemas/SendBatchProgress" }
+        queuedAt: { type: string, format: date-time }
+        startedAt: { type: [string, "null"], format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    ListSendBatchesResponse:
+      type: object
+      additionalProperties: false
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/SendBatch" }
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, pageSize, totalItems, totalPages]
+          properties:
+            page: { type: integer, minimum: 1 }
+            pageSize: { type: integer, minimum: 1, maximum: 100 }
+            totalItems: { type: integer, minimum: 0 }
+            totalPages: { type: integer, minimum: 0 }
+    MessageSummary:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          invitationGroupId,
+          invitationDisplayName,
+          maskedPhone,
+          status,
+          locale,
+          providerMessageId,
+          attemptCount,
+          failureClass,
+          failureCode,
+          failureReason,
+          canResend,
+          queuedAt,
+          sentAt,
+          deliveredAt,
+          readAt,
+          failedAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        invitationGroupId: { type: string, format: uuid }
+        invitationDisplayName: { type: string }
+        maskedPhone: { type: string }
+        status: { $ref: "#/components/schemas/MessageStatus" }
+        locale: { $ref: "#/components/schemas/PreparationLocale" }
+        providerMessageId: { type: [string, "null"] }
+        attemptCount: { type: integer, minimum: 0 }
+        failureClass:
+          anyOf:
+            - $ref: "#/components/schemas/MessagingFailureClass"
+            - type: "null"
+        failureCode: { type: [string, "null"] }
+        failureReason: { type: [string, "null"] }
+        canResend: { type: boolean }
+        queuedAt: { type: string, format: date-time }
+        sentAt: { type: [string, "null"], format: date-time }
+        deliveredAt: { type: [string, "null"], format: date-time }
+        readAt: { type: [string, "null"], format: date-time }
+        failedAt: { type: [string, "null"], format: date-time }
+    SendBatchDetail:
+      type: object
+      additionalProperties: false
+      required: [batch, messages, pagination]
+      properties:
+        batch: { $ref: "#/components/schemas/SendBatch" }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/MessageSummary" }
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, pageSize, totalItems, totalPages]
+          properties:
+            page: { type: integer, minimum: 1 }
+            pageSize: { type: integer, minimum: 1, maximum: 100 }
+            totalItems: { type: integer, minimum: 0 }
+            totalPages: { type: integer, minimum: 0 }
+    ResendReadinessResponse:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          messageId,
+          invitationGroupId,
+          eligible,
+          estimatedCreditUnits,
+          confirmationToken,
+          expiresAt,
+          reasonCode,
+          reason,
+        ]
+      properties:
+        messageId: { type: string, format: uuid }
+        invitationGroupId: { type: string, format: uuid }
+        eligible: { type: boolean }
+        estimatedCreditUnits: { type: integer, minimum: 0, maximum: 1 }
+        confirmationToken: { type: [string, "null"], pattern: "^[a-f0-9]{64}$" }
+        expiresAt: { type: [string, "null"], format: date-time }
+        reasonCode:
+          type: [string, "null"]
+          enum:
+            [
+              NOT_FAILED,
+              AMBIGUOUS_OUTCOME,
+              ALREADY_RESENT,
+              TEMPLATE_NOT_APPROVED,
+              SNAPSHOT_STALE,
+              null,
+            ]
+          description: Stable machine-readable reason when the resend is ineligible; null when eligible.
+        reason: { type: [string, "null"] }
+    ResendMessage:
+      type: object
+      additionalProperties: false
+      required: [confirmationToken]
+      properties:
+        confirmationToken: { type: string, pattern: "^[a-f0-9]{64}$" }
+    WhatsappWebhookAcknowledgement:
+      type: object
+      additionalProperties: false
+      required: [accepted, queuedEvents, duplicateEvents]
+      properties:
+        accepted: { type: boolean, const: true }
+        queuedEvents: { type: integer, minimum: 0 }
+        duplicateEvents: { type: integer, minimum: 0 }

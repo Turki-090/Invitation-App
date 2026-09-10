@@ -14,6 +14,7 @@
     "@dawah/config": "workspace:*",
     "@dawah/domain": "workspace:*",
     "@dawah/imports": "workspace:*",
+    "@dawah/messaging": "workspace:*",
     "@dawah/queue": "workspace:*",
     "@dawah/storage": "workspace:*",
     "@prisma/client": "6.19.3",

@@ -185,6 +185,35 @@ describe("AssetsService", () => {
     );
     expect(storage.deleteObject).not.toHaveBeenCalled();
   });
+
+  it("retains an asset referenced by an immutable invitation snapshot", async () => {
+    const asset = persistedAsset({ kind: "INVITATION_ASSET" });
+    const storage = storageMock();
+    const transaction = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: assetId }]),
+      storedAsset: { findFirstOrThrow: vi.fn().mockResolvedValue(asset) },
+      invitationTemplate: { count: vi.fn().mockResolvedValue(0) },
+      invitationContentSnapshot: { count: vi.fn().mockResolvedValue(1) },
+      auditLog: { create: vi.fn() },
+    };
+    const prisma = prismaMock({
+      storedAsset: { findFirst: vi.fn().mockResolvedValue(asset) },
+      $transaction: vi.fn(
+        async (operation: (client: typeof transaction) => Promise<unknown>) =>
+          operation(transaction),
+      ),
+    });
+    const service = serviceWith(prisma, accessMock(), storage);
+
+    await expect(
+      service.archive(principal, eventId, assetId),
+    ).rejects.toMatchObject({ response: { code: "ASSET_IN_USE" } });
+    expect(transaction.invitationContentSnapshot.count).toHaveBeenCalledWith({
+      where: { assetId, eventId },
+    });
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+  });
 });
 
 function serviceWith(

@@ -59,6 +59,7 @@ vi.mock("../lib/api", () => ({
 }));
 
 const event: EventDetail = {
+  canSendInvitations: true,
   id: eventId,
   nameAr: "زواج خالد ونورة",
   nameEn: "Khalid & Nora Wedding",
@@ -85,6 +86,7 @@ const event: EventDetail = {
 };
 
 const secondEvent: EventSummary = {
+  canSendInvitations: true,
   id: secondEventId,
   nameAr: "حفل التخرج",
   nameEn: "Graduation",
@@ -98,7 +100,7 @@ const secondEvent: EventSummary = {
   role: "OWNER",
 };
 
-function renderWorkspace(section: "overview" | "settings") {
+function renderWorkspace(section: "overview" | "sending" | "settings") {
   const queryClient = new QueryClient({
     defaultOptions: {
       mutations: { retry: false },
@@ -115,6 +117,7 @@ function renderWorkspace(section: "overview" | "settings") {
         guestsCopy={en.guests}
         locale="en"
         preparationCopy={en.preparation}
+        sendingCopy={en.sending}
         section={section}
         shellCopy={en.shell}
       />
@@ -231,5 +234,24 @@ describe("event workspace", () => {
     await waitFor(() =>
       expect(router.replace).toHaveBeenCalledWith("/en/events"),
     );
+  });
+
+  it("hides and guards sending when the effective membership lacks permission", async () => {
+    api.getEvent.mockResolvedValue({
+      ...event,
+      canSendInvitations: false,
+      role: "CHECK_IN_STAFF",
+    });
+
+    renderWorkspace("sending");
+
+    expect(
+      await screen.findByRole("heading", {
+        name: en.sending.permissionDeniedTitle,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("link", { name: en.sending.navigation }),
+    ).toBeNull();
   });
 });

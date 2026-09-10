@@ -16,6 +16,7 @@
     "@dawah/config": "workspace:*",
     "@dawah/domain": "workspace:*",
     "@dawah/imports": "workspace:*",
+    "@dawah/messaging": "workspace:*",
     "@dawah/queue": "workspace:*",
     "@dawah/storage": "workspace:*",
     "@nestjs/common": "11.2.3",

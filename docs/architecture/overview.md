@@ -14,6 +14,11 @@ Host web / guest web / future native apps
                        BullMQ worker -> WhatsApp Cloud API
 ```
 
-PostgreSQL is the source of truth. Redis is limited to queues, rate limits, idempotency, and measured cache use. Business rules live in `packages/domain`; DTO validation and stable client-facing types live in `packages/api-contract`. Prisma is isolated behind API services and is never exposed as the public contract.
+PostgreSQL is the source of truth, including durable high-impact idempotency and
+provider/webhook evidence. Redis is limited to queues, worker/provider rate
+limits, and measured cache use. Business rules live in `packages/domain`; DTO
+validation and stable client-facing types live in `packages/api-contract`.
+Prisma is isolated behind API and worker repositories and is never exposed as
+the public contract.
 
 The initial deployments are a web process, API process, and worker process. Domain modules remain in one codebase until measured scaling needs justify extraction.

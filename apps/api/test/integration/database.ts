@@ -35,6 +35,11 @@ export class TestDatabase {
     assertTestDatabase(this.databaseUrl);
 
     await this.prisma.$transaction([
+      this.prisma.webhookEvent.deleteMany(),
+      this.prisma.messageAttempt.deleteMany(),
+      this.prisma.idempotencyRecord.deleteMany(),
+      this.prisma.message.deleteMany(),
+      this.prisma.sendBatch.deleteMany(),
       this.prisma.rsvpMember.deleteMany(),
       this.prisma.rsvpHistory.deleteMany(),
       this.prisma.rsvp.deleteMany(),

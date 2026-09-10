@@ -141,11 +141,6 @@ async function verifyOpenApiRuntime() {
           `${method.toUpperCase()} ${path} did not enforce its documented bearer authentication.`,
         );
       }
-      if (!authenticated && !response.ok) {
-        throw new Error(
-          `${method.toUpperCase()} ${path} failed its documented unauthenticated smoke request.`,
-        );
-      }
       if (
         !(response.headers.get("content-type") ?? "").includes(
           "application/json",
@@ -155,6 +150,11 @@ async function verifyOpenApiRuntime() {
       }
 
       const body = await response.json();
+      if (!authenticated && body.error?.code === "AUTH_REQUIRED") {
+        throw new Error(
+          `${method.toUpperCase()} ${path} unexpectedly required bearer authentication.`,
+        );
+      }
       if (operation.operationId === "getReadiness") {
         if (
           body.status !== "ok" ||

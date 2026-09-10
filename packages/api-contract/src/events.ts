@@ -197,6 +197,7 @@ export const eventSummarySchema = z.object({
   city: z.string(),
   status: eventStatusSchema,
   role: membershipRoleSchema,
+  canSendInvitations: z.boolean(),
 });
 
 export type EventSummary = z.infer<typeof eventSummarySchema>;

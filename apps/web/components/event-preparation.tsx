@@ -69,6 +69,7 @@ interface EventPreparationProps {
 interface TemplateDraft {
   name: string;
   locale: "ar-SA" | "en";
+  providerTemplateName: string;
   body: string;
   extraMessage: string;
   assetId: string;
@@ -210,6 +211,7 @@ function MessagePreparation({
             extraMessage: draft.extraMessage || null,
             locale: draft.locale,
             name: draft.name,
+            providerTemplateName: draft.providerTemplateName || null,
           })
         : createInvitationTemplate(supabase, eventId, {
             assetId: draft.assetId || null,
@@ -217,6 +219,7 @@ function MessagePreparation({
             extraMessage: draft.extraMessage || undefined,
             locale: draft.locale,
             name: draft.name,
+            providerTemplateName: draft.providerTemplateName || undefined,
           }),
     onSuccess: async (template) => {
       await refreshTemplates(template);
@@ -425,6 +428,27 @@ function MessagePreparation({
                     />
                   </Field>
                 </div>
+                <Field
+                  hint={copy.providerTemplateNameHint}
+                  id="template-provider-name"
+                  label={copy.providerTemplateName}
+                >
+                  <Input
+                    dir="ltr"
+                    id="template-provider-name"
+                    mono
+                    onChange={(event) => {
+                      const value = event.currentTarget.value;
+                      setDraft((current) => ({
+                        ...current,
+                        providerTemplateName: value,
+                      }));
+                    }}
+                    pattern="[a-z0-9_]+"
+                    placeholder={copy.providerTemplateNamePlaceholder}
+                    value={draft.providerTemplateName}
+                  />
+                </Field>
                 <Field
                   hint={copy.messageHint}
                   id="template-body"
@@ -1657,6 +1681,7 @@ function blankTemplate(
     extraMessage: copy.defaultExtraMessage,
     locale,
     name: copy.defaultTemplateName,
+    providerTemplateName: "",
   };
 }
 
@@ -1667,6 +1692,7 @@ function templateToDraft(template: InvitationTemplate): TemplateDraft {
     extraMessage: template.extraMessage ?? "",
     locale: template.locale,
     name: template.name,
+    providerTemplateName: template.providerTemplateName ?? "",
   };
 }
 
@@ -1679,7 +1705,8 @@ function templateMatchesDraft(
     template.body === draft.body &&
     (template.extraMessage ?? "") === draft.extraMessage &&
     template.locale === draft.locale &&
-    template.name === draft.name
+    template.name === draft.name &&
+    (template.providerTemplateName ?? "") === draft.providerTemplateName
   );
 }
 

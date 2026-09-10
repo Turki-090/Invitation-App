@@ -38,6 +38,10 @@ import {
 import type { AuthPrincipal } from "../auth/auth.types";
 import { EventAccessService } from "../events/event-access.service";
 import { PrismaService } from "../prisma/prisma.service";
+import {
+  invitationSourceHash,
+  stableSerialize,
+} from "./invitation-source-hash";
 
 type TemplateWithAsset = InvitationTemplate & { asset: StoredAsset | null };
 type InvitationWithMembers = Prisma.InvitationGroupGetPayload<{
@@ -100,6 +104,7 @@ export class PreparationService {
       locale: input.locale,
       body: input.body,
       extraMessage: input.extraMessage ?? null,
+      providerTemplateName: input.providerTemplateName ?? null,
       assetId: asset?.id ?? null,
       assetSha256: asset?.sha256 ?? null,
     });
@@ -115,6 +120,7 @@ export class PreparationService {
           displayName: input.name,
           bodyTemplate: input.body,
           extraMessageTemplate: input.extraMessage?.trim() || null,
+          providerTemplateName: input.providerTemplateName?.trim() || null,
           variableSchema: [...variables],
           interactiveComponents: [],
           contentHash,
@@ -196,6 +202,10 @@ export class PreparationService {
           : input.extraMessage?.trim() || null;
       const requestedAssetId =
         input.assetId === undefined ? existing.assetId : input.assetId;
+      const providerTemplateName =
+        input.providerTemplateName === undefined
+          ? existing.providerTemplateName
+          : input.providerTemplateName?.trim() || null;
       const asset = await this.resolveAsset(
         eventId,
         requestedAssetId,
@@ -210,6 +220,7 @@ export class PreparationService {
         locale,
         body,
         extraMessage,
+        providerTemplateName,
         assetId: asset?.id ?? null,
         assetSha256: asset?.sha256 ?? null,
       });
@@ -236,7 +247,7 @@ export class PreparationService {
           contentHash,
           assetId: asset?.id ?? null,
           provider: existing.provider,
-          providerTemplateName: existing.providerTemplateName,
+          providerTemplateName,
         },
         include: { asset: true },
       });
@@ -547,6 +558,14 @@ export class PreparationService {
           eventId,
           input.templateId,
         );
+        if (currentTemplate.assetId) {
+          await transaction.$queryRaw`
+            SELECT "id" FROM "stored_assets"
+            WHERE "id" = ${currentTemplate.assetId}::uuid
+              AND "event_id" = ${eventId}::uuid
+            FOR SHARE
+          `;
+        }
         const invitationLock = invitationIds
           ? Prisma.sql`
               SELECT "id" FROM "invitation_groups"
@@ -849,42 +868,7 @@ export class PreparationService {
     invitation: InvitationWithMembers,
     template: TemplateWithAsset,
   ): string {
-    return this.sha256(
-      this.stableSerialize({
-        event: {
-          id: event.id,
-          nameAr: event.nameAr,
-          nameEn: event.nameEn,
-          date: event.eventDate.toISOString(),
-          time: event.startTime.toISOString(),
-          venueNameAr: event.venueNameAr,
-          venueNameEn: event.venueNameEn,
-          timezone: event.timezone,
-        },
-        invitation: {
-          id: invitation.id,
-          displayName: invitation.displayName,
-          phoneE164: invitation.phoneE164,
-          invitationType: invitation.invitationType,
-          maxCompanions: invitation.maxCompanions,
-          cancelledAt: invitation.cancelledAt?.toISOString() ?? null,
-          members: invitation.members.map((member) => ({
-            name: member.name,
-            isPrimary: member.isPrimary,
-            position: member.position,
-          })),
-        },
-        template: {
-          id: template.id,
-          version: template.version,
-          locale: template.locale,
-          status: template.status,
-          contentHash: template.contentHash,
-          assetId: template.assetId,
-          assetSha256: template.asset?.sha256 ?? null,
-        },
-      }),
-    );
+    return invitationSourceHash(event, invitation, template);
   }
 
   private validateTemplateMaterial(material: string): readonly string[] {
@@ -1037,6 +1021,7 @@ export class PreparationService {
       ] as InvitationTemplateContract["variableKeys"],
       assetId: template.assetId,
       assetChecksumSha256: template.asset?.sha256 ?? null,
+      providerTemplateName: template.providerTemplateName,
       status: template.status,
       version: template.version,
       createdAt: template.createdAt.toISOString(),
@@ -1103,17 +1088,6 @@ export class PreparationService {
   }
 
   private stableSerialize(value: unknown): string {
-    if (value === null || typeof value !== "object")
-      return JSON.stringify(value);
-    if (Array.isArray(value)) {
-      return `[${value.map((entry) => this.stableSerialize(entry)).join(",")}]`;
-    }
-    return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .map(
-        ([key, entry]) =>
-          `${JSON.stringify(key)}:${this.stableSerialize(entry)}`,
-      )
-      .join(",")}}`;
+    return stableSerialize(value);
   }
 }
