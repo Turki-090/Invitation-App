@@ -700,6 +700,67 @@ const en = {
     countryOman: "Oman (+968)",
     dismiss: "Dismiss notification",
   },
+  publicInvitation: {
+    metadataTitle: "Private invitation",
+    eyebrow: "By the grace of God",
+    invitationIntro: "We would be delighted to have you join our celebration",
+    language: "Invitation language",
+    arabic: "العربية",
+    english: "English",
+    singleScope: "An invitation especially for you",
+    namedGroupScope: "This invitation includes {count} named guests",
+    companionScope: "For you and up to {count} companions",
+    eventDetails: "Event details",
+    timeRange: "{start} – {end}",
+    openMap: "Open location",
+    responseFormLabel: "RSVP",
+    chooseGuests: "Choose who will attend",
+    selectedOf: "{selected} of {total} attending",
+    selectOneOrDecline:
+      "Select at least one guest, or choose everyone declines.",
+    chooseCompanionCount: "Choose the number of companions",
+    chooseCompanionCountHint:
+      "Choose a companion count before confirming attendance.",
+    meOnly: "Me only",
+    mePlus: "Me + {count}",
+    expectedPeople: "Expected attendance: {count}",
+    addCompanion: "Add a companion",
+    removeCompanion: "Remove a companion",
+    attend: "I will attend",
+    decline: "I am unable to attend",
+    confirmAttendance: "Confirm attendance",
+    everyoneDeclines: "Everyone declines",
+    cancelEdit: "Cancel changes",
+    attendanceConfirmed: "Attendance confirmed",
+    declinedTitle: "Your apology has been recorded",
+    declinedDescription: "Thank you for letting us know.",
+    responseEdited: "This response has been updated",
+    editingRecordedResponse: "You are editing the recorded response",
+    changeResponse: "Change response",
+    editsUnavailable: "This response is saved and cannot be changed here now.",
+    confirmationQueued:
+      "Your response was saved. A WhatsApp confirmation is on its way.",
+    responseSaved: "Your response was saved successfully.",
+    closedTitle: "The RSVP period has ended",
+    closedWithoutResponse:
+      "No response was recorded. Please contact the host to update your attendance.",
+    completedTitle: "Thank you for sharing our celebration",
+    completedDescription: "We were delighted to have you with us.",
+    responseUnavailableTitle: "RSVP is not available right now",
+    responseUnavailableDescription:
+      "The event details remain available, but this link cannot submit a new response.",
+    linkUnavailableTitle: "Invitation link unavailable",
+    linkUnavailableDescription:
+      "The link may have expired or been replaced. Ask the host for a new link.",
+    deadline: "You can respond or make changes until {date}",
+    privateLink: "This is a private invitation link. Please do not share it.",
+    submitError:
+      "Your response could not be saved. Your choices are still here; try again.",
+    tooManyAttempts:
+      "There have been too many attempts. Wait a moment and try again.",
+    conflictError:
+      "The response changed while saving. Review it and submit again.",
+  },
 } satisfies Dictionary;
 
 export default en;

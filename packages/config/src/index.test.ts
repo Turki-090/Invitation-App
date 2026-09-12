@@ -176,6 +176,19 @@ describe("environment validation", () => {
     );
   });
 
+  it("normalizes provider-safe RSVP confirmation template names", () => {
+    expect(validateApiEnvironment(safeProductionApiEnvironment)).toMatchObject({
+      META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_AR: "dawah_rsvp_confirmation_ar",
+      META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_EN: "dawah_rsvp_confirmation_en",
+    });
+    expect(() =>
+      validateWorkerEnvironment({
+        ...safeProductionWorkerEnvironment,
+        META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_AR: "Unsafe Template Name",
+      }),
+    ).toThrow(/META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_AR/);
+  });
+
   it.each([
     "https://api.dawah.sa",
     "https://api.dawah.sa/api/v1?token=leaked",

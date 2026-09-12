@@ -34,11 +34,18 @@ export interface WhatsappMediaEnvironment {
   META_WHATSAPP_MEDIA_URL_TTL_SECONDS: number;
 }
 
+export interface WhatsappRsvpConfirmationEnvironment {
+  META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_AR: string;
+  META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_EN: string;
+  META_WHATSAPP_MAX_ATTEMPTS: number;
+}
+
 export interface ApiEnvironment
   extends
     StorageEnvironment,
     ImportAndAssetLimitsEnvironment,
-    WhatsappMediaEnvironment {
+    WhatsappMediaEnvironment,
+    WhatsappRsvpConfirmationEnvironment {
   NODE_ENV: NodeEnvironment;
   DAWAH_ENV: DeploymentEnvironment;
   DATABASE_URL: string;
@@ -60,7 +67,8 @@ export interface WorkerEnvironment
   extends
     StorageEnvironment,
     ImportAndAssetLimitsEnvironment,
-    WhatsappMediaEnvironment {
+    WhatsappMediaEnvironment,
+    WhatsappRsvpConfirmationEnvironment {
   NODE_ENV: NodeEnvironment;
   DAWAH_ENV: DeploymentEnvironment;
   DATABASE_URL: string;
@@ -74,7 +82,6 @@ export interface WorkerEnvironment
   META_WHATSAPP_REQUEST_TIMEOUT_MS: number;
   META_WHATSAPP_SEND_CONCURRENCY: number;
   META_WHATSAPP_MAX_SENDS_PER_SECOND: number;
-  META_WHATSAPP_MAX_ATTEMPTS: number;
 }
 
 export interface WebEnvironment {
@@ -152,6 +159,20 @@ const whatsappMediaShape = {
     .default(15 * 60),
 } as const;
 
+const whatsappRsvpConfirmationShape = {
+  META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_AR: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9_]{1,255}$/)
+    .default("dawah_rsvp_confirmation_ar"),
+  META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_EN: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9_]{1,255}$/)
+    .default("dawah_rsvp_confirmation_en"),
+  META_WHATSAPP_MAX_ATTEMPTS: positiveInteger.max(10).default(5),
+} as const;
+
 const runtimeShape = {
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -165,6 +186,7 @@ const apiEnvironmentSchema = z
     ...storageShape,
     ...importAndAssetLimitsShape,
     ...whatsappMediaShape,
+    ...whatsappRsvpConfirmationShape,
     DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }),
     QUEUE_PREFIX: optionalText,
@@ -269,6 +291,7 @@ const workerEnvironmentSchema = z
     ...storageShape,
     ...importAndAssetLimitsShape,
     ...whatsappMediaShape,
+    ...whatsappRsvpConfirmationShape,
     DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }),
     QUEUE_PREFIX: optionalText,
@@ -291,7 +314,6 @@ const workerEnvironmentSchema = z
       .default(10_000),
     META_WHATSAPP_SEND_CONCURRENCY: positiveInteger.max(32).default(4),
     META_WHATSAPP_MAX_SENDS_PER_SECOND: positiveInteger.max(80).default(10),
-    META_WHATSAPP_MAX_ATTEMPTS: positiveInteger.max(10).default(5),
   })
   .passthrough()
   .superRefine((environment, context) => {

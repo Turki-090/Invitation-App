@@ -40,6 +40,8 @@ export class TestDatabase {
       this.prisma.idempotencyRecord.deleteMany(),
       this.prisma.message.deleteMany(),
       this.prisma.sendBatch.deleteMany(),
+      this.prisma.rsvpConfirmation.deleteMany(),
+      this.prisma.rsvpSubmission.deleteMany(),
       this.prisma.rsvpMember.deleteMany(),
       this.prisma.rsvpHistory.deleteMany(),
       this.prisma.rsvp.deleteMany(),

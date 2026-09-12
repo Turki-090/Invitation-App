@@ -87,6 +87,18 @@ const stories = [
     height: 844,
   },
   {
+    id: "guest-public-invitation--named-family-arabic",
+    locale: "ar-SA",
+    width: 390,
+    height: 844,
+  },
+  {
+    id: "guest-public-invitation--companions-english",
+    locale: "en",
+    width: 390,
+    height: 844,
+  },
+  {
     id: "foundations-states--loading-empty-error",
     locale: "en",
     width: 1200,

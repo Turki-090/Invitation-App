@@ -247,7 +247,7 @@ checks, live startup smoke, 42 Storybook accessibility/visual cases, and
 production API/worker container readiness all passed. The Stage 6 repository
 exit gate is therefore complete.
 
-A live non-production Meta exercise is still required before promoting this
-implementation to a messaging/RSVP staging beta. It requires deployment
-credentials and provider-side template/webhook configuration and is not
-substituted by repository mocks.
+The live non-production Meta exercise is tracked as Stage 10 staging-acceptance
+evidence. It requires deployed credentials and provider-side template/webhook
+configuration and is not substituted by repository mocks; this external
+assurance task does not reopen the completed Stage 6 repository exit gate.

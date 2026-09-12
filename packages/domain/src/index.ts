@@ -5,4 +5,5 @@ export * from "./messaging";
 export * from "./event-lifecycle";
 export * from "./permissions";
 export * from "./phone";
+export * from "./rsvp";
 export * from "./types";

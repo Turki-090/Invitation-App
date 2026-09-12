@@ -24,6 +24,8 @@ import {
   type CreateSendBatchInput,
   type ListSendBatchesResponse,
   type MessageListQuery,
+  type PublicInvitation,
+  type PublicInvitationLocaleQuery,
   type ResendMessageInput,
   type ResendReadinessResponse,
   type SendBatch,
@@ -31,10 +33,14 @@ import {
   type SendReadinessRequest,
   type SendReadinessResponse,
   type StoredAsset,
+  type SubmitRsvpInput,
   type UpdateImportMappingInput,
   type UpdateImportRowInput,
   type UpdateInvitationTemplateInput,
   type UpdateInvitationInput,
+  publicInvitationSchema,
+  rsvpResultSchema,
+  type RsvpResult,
 } from "@dawah/api-contract";
 import { createDawahApiClient, type components } from "@dawah/api-client";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -56,6 +62,87 @@ export class ApiClientError extends Error {
     super(message);
     this.name = "ApiClientError";
   }
+}
+
+export const publicInvitationTokenPattern = /^[A-Za-z0-9_-]{43,256}$/;
+
+export function isPublicInvitationToken(value: string): boolean {
+  return publicInvitationTokenPattern.test(value);
+}
+
+export async function getPublicInvitation(
+  token: string,
+  locale: PublicInvitationLocaleQuery["locale"],
+): Promise<PublicInvitation> {
+  const response = await fetch(publicInvitationUrl(token, locale), {
+    cache: "no-store",
+    credentials: "omit",
+    headers: { Accept: "application/json" },
+    referrerPolicy: "no-referrer",
+  });
+  const payload = await response.json().catch(() => undefined);
+  if (!response.ok) throwApiError(payload, response.status);
+  const parsed = publicInvitationSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new ApiClientError(
+      "INVALID_PUBLIC_INVITATION_RESPONSE",
+      "The invitation response could not be verified.",
+      502,
+    );
+  }
+  return parsed.data;
+}
+
+export async function submitPublicRsvp(
+  token: string,
+  locale: PublicInvitationLocaleQuery["locale"],
+  input: SubmitRsvpInput,
+): Promise<RsvpResult> {
+  const response = await fetch(publicRsvpUrl(token, locale), {
+    body: JSON.stringify(input),
+    cache: "no-store",
+    credentials: "omit",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+    referrerPolicy: "no-referrer",
+  });
+  const payload = await response.json().catch(() => undefined);
+  if (!response.ok) throwApiError(payload, response.status);
+  const parsed = rsvpResultSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new ApiClientError(
+      "INVALID_RSVP_RESPONSE",
+      "The RSVP response could not be verified.",
+      502,
+    );
+  }
+  return parsed.data;
+}
+
+function publicInvitationUrl(
+  token: string,
+  locale: PublicInvitationLocaleQuery["locale"],
+): string {
+  return publicCapabilityUrl(token, locale, "");
+}
+
+function publicRsvpUrl(
+  token: string,
+  locale: PublicInvitationLocaleQuery["locale"],
+): string {
+  return publicCapabilityUrl(token, locale, "/rsvp");
+}
+
+function publicCapabilityUrl(
+  token: string,
+  locale: PublicInvitationLocaleQuery["locale"],
+  suffix: "" | "/rsvp",
+): string {
+  const search = new URLSearchParams({ locale });
+  return `${apiBaseUrl}/public/invitations/${encodeURIComponent(token)}${suffix}?${search.toString()}`;
 }
 
 type CreateEvent = components["schemas"]["CreateEvent"];

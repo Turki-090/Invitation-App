@@ -26,6 +26,8 @@ tags:
     description: Invitation previews, readiness checks, and immutable content snapshots.
   - name: messaging
     description: Idempotent WhatsApp send batches, delivery progress, and safe resend review.
+  - name: rsvp
+    description: Private accountless invitation access and atomic guest or host RSVP changes.
   - name: webhooks
     description: Authenticated provider callbacks processed asynchronously.
 paths:
@@ -217,6 +219,84 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /public/invitations/{token}:
+    parameters:
+      - $ref: "#/components/parameters/PublicInvitationToken"
+    get:
+      summary: Retrieve one private invitation
+      description: Resolves an opaque capability to the minimum localized event, invitation, member, RSVP, and lifecycle fields required by the guest journey. Invalid, expired, and revoked capabilities share one not-found response.
+      tags: [rsvp]
+      operationId: getPublicInvitation
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/PublicInvitationLocale"
+      responses:
+        "200":
+          description: Localized invitation data scoped to exactly one capability.
+          headers:
+            Cache-Control:
+              description: Prevents browsers and intermediaries from retaining private invitation data.
+              schema:
+                {
+                  type: string,
+                  const: "private, no-store, max-age=0, must-revalidate",
+                }
+            Pragma:
+              schema: { type: string, const: no-cache }
+            Expires:
+              schema: { type: string, const: "0" }
+            Referrer-Policy:
+              schema: { type: string, const: no-referrer }
+            X-Robots-Tag:
+              schema: { type: string, const: "noindex, nofollow, noarchive" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicInvitation" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/PublicInvitationNotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /public/invitations/{token}/rsvp:
+    parameters:
+      - $ref: "#/components/parameters/PublicInvitationToken"
+    post:
+      summary: Submit or edit a guest RSVP
+      description: Applies a capability-scoped, idempotent attendance selection and returns the resulting server-calculated state. The submission UUID may be safely retried with the identical payload.
+      tags: [rsvp]
+      operationId: submitPublicInvitationRsvp
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/PublicInvitationLocale"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitRsvp" }
+      responses:
+        "200":
+          description: Canonical RSVP result, including whether the selection changed and whether confirmation delivery was queued.
+          headers:
+            Cache-Control:
+              description: Prevents browsers and intermediaries from retaining private RSVP data.
+              schema:
+                {
+                  type: string,
+                  const: "private, no-store, max-age=0, must-revalidate",
+                }
+            Pragma:
+              schema: { type: string, const: no-cache }
+            Expires:
+              schema: { type: string, const: "0" }
+            Referrer-Policy:
+              schema: { type: string, const: no-referrer }
+            X-Robots-Tag:
+              schema: { type: string, const: "noindex, nofollow, noarchive" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RsvpResult" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/PublicInvitationNotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /events/{eventId}/invitations:
     parameters:
       - $ref: "#/components/parameters/EventId"
@@ -393,6 +473,118 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/invitations/{invitationId}/rsvp:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/InvitationId"
+    get:
+      summary: Get an invitation RSVP and history
+      description: Returns the current RSVP selection and strictly shaped change history to an authorized host.
+      tags: [rsvp]
+      operationId: getHostRsvp
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Current RSVP and ordered history for the event-owned invitation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HostRsvpDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      summary: Submit or edit an RSVP as a host
+      description: Atomically replaces the current invitation selection and records a host-manual history entry under the supplied submission UUID.
+      tags: [rsvp]
+      operationId: submitHostRsvp
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitRsvp" }
+      responses:
+        "200":
+          description: Canonical server-calculated RSVP result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RsvpResult" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/invitations/{invitationId}/public-access:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/InvitationId"
+    get:
+      summary: Get private-link access status
+      description: Reports only capability lifecycle metadata; raw capability tokens and hashes are never returned by status reads.
+      tags: [rsvp]
+      operationId: getPublicInvitationAccess
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Latest public-access status for the event-owned invitation.
+          content:
+            application/json:
+              schema:
+                {
+                  $ref: "#/components/schemas/PublicInvitationCapabilityStatus",
+                }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      summary: Issue or rotate private-link access
+      description: Revokes any active invitation capability and returns a new high-entropy raw token exactly once. Only its hash is retained by the service.
+      tags: [rsvp]
+      operationId: issuePublicInvitationAccess
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              { $ref: "#/components/schemas/IssuePublicInvitationCapability" }
+      responses:
+        "201":
+          description: Newly issued raw capability and its lifecycle metadata.
+          content:
+            application/json:
+              schema:
+                {
+                  $ref: "#/components/schemas/IssuedPublicInvitationCapability",
+                }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    delete:
+      summary: Revoke private-link access
+      description: Revokes the invitation's active capability without deleting its issuance history.
+      tags: [rsvp]
+      operationId: revokePublicInvitationAccess
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Public access is inactive after the idempotent revocation.
+          content:
+            application/json:
+              schema:
+                {
+                  $ref: "#/components/schemas/PublicInvitationCapabilityStatus",
+                }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
   /events/{eventId}/imports/limits:
     parameters:
@@ -1177,6 +1369,24 @@ components:
       required: true
       description: Invitation-group UUID.
       schema: { type: string, format: uuid }
+    PublicInvitationToken:
+      name: token
+      in: path
+      required: true
+      description: Opaque, high-entropy capability returned only when private-link access is issued.
+      schema:
+        type: string
+        minLength: 43
+        maxLength: 256
+        pattern: "^[A-Za-z0-9_-]+$"
+    PublicInvitationLocale:
+      name: locale
+      in: query
+      required: false
+      description: Locale used to shape localized public invitation fields and RSVP confirmation content.
+      schema:
+        $ref: "#/components/schemas/PreparationLocale"
+        default: ar-SA
     ImportJobId:
       name: importJobId
       in: path
@@ -1236,6 +1446,11 @@ components:
           schema: { $ref: "#/components/schemas/ApiError" }
     NotFound:
       description: The event does not exist or is not accessible to this principal.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    PublicInvitationNotFound:
+      description: The public invitation capability is invalid, expired, revoked, cancelled, or otherwise unavailable. These cases intentionally share one response.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
@@ -1509,6 +1724,299 @@ components:
     RsvpStatus:
       type: string
       enum: [PENDING, ACCEPTED, PARTIALLY_ACCEPTED, DECLINED]
+    RsvpSource:
+      type: string
+      enum: [WHATSAPP, GUEST_WEB, HOST_MANUAL, SYSTEM]
+    GuestRsvpLifecycleState:
+      type: string
+      enum: [OPEN, CLOSED, COMPLETED]
+    GuestRsvpPolicyReason:
+      type: string
+      enum:
+        [
+          INITIAL_RESPONSE_AVAILABLE,
+          EDITS_AVAILABLE,
+          EDITS_DISABLED,
+          RSVP_NOT_OPEN,
+          RSVP_CLOSED,
+          DEADLINE_PASSED,
+          EVENT_STARTED,
+          EVENT_COMPLETED,
+          EVENT_ARCHIVED,
+        ]
+    SubmitRsvp:
+      type: object
+      additionalProperties: false
+      required: [submissionId, attendingMemberIds, companionCount]
+      properties:
+        submissionId:
+          type: string
+          format: uuid
+          description: Client-generated logical-submission UUID used for idempotent retries.
+        attendingMemberIds:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        companionCount: { type: integer, minimum: 0, maximum: 100 }
+    PublicInvitationMember:
+      type: object
+      additionalProperties: false
+      required: [id, name, isPrimary, position]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        isPrimary: { type: boolean }
+        position: { type: integer, minimum: 1 }
+    PublicRsvpState:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          status,
+          attendingMemberIds,
+          companionCount,
+          expectedAttendees,
+          respondedAt,
+          updatedAt,
+          isEdited,
+        ]
+      properties:
+        status: { $ref: "#/components/schemas/RsvpStatus" }
+        attendingMemberIds:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        companionCount: { type: integer, minimum: 0, maximum: 100 }
+        expectedAttendees: { type: integer, minimum: 0, maximum: 200 }
+        respondedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        isEdited: { type: boolean }
+    GuestRsvpPolicy:
+      type: object
+      additionalProperties: false
+      required: [lifecycleState, canRespond, canEdit, reason]
+      properties:
+        lifecycleState:
+          $ref: "#/components/schemas/GuestRsvpLifecycleState"
+        canRespond: { type: boolean }
+        canEdit: { type: boolean }
+        reason: { $ref: "#/components/schemas/GuestRsvpPolicyReason" }
+    PublicInvitation:
+      type: object
+      additionalProperties: false
+      required: [locale, event, invitation, currentRsvp, policy]
+      properties:
+        locale: { $ref: "#/components/schemas/PreparationLocale" }
+        event:
+          type: object
+          additionalProperties: false
+          required:
+            [
+              name,
+              eventType,
+              eventDate,
+              startTime,
+              endTime,
+              timezone,
+              venueName,
+              city,
+              mapUrl,
+              rsvpDeadline,
+            ]
+          properties:
+            name: { type: string, minLength: 1, maxLength: 120 }
+            eventType: { $ref: "#/components/schemas/EventType" }
+            eventDate: { type: string, format: date }
+            startTime:
+              type: string
+              pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+            endTime:
+              type: [string, "null"]
+              pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+            timezone: { type: string, minLength: 1, maxLength: 80 }
+            venueName: { type: string, minLength: 1, maxLength: 160 }
+            city: { type: string, minLength: 1, maxLength: 80 }
+            mapUrl: { type: [string, "null"], format: uri }
+            rsvpDeadline: { type: [string, "null"], format: date }
+        invitation:
+          type: object
+          additionalProperties: false
+          required: [displayName, invitationType, maxCompanions, members]
+          properties:
+            displayName: { type: string, minLength: 1, maxLength: 160 }
+            invitationType:
+              $ref: "#/components/schemas/InvitationType"
+            maxCompanions: { type: integer, minimum: 0, maximum: 100 }
+            members:
+              type: array
+              minItems: 1
+              maxItems: 100
+              items: { $ref: "#/components/schemas/PublicInvitationMember" }
+        currentRsvp:
+          anyOf:
+            - $ref: "#/components/schemas/PublicRsvpState"
+            - type: "null"
+        policy: { $ref: "#/components/schemas/GuestRsvpPolicy" }
+    RsvpResult:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          submissionId,
+          status,
+          attendingMemberIds,
+          companionCount,
+          expectedAttendees,
+          respondedAt,
+          isEdited,
+          changed,
+          confirmationQueued,
+        ]
+      properties:
+        submissionId: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/RsvpStatus" }
+        attendingMemberIds:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        companionCount: { type: integer, minimum: 0, maximum: 100 }
+        expectedAttendees: { type: integer, minimum: 0, maximum: 200 }
+        respondedAt: { type: string, format: date-time }
+        isEdited: { type: boolean }
+        changed: { type: boolean }
+        confirmationQueued: { type: boolean }
+    HistoricalRsvpResponse:
+      type: object
+      additionalProperties: false
+      required: [status, attendingMemberIds, companionCount, expectedAttendees]
+      properties:
+        status: { $ref: "#/components/schemas/RsvpStatus" }
+        attendingMemberIds:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        companionCount: { type: integer, minimum: 0, maximum: 100 }
+        expectedAttendees: { type: integer, minimum: 0, maximum: 200 }
+    RsvpHistoryEntry:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          previousStatus,
+          newStatus,
+          previousCount,
+          newCount,
+          previousResponse,
+          newResponse,
+          source,
+          actorReference,
+          createdAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        previousStatus: { $ref: "#/components/schemas/RsvpStatus" }
+        newStatus: { $ref: "#/components/schemas/RsvpStatus" }
+        previousCount: { type: integer, minimum: 0, maximum: 200 }
+        newCount: { type: integer, minimum: 0, maximum: 200 }
+        previousResponse:
+          $ref: "#/components/schemas/HistoricalRsvpResponse"
+        newResponse: { $ref: "#/components/schemas/HistoricalRsvpResponse" }
+        source: { $ref: "#/components/schemas/RsvpSource" }
+        actorReference: { type: [string, "null"], minLength: 1, maxLength: 255 }
+        createdAt: { type: string, format: date-time }
+    HostRsvpState:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          status,
+          attendingMemberIds,
+          companionCount,
+          expectedAttendees,
+          respondedAt,
+          updatedAt,
+          isEdited,
+          source,
+        ]
+      properties:
+        status: { $ref: "#/components/schemas/RsvpStatus" }
+        attendingMemberIds:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        companionCount: { type: integer, minimum: 0, maximum: 100 }
+        expectedAttendees: { type: integer, minimum: 0, maximum: 200 }
+        respondedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        isEdited: { type: boolean }
+        source: { $ref: "#/components/schemas/RsvpSource" }
+    HostRsvpDetail:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          eventId,
+          invitationId,
+          displayName,
+          invitationType,
+          maxCompanions,
+          members,
+          currentRsvp,
+          history,
+        ]
+      properties:
+        eventId: { type: string, format: uuid }
+        invitationId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 160 }
+        invitationType: { $ref: "#/components/schemas/InvitationType" }
+        maxCompanions: { type: integer, minimum: 0, maximum: 100 }
+        members:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: "#/components/schemas/PublicInvitationMember" }
+        currentRsvp:
+          anyOf:
+            - $ref: "#/components/schemas/HostRsvpState"
+            - type: "null"
+        history:
+          type: array
+          maxItems: 1000
+          items: { $ref: "#/components/schemas/RsvpHistoryEntry" }
+    IssuePublicInvitationCapability:
+      type: object
+      additionalProperties: false
+      properties:
+        expiresAt: { type: string, format: date-time }
+    PublicInvitationCapabilityStatus:
+      type: object
+      additionalProperties: false
+      required: [active, createdAt, expiresAt, revokedAt]
+      properties:
+        active: { type: boolean }
+        createdAt: { type: [string, "null"], format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
+        revokedAt: { type: [string, "null"], format: date-time }
+    IssuedPublicInvitationCapability:
+      type: object
+      additionalProperties: false
+      required: [active, token, createdAt, expiresAt, revokedAt]
+      properties:
+        active: { type: boolean, const: true }
+        token:
+          type: string
+          minLength: 43
+          maxLength: 256
+          pattern: "^[A-Za-z0-9_-]+$"
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
+        revokedAt: { type: "null" }
     GccPhoneCountry:
       type: string
       enum: [SA, AE, BH, KW, OM, QA]

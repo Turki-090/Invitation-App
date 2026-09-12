@@ -100,6 +100,20 @@ const stories = [
     height: 844,
   },
   {
+    id: "guest-public-invitation--named-family-arabic",
+    locale: "ar-SA",
+    name: "public-invitation-family-ar.png",
+    width: 390,
+    height: 844,
+  },
+  {
+    id: "guest-public-invitation--companions-english",
+    locale: "en",
+    name: "public-invitation-companions-en.png",
+    width: 390,
+    height: 844,
+  },
+  {
     id: "foundations-states--loading-empty-error",
     locale: "en",
     name: "critical-states.png",

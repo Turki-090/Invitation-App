@@ -397,6 +397,15 @@ describe("PreparationService", () => {
     expect(repeated).toMatchObject({ createdCount: 0, reusedCount: 1 });
     expect(repeated.snapshotIds).toEqual(first.snapshotIds);
     expect(storedSnapshots).toHaveLength(1);
+    expect(storedSnapshots[0]?.renderedContent).toMatchObject({
+      rsvpBinding: {
+        version: 1,
+        invitationId,
+        invitationType: "SINGLE",
+        memberIds: ["50000000-0000-4000-8000-000000000001"],
+        maxCompanions: 0,
+      },
+    });
 
     invitation.displayName = "Sarah Updated";
     const changed = await service.createSnapshots(principal, eventId, {

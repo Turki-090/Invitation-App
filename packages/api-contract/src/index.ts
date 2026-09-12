@@ -5,4 +5,5 @@ export * from "./imports";
 export * from "./invitations";
 export * from "./messaging";
 export * from "./preparation";
+export * from "./rsvp";
 export * from "./shared";

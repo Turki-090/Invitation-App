@@ -11,6 +11,8 @@ export interface MessagingTemplateSendInput {
   readonly templateName: string;
   readonly languageCode: string;
   readonly bodyParameters: readonly string[];
+  /** Stable callback payloads for approved quick-reply template buttons. */
+  readonly quickReplyPayloads?: readonly string[];
   readonly header?:
     | { readonly kind: "IMAGE_ID"; readonly mediaId: string }
     | { readonly kind: "IMAGE_LINK"; readonly url: string };

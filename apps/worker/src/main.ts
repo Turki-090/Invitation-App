@@ -8,6 +8,7 @@ import {
   defaultJobOptions,
   queueNames,
   whatsappMessageJobs,
+  whatsappRsvpConfirmationJobs,
   type WhatsappSendJobData,
   type WhatsappWebhookJobData,
 } from "@dawah/queue";
@@ -74,6 +75,10 @@ const messagingRepository = new PrismaMessagingRepository(prisma, {
   mediaPublicApiBaseUrl: environment.META_WHATSAPP_MEDIA_PUBLIC_BASE_URL,
   mediaSigningSecret: environment.META_WHATSAPP_MEDIA_SIGNING_SECRET,
   mediaUrlTtlSeconds: environment.META_WHATSAPP_MEDIA_URL_TTL_SECONDS,
+  rsvpConfirmationTemplateAr:
+    environment.META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_AR,
+  rsvpConfirmationTemplateEn:
+    environment.META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_EN,
 });
 const provider = new MetaWhatsAppProvider({
   accessToken: environment.META_WHATSAPP_ACCESS_TOKEN,
@@ -125,6 +130,48 @@ const whatsappWebhookWorker = new Worker<WhatsappWebhookJobData>(
     prefix: environment.QUEUE_PREFIX,
   },
 );
+
+let confirmationSweepRunning = false;
+const sweepRsvpConfirmations = async (): Promise<void> => {
+  if (confirmationSweepRunning) return;
+  confirmationSweepRunning = true;
+  try {
+    const confirmationIds =
+      await messagingRepository.listQueuedRsvpConfirmationIds();
+    if (confirmationIds.length === 0) return;
+    const jobs = await sendQueue.addBulk(
+      whatsappRsvpConfirmationJobs(
+        confirmationIds,
+        environment.META_WHATSAPP_MAX_ATTEMPTS,
+      ),
+    );
+    await Promise.all(
+      jobs.map(async (job) => {
+        if ((await job.getState()) !== "failed") return;
+        try {
+          await job.retry("failed", {
+            resetAttemptsMade: true,
+            resetAttemptsStarted: true,
+          });
+        } catch (error) {
+          if ((await job.getState()) === "failed") throw error;
+        }
+      }),
+    );
+  } finally {
+    confirmationSweepRunning = false;
+  }
+};
+const confirmationSweepTimer = setInterval(() => {
+  void sweepRsvpConfirmations().catch((error: unknown) => {
+    console.error(
+      "RSVP confirmation outbox sweep failed:",
+      error instanceof Error ? error.message : "unknown error",
+    );
+  });
+}, 30_000);
+confirmationSweepTimer.unref();
+void sweepRsvpConfirmations().catch(() => undefined);
 
 healthWorker.on("error", (error) => {
   console.error("Health worker queue connection error:", error.message);
@@ -259,6 +306,7 @@ let shuttingDown = false;
 const shutdown = async (signal: string): Promise<void> => {
   if (shuttingDown) return;
   shuttingDown = true;
+  clearInterval(confirmationSweepTimer);
   console.info(`Dawah worker received ${signal}; shutting down.`);
 
   server.closeIdleConnections();

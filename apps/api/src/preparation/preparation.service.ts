@@ -750,6 +750,13 @@ export class PreparationService {
       recipientName: domain.recipientName,
       memberNames: [...domain.memberNames],
       maxCompanions: domain.maxCompanions,
+      rsvpBinding: {
+        version: 1,
+        invitationId: invitation.id,
+        invitationType: invitation.invitationType,
+        memberIds: invitation.members.map(({ id }) => id),
+        maxCompanions: invitation.maxCompanions,
+      },
       templateBody: template.bodyTemplate,
       extraMessageTemplate: template.extraMessageTemplate,
       renderedBody,

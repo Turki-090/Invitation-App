@@ -12,6 +12,7 @@ import { ImportsModule } from "./imports/imports.module";
 import { MessagingModule } from "./messaging/messaging.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PreparationModule } from "./preparation/preparation.module";
+import { RsvpModule } from "./rsvp/rsvp.module";
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { PreparationModule } from "./preparation/preparation.module";
     ImportsModule,
     MessagingModule,
     PreparationModule,
+    RsvpModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

@@ -21,6 +21,26 @@ export interface SkippedMessage {
   readonly reason: string;
 }
 
+export interface DeferredMessage {
+  readonly outcome: "DEFER";
+  readonly reason: string;
+}
+
+export interface ClaimedRsvpConfirmation {
+  readonly outcome: "SEND";
+  readonly confirmationId: string;
+  readonly attemptNumber: number;
+  readonly input: MessagingTemplateSendInput;
+}
+
+type ProviderFailure = {
+  readonly failureClass: "TRANSIENT" | "PERMANENT" | "AMBIGUOUS";
+  readonly providerCode: string;
+  readonly httpStatus?: number;
+  readonly retryAfterMilliseconds?: number;
+  readonly retry: boolean;
+};
+
 export interface WhatsappSendRepository {
   prepareBatchDispatch(batchId: string): Promise<readonly string[]>;
   markBatchDispatched(batchId: string): Promise<void>;
@@ -32,15 +52,18 @@ export interface WhatsappSendRepository {
     claim: ClaimedMessage,
     result: ProviderMessageResult,
   ): Promise<void>;
-  recordFailure(
-    claim: ClaimedMessage,
-    failure: {
-      readonly failureClass: "TRANSIENT" | "PERMANENT" | "AMBIGUOUS";
-      readonly providerCode: string;
-      readonly httpStatus?: number;
-      readonly retryAfterMilliseconds?: number;
-      readonly retry: boolean;
-    },
+  recordFailure(claim: ClaimedMessage, failure: ProviderFailure): Promise<void>;
+  claimRsvpConfirmation(
+    confirmationId: string,
+    maximumAttempts: number,
+  ): Promise<ClaimedRsvpConfirmation | SkippedMessage | DeferredMessage>;
+  recordRsvpConfirmationAccepted(
+    claim: ClaimedRsvpConfirmation,
+    result: ProviderMessageResult,
+  ): Promise<void>;
+  recordRsvpConfirmationFailure(
+    claim: ClaimedRsvpConfirmation,
+    failure: ProviderFailure,
   ): Promise<void>;
 }
 
@@ -54,7 +77,8 @@ export interface WhatsappSendProcessorOptions {
 }
 
 export interface WhatsappSendResult {
-  readonly operation: "DISPATCH_BATCH" | "SEND_MESSAGE";
+  readonly operation:
+    "DISPATCH_BATCH" | "SEND_MESSAGE" | "SEND_RSVP_CONFIRMATION";
   readonly outcome: "DISPATCHED" | "ACCEPTED" | "RETRY" | "FAILED" | "SKIPPED";
   readonly count?: number;
 }
@@ -78,6 +102,30 @@ export function createWhatsappSendProcessor(
       };
     }
 
+    if (job.data.operation === "SEND_RSVP_CONFIRMATION") {
+      const claim = await options.repository.claimRsvpConfirmation(
+        job.data.confirmationId,
+        options.maximumAttempts,
+      );
+      if (claim.outcome === "DEFER") throw new RetryableMessagingError();
+      if (claim.outcome === "SKIP") {
+        return { operation: "SEND_RSVP_CONFIRMATION", outcome: "SKIPPED" };
+      }
+      try {
+        const result = await options.provider.sendConfirmation(claim.input);
+        await options.repository.recordRsvpConfirmationAccepted(claim, result);
+        return { operation: "SEND_RSVP_CONFIRMATION", outcome: "ACCEPTED" };
+      } catch (error) {
+        const failure = providerFailure(
+          error,
+          claim.attemptNumber,
+          options.maximumAttempts,
+        );
+        await options.repository.recordRsvpConfirmationFailure(claim, failure);
+        return handleFailure(options, failure, "SEND_RSVP_CONFIRMATION");
+      }
+    }
+
     const claim = await options.repository.claimMessage(
       job.data.messageId,
       options.maximumAttempts,
@@ -90,37 +138,53 @@ export function createWhatsappSendProcessor(
       await options.repository.recordAccepted(claim, result);
       return { operation: "SEND_MESSAGE", outcome: "ACCEPTED" };
     } catch (error) {
-      const providerError = normalizeProviderError(error);
-      const retry =
-        providerError.failureClass === "TRANSIENT" &&
-        providerError.retryable &&
-        claim.attemptNumber < options.maximumAttempts;
-      await options.repository.recordFailure(claim, {
-        failureClass: providerError.failureClass,
-        providerCode: providerError.providerCode,
-        ...(providerError.httpStatus === undefined
-          ? {}
-          : { httpStatus: providerError.httpStatus }),
-        ...(providerError.retryAfterMilliseconds === undefined
-          ? {}
-          : {
-              retryAfterMilliseconds: providerError.retryAfterMilliseconds,
-            }),
-        retry,
-      });
-      if (!retry) {
-        return { operation: "SEND_MESSAGE", outcome: "FAILED" };
-      }
-      if (
-        providerError.retryAfterMilliseconds &&
-        options.rateLimit &&
-        options.rateLimitError
-      ) {
-        await options.rateLimit(providerError.retryAfterMilliseconds);
-        throw options.rateLimitError();
-      }
-      throw new RetryableMessagingError();
+      const failure = providerFailure(
+        error,
+        claim.attemptNumber,
+        options.maximumAttempts,
+      );
+      await options.repository.recordFailure(claim, failure);
+      return handleFailure(options, failure, "SEND_MESSAGE");
     }
+  };
+}
+
+async function handleFailure(
+  options: WhatsappSendProcessorOptions,
+  failure: ProviderFailure,
+  operation: "SEND_MESSAGE" | "SEND_RSVP_CONFIRMATION",
+): Promise<WhatsappSendResult> {
+  if (!failure.retry) return { operation, outcome: "FAILED" };
+  if (
+    failure.retryAfterMilliseconds &&
+    options.rateLimit &&
+    options.rateLimitError
+  ) {
+    await options.rateLimit(failure.retryAfterMilliseconds);
+    throw options.rateLimitError();
+  }
+  throw new RetryableMessagingError();
+}
+
+function providerFailure(
+  error: unknown,
+  attemptNumber: number,
+  maximumAttempts: number,
+): ProviderFailure {
+  const providerError = normalizeProviderError(error);
+  return {
+    failureClass: providerError.failureClass,
+    providerCode: providerError.providerCode,
+    ...(providerError.httpStatus === undefined
+      ? {}
+      : { httpStatus: providerError.httpStatus }),
+    ...(providerError.retryAfterMilliseconds === undefined
+      ? {}
+      : { retryAfterMilliseconds: providerError.retryAfterMilliseconds }),
+    retry:
+      providerError.failureClass === "TRANSIENT" &&
+      providerError.retryable &&
+      attemptNumber < maximumAttempts,
   };
 }
 

@@ -12,7 +12,7 @@ Every API and screen distinguishes invitation groups, named guests, and expected
 
 ## RSVP
 
-States are `PENDING`, `ACCEPTED`, `PARTIALLY_ACCEPTED`, and `DECLINED`. Named groups use the partial state when at least one but fewer than all members attend. Single and companion invitations do not use partial acceptance. A decline always sets expected attendance to zero.
+States are `PENDING`, `ACCEPTED`, `PARTIALLY_ACCEPTED`, and `DECLINED`. Named groups use the partial state when at least one but fewer than all members attend. Single and companion invitations do not use partial acceptance. A decline always sets expected attendance to zero. Guests may respond only while RSVP is open and the event-local deadline has not passed; existing responses may change only when guest edits are enabled. Authorized hosts may record or correct responses until the invitation is cancelled or the event is archived. WhatsApp offers only immediately actionable choices and at most three quick replies; the private web invitation remains the exact-selection path for a named subset or an intermediate companion count.
 
 ## Authorization
 

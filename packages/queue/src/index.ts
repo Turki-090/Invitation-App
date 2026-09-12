@@ -21,7 +21,11 @@ export const defaultJobOptions = {
 
 export type WhatsappSendJobData =
   | { readonly operation: "DISPATCH_BATCH"; readonly batchId: string }
-  | { readonly operation: "SEND_MESSAGE"; readonly messageId: string };
+  | { readonly operation: "SEND_MESSAGE"; readonly messageId: string }
+  | {
+      readonly operation: "SEND_RSVP_CONFIRMATION";
+      readonly confirmationId: string;
+    };
 
 export interface WhatsappWebhookJobData {
   readonly webhookEventId: string;
@@ -35,6 +39,10 @@ export function whatsappMessageJobId(messageId: string): string {
   return `message-${messageId}`;
 }
 
+export function whatsappRsvpConfirmationJobId(confirmationId: string): string {
+  return `rsvp-confirmation-${confirmationId}`;
+}
+
 export function whatsappMessageJobs(
   messageIds: readonly string[],
   maximumAttempts: number,
@@ -44,6 +52,24 @@ export function whatsappMessageJobs(
     data: { operation: "SEND_MESSAGE" as const, messageId },
     opts: {
       jobId: whatsappMessageJobId(messageId),
+      attempts: maximumAttempts,
+      backoff: defaultJobOptions.backoff,
+    },
+  }));
+}
+
+export function whatsappRsvpConfirmationJobs(
+  confirmationIds: readonly string[],
+  maximumAttempts: number,
+) {
+  return confirmationIds.map((confirmationId) => ({
+    name: "send-rsvp-confirmation" as const,
+    data: {
+      operation: "SEND_RSVP_CONFIRMATION" as const,
+      confirmationId,
+    },
+    opts: {
+      jobId: whatsappRsvpConfirmationJobId(confirmationId),
       attempts: maximumAttempts,
       backoff: defaultJobOptions.backoff,
     },

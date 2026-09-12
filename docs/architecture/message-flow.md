@@ -67,8 +67,14 @@ Meta -> raw-body HMAC verification -> normalized immutable WebhookEvent
 The API deduplicates provider retries before queueing. The reducer never trusts
 arrival order: `READ` cannot regress to `DELIVERED`; a definitive failure
 outranks `SENT`, but cannot erase `DELIVERED`, `READ`, or `RESPONDED` evidence.
-Delivery state remains separate from RSVP state; inbound responses are persisted
-as messaging evidence, with RSVP interpretation deferred to Stage 7.
+Delivery state remains separate from RSVP state. Inbound responses are persisted
+as messaging evidence, then Stage 7 maps only callback payloads present in the
+immutable sent snapshot. The invitation binding and response chronology are
+checked before the RSVP, full member selection, history, audit, and confirmation
+outbox are committed atomically. Invitation presentations never exceed Meta's
+three quick-reply buttons. Whole-second provider timestamps are ordered by a
+durable ingestion sequence, and confirmation claims are serialized per
+invitation so rapid edits cannot create concurrent stale sends.
 
 See [`../whatsapp-messaging-stage6.md`](../whatsapp-messaging-stage6.md) for the
 complete safety, persistence, resend, configuration, and operational contract.

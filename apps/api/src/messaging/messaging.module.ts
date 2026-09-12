@@ -23,5 +23,6 @@ import { WhatsappWebhookService } from "./whatsapp-webhook.service";
     MessagingService,
     WhatsappWebhookService,
   ],
+  exports: [MessagingQueueService],
 })
 export class MessagingModule {}

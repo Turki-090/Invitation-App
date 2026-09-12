@@ -38,6 +38,17 @@ const contentSecurityPolicy = [
   ...(deployed ? ["upgrade-insecure-requests"] : []),
 ].join("; ");
 
+export const privateInvitationHeaders = [
+  {
+    key: "Cache-Control",
+    value: "private, no-store, no-cache, max-age=0, must-revalidate",
+  },
+  { key: "Pragma", value: "no-cache" },
+  { key: "Expires", value: "0" },
+  { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+  { key: "Referrer-Policy", value: "no-referrer" },
+] as const;
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
@@ -65,6 +76,14 @@ const nextConfig: NextConfig = {
               ]
             : []),
         ],
+      },
+      {
+        source: "/i/:token",
+        headers: [...privateInvitationHeaders],
+      },
+      {
+        source: "/:locale(ar-SA|en)/i/:token",
+        headers: [...privateInvitationHeaders],
       },
     ];
   },
