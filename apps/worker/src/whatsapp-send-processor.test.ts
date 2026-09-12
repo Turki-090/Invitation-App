@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createWhatsappSendProcessor,
   type ClaimedMessage,
+  type ClaimedRsvpConfirmation,
   type WhatsappSendRepository,
 } from "./whatsapp-send-processor";
 
@@ -167,6 +168,77 @@ describe("WhatsApp send processor", () => {
       retry: false,
     });
   });
+
+  it("sends a durable RSVP confirmation through the confirmation provider path", async () => {
+    const confirmationId = "40000000-0000-4000-8000-000000000001";
+    const claim: ClaimedRsvpConfirmation = {
+      outcome: "SEND",
+      confirmationId,
+      attemptNumber: 1,
+      input: {
+        logicalMessageId: confirmationId,
+        to: "+966501234567",
+        templateName: "dawah_rsvp_confirmation_ar",
+        languageCode: "ar",
+        bodyParameters: ["Guest", "2"],
+      },
+    };
+    const result: ProviderMessageResult = {
+      provider: "META_WHATSAPP",
+      providerMessageId: "wamid.confirmation-1",
+      acceptedAt,
+    };
+    const repository = sendRepository({
+      claimRsvpConfirmation: vi.fn(async () => claim),
+    });
+    const provider = messagingProvider({
+      sendConfirmation: vi.fn(async () => result),
+    });
+    const processor = createWhatsappSendProcessor({
+      repository,
+      provider,
+      maximumAttempts: 3,
+      enqueueMessages: vi.fn(async () => undefined),
+    });
+
+    await expect(
+      processor({
+        data: { operation: "SEND_RSVP_CONFIRMATION", confirmationId },
+      }),
+    ).resolves.toEqual({
+      operation: "SEND_RSVP_CONFIRMATION",
+      outcome: "ACCEPTED",
+    });
+    expect(provider.sendConfirmation).toHaveBeenCalledWith(claim.input);
+    expect(repository.recordRsvpConfirmationAccepted).toHaveBeenCalledWith(
+      claim,
+      result,
+    );
+  });
+
+  it("retries a confirmation that is waiting for an earlier send", async () => {
+    const confirmationId = "40000000-0000-4000-8000-000000000002";
+    const repository = sendRepository({
+      claimRsvpConfirmation: vi.fn(async () => ({
+        outcome: "DEFER" as const,
+        reason: "EARLIER_CONFIRMATION_SENDING",
+      })),
+    });
+    const provider = messagingProvider();
+    const processor = createWhatsappSendProcessor({
+      repository,
+      provider,
+      maximumAttempts: 3,
+      enqueueMessages: vi.fn(async () => undefined),
+    });
+
+    await expect(
+      processor({
+        data: { operation: "SEND_RSVP_CONFIRMATION", confirmationId },
+      }),
+    ).rejects.toThrow("Transient messaging provider failure.");
+    expect(provider.sendConfirmation).not.toHaveBeenCalled();
+  });
 });
 
 function claimedMessage(
@@ -201,6 +273,12 @@ function sendRepository(
     })),
     recordAccepted: vi.fn(async () => undefined),
     recordFailure: vi.fn(async () => undefined),
+    claimRsvpConfirmation: vi.fn(async () => ({
+      outcome: "SKIP" as const,
+      reason: "CONFIRMATION_NOT_FOUND",
+    })),
+    recordRsvpConfirmationAccepted: vi.fn(async () => undefined),
+    recordRsvpConfirmationFailure: vi.fn(async () => undefined),
     ...overrides,
   };
 }

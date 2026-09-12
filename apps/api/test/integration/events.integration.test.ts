@@ -269,61 +269,113 @@ describe("EventsService PostgreSQL integration", () => {
       },
     });
 
-    await prisma.invitationGroup.create({
-      data: {
-        eventId: event.id,
-        displayName: "عائلة القبول",
-        contactName: "خالد",
-        phoneE164: "+966501111111",
-        phoneCountry: "SA",
-        invitationType: "NAMED_GROUP",
-        rsvpStatus: "ACCEPTED",
-        expectedAttendees: 2,
-        createdBy: owner.id,
-        members: {
-          create: [
-            { name: "خالد", position: 1, isPrimary: true },
-            { name: "نورة", position: 2 },
-          ],
+    await prisma.$transaction(async (transaction) => {
+      const accepted = await transaction.invitationGroup.create({
+        data: {
+          eventId: event.id,
+          displayName: "عائلة القبول",
+          contactName: "خالد",
+          phoneE164: "+966501111111",
+          phoneCountry: "SA",
+          invitationType: "NAMED_GROUP",
+          rsvpStatus: "ACCEPTED",
+          expectedAttendees: 2,
+          createdBy: owner.id,
+          members: {
+            create: [
+              { name: "خالد", position: 1, isPrimary: true },
+              { name: "نورة", position: 2 },
+            ],
+          },
         },
-      },
-    });
-    await prisma.invitationGroup.create({
-      data: {
-        eventId: event.id,
-        displayName: "عائلة القبول الجزئي",
-        contactName: "سارة",
-        phoneE164: "+966502222222",
-        phoneCountry: "SA",
-        invitationType: "NAMED_GROUP",
-        rsvpStatus: "PARTIALLY_ACCEPTED",
-        expectedAttendees: 1,
-        createdBy: owner.id,
-        members: {
-          create: [
-            { name: "سارة", position: 1, isPrimary: true },
-            { name: "ريم", position: 2 },
-            { name: "فهد", position: 3 },
-          ],
+        include: { members: true },
+      });
+      const acceptedRsvp = await transaction.rsvp.create({
+        data: {
+          invitationGroupId: accepted.id,
+          status: "ACCEPTED",
+          source: "SYSTEM",
         },
-      },
-    });
-    await prisma.invitationGroup.create({
-      data: {
-        eventId: event.id,
-        displayName: "ملغاة",
-        contactName: "ملغاة",
-        phoneE164: "+966503333333",
-        phoneCountry: "SA",
-        invitationType: "SINGLE",
-        rsvpStatus: "PENDING",
-        expectedAttendees: 99,
-        createdBy: owner.id,
-        cancelledAt: new Date(),
-        members: {
-          create: [{ name: "ملغاة", position: 1, isPrimary: true }],
+      });
+      await transaction.rsvpMember.createMany({
+        data: accepted.members.map((member) => ({
+          invitationGroupId: accepted.id,
+          rsvpId: acceptedRsvp.id,
+          guestMemberId: member.id,
+          attending: true,
+        })),
+      });
+
+      const partial = await transaction.invitationGroup.create({
+        data: {
+          eventId: event.id,
+          displayName: "عائلة القبول الجزئي",
+          contactName: "سارة",
+          phoneE164: "+966502222222",
+          phoneCountry: "SA",
+          invitationType: "NAMED_GROUP",
+          rsvpStatus: "PARTIALLY_ACCEPTED",
+          expectedAttendees: 1,
+          createdBy: owner.id,
+          members: {
+            create: [
+              { name: "سارة", position: 1, isPrimary: true },
+              { name: "ريم", position: 2 },
+              { name: "فهد", position: 3 },
+            ],
+          },
         },
-      },
+        include: { members: { orderBy: { position: "asc" } } },
+      });
+      const partialRsvp = await transaction.rsvp.create({
+        data: {
+          invitationGroupId: partial.id,
+          status: "PARTIALLY_ACCEPTED",
+          source: "SYSTEM",
+        },
+      });
+      await transaction.rsvpMember.createMany({
+        data: partial.members.map((member, index) => ({
+          invitationGroupId: partial.id,
+          rsvpId: partialRsvp.id,
+          guestMemberId: member.id,
+          attending: index === 0,
+        })),
+      });
+
+      const cancelled = await transaction.invitationGroup.create({
+        data: {
+          eventId: event.id,
+          displayName: "ملغاة",
+          contactName: "ملغاة",
+          phoneE164: "+966503333333",
+          phoneCountry: "SA",
+          invitationType: "SINGLE",
+          rsvpStatus: "ACCEPTED",
+          expectedAttendees: 1,
+          createdBy: owner.id,
+          cancelledAt: new Date(),
+          members: {
+            create: [{ name: "ملغاة", position: 1, isPrimary: true }],
+          },
+        },
+        include: { members: true },
+      });
+      const cancelledRsvp = await transaction.rsvp.create({
+        data: {
+          invitationGroupId: cancelled.id,
+          status: "ACCEPTED",
+          source: "SYSTEM",
+        },
+      });
+      await transaction.rsvpMember.create({
+        data: {
+          invitationGroupId: cancelled.id,
+          rsvpId: cancelledRsvp.id,
+          guestMemberId: cancelled.members[0]!.id,
+          attending: true,
+        },
+      });
     });
 
     expect(

@@ -247,8 +247,9 @@ export interface InvitationPresentation {
 
 /**
  * Produces the invitation-type-specific sentence and response choices used by
- * both the host preview and, later, provider adapters. It intentionally has no
- * provider-specific button limits; those belong to the messaging adapter.
+ * both the host preview and provider adapters. Reply actions are deliberately
+ * limited to Meta's three quick-reply buttons so every snapshotted action can
+ * be sent without provider-side truncation.
  */
 export function createInvitationPresentation(
   input: InvitationPresentationInput,
@@ -303,17 +304,6 @@ export function createInvitationPresentation(
           memberCount,
           0,
         ),
-        {
-          id: "SELECT_MEMBERS",
-          label:
-            input.locale === InvitationContentLocale.AR_SA
-              ? "اختيار الحاضرين"
-              : "Select attendees",
-          intent: InvitationReplyIntent.SELECT_NAMED_MEMBERS,
-          attendingMemberCount: null,
-          companionCount: null,
-          expectedAttendeeCount: null,
-        },
         directReply(
           "DECLINE_ALL",
           input.locale === InvitationContentLocale.AR_SA
@@ -328,11 +318,7 @@ export function createInvitationPresentation(
   }
 
   const replies: InvitationReplyAction[] = [];
-  for (
-    let companionCount = 0;
-    companionCount <= input.maxCompanions;
-    companionCount += 1
-  ) {
+  for (const companionCount of companionQuickReplyCounts(input.maxCompanions)) {
     replies.push(
       directReply(
         `ATTEND_WITH_${companionCount}_COMPANIONS`,
@@ -746,6 +732,10 @@ function directReply(
     companionCount,
     expectedAttendeeCount: attendingMemberCount + companionCount,
   };
+}
+
+function companionQuickReplyCounts(maxCompanions: number): readonly number[] {
+  return maxCompanions === 0 ? [0] : [0, maxCompanions];
 }
 
 function namedGroupScope(

@@ -313,13 +313,27 @@ describe("InvitationsService PostgreSQL integration", () => {
       "الضيف الأساسي",
     ]);
 
-    await prisma.rsvp.create({
-      data: {
-        invitationGroupId: created.id,
-        status: "ACCEPTED",
-        companionCount: 1,
-        source: "HOST_MANUAL",
-      },
+    await prisma.$transaction(async (transaction) => {
+      const response = await transaction.rsvp.create({
+        data: {
+          invitationGroupId: created.id,
+          status: "ACCEPTED",
+          companionCount: 1,
+          source: "HOST_MANUAL",
+        },
+      });
+      await transaction.rsvpMember.create({
+        data: {
+          invitationGroupId: created.id,
+          rsvpId: response.id,
+          guestMemberId: updated.members[0]!.id,
+          attending: true,
+        },
+      });
+      await transaction.invitationGroup.update({
+        where: { id: created.id },
+        data: { rsvpStatus: "ACCEPTED", expectedAttendees: 2 },
+      });
     });
     await expect(
       invitations.update(principal, event.id, created.id, {
@@ -428,6 +442,27 @@ describe("InvitationsService PostgreSQL integration", () => {
           isPrimary: true,
         })),
       });
+      const acceptedGroups = await transaction.invitationGroup.findMany({
+        where: { eventId: event.id, rsvpStatus: "ACCEPTED" },
+        include: { members: true },
+      });
+      for (const group of acceptedGroups) {
+        const response = await transaction.rsvp.create({
+          data: {
+            invitationGroupId: group.id,
+            status: "ACCEPTED",
+            source: "SYSTEM",
+          },
+        });
+        await transaction.rsvpMember.create({
+          data: {
+            invitationGroupId: group.id,
+            rsvpId: response.id,
+            guestMemberId: group.members[0]!.id,
+            attending: true,
+          },
+        });
+      }
     });
 
     const pages = await Promise.all(

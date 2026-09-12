@@ -217,6 +217,7 @@ describe("Stage 6 PostgreSQL messaging integration", () => {
     expect(provider.sendInvitation).toHaveBeenCalledTimes(1);
     const providerInput = provider.sendInvitation.mock.calls[0]?.[0];
     expect(providerInput?.header?.kind).toBe("IMAGE_LINK");
+    expect(providerInput?.quickReplyPayloads).toEqual(["ATTEND", "DECLINE"]);
     if (providerInput?.header?.kind !== "IMAGE_LINK") {
       throw new Error("Expected an immutable signed image header.");
     }

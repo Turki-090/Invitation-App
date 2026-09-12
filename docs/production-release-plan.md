@@ -1,9 +1,10 @@
 # Dawah production and release plan
 
-Status date: 2026-09-10
+Status date: 2026-09-12
 
-The “Current position” section preserves the pre-Stage 1 baseline captured on
-2026-09-05. Dated completion records under each roadmap stage are authoritative.
+The “Current position” section reflects the verified repository state through
+Stage 7. Dated completion records under each roadmap stage remain the detailed
+source of evidence.
 
 This plan maps the current repository to the requirements in `GPT — Wedding Platform Master Business & Technical Build Specification.md` and the visual rules in `System Design/`. It targets a production web release for Saudi Arabia and the GCC. Native iOS and Android applications remain a post-web-release phase and are not a launch dependency.
 
@@ -28,60 +29,73 @@ QR check-in can launch behind a feature flag during the controlled pilot. Native
 
 ### Executive assessment
 
-The repository has a credible API-first foundation, not a disposable prototype. The selected stack, boundaries, database direction, design tokens, and initial documentation follow the master specification. However, only authentication, event listing, and basic event creation form a working vertical slice. The invitation-management product is not yet feature-complete or release-ready.
+Stages 1 through 7 have closed their repository exit gates. The application now
+has a tested end-to-end host and guest loop: authentication, localized event
+management, guest preparation, asynchronous WhatsApp delivery, accountless
+public invitations, RSVP edits, confirmation messages, and reconciled dashboard
+counts. The product is not ready for general availability: reminders and team
+collaboration, reports/exports/credits/check-in, and production assurance remain
+in Stages 8 through 10.
 
-Approximate completion, weighted by usable product capability rather than lines of code:
+Current delivery state:
 
-| Scope                       | Current estimate | Assessment                                                                                                                                                 |
-| --------------------------- | ---------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Engineering foundation      |           55–65% | Good direction; production infrastructure and integration coverage remain incomplete.                                                                      |
-| MVP 1 — Foundation          |              60% | Monorepo, API, schema, auth foundation, CI, tokens, and docs exist. Worker, deployment environments, full authorization, and production operations do not. |
-| MVP 2 — Event creation      |           35–45% | Create/list works through the real API and database. Detail, update, settings, lifecycle, switcher, dashboard, and onboarding wizard are missing.          |
-| MVP 3 — Guest management    |           10–15% | Core tables and invitation-domain rules exist. There is no guest/invitation API or user interface.                                                         |
-| MVP 4 — WhatsApp            |             0–5% | Architecture and status vocabulary are documented; provider, worker, queues, messages, webhooks, and retries are absent.                                   |
-| MVP 5 — RSVP                |           10–15% | RSVP calculation and persistence models exist. Public APIs, atomic service flow, guest screens, and WhatsApp response handling are absent.                 |
-| MVP 6 — Reminders           |               0% | Not implemented.                                                                                                                                           |
-| MVP 7 — Team                |            5–10% | Membership tables and a permission map exist, but there is no central authorization service, team API, UI, or permission test suite.                       |
-| MVP 8 — Reports and billing |               0% | Not implemented beyond design/specification intent.                                                                                                        |
-| MVP 9 — Check-in            |               0% | Not implemented.                                                                                                                                           |
-| Public-release readiness    |           10–15% | Local builds work, but staging, deployment, observability, backups, security verification, PDPL operations, and release exercises remain.                  |
-
-These percentages are planning indicators, not delivery estimates.
+| Scope                       | Status          | Remaining work                                                                      |
+| --------------------------- | --------------- | ----------------------------------------------------------------------------------- |
+| Engineering foundation      | Complete        | Production deployment and operations are intentionally completed in Stage 10.       |
+| MVP 1 — Foundation          | Complete        | No open repository exit-gate work.                                                  |
+| MVP 2 — Event creation      | Complete        | No open repository exit-gate work.                                                  |
+| MVP 3 — Guest management    | Complete        | No separate post-release import expansion is planned.                               |
+| MVP 4 — WhatsApp            | Complete        | Live provider acceptance is tracked under Stage 10 staging assurance.               |
+| MVP 5 — RSVP                | Complete        | Live provider acceptance is tracked under Stage 10 staging assurance.               |
+| MVP 6 — Reminders           | Not started     | Stage 8 reminder rules, scheduling, history, and duplicate protection.              |
+| MVP 7 — Team                | Foundation only | Stage 8 co-host lifecycle, full permission enforcement, UI, and matrix tests.       |
+| MVP 8 — Reports and billing | Not started     | Stage 9 reports, private exports, credit ledger, and payment abstraction.           |
+| MVP 9 — Check-in            | Not started     | Stage 9 feature-flagged QR and event-day workflow.                                  |
+| Public-release readiness    | Not started     | Stage 10 environments, assurance, compliance, pilot, and general-availability work. |
 
 ### What is implemented now
 
-- A `pnpm` and Turborepo monorepo with strict TypeScript packages.
-- Next.js App Router web application and independent NestJS `/api/v1` service.
-- PostgreSQL and Prisma with one reviewed initial migration.
-- Ten database models: users, events, memberships, invitation groups, guest members, RSVP, RSVP members, public capabilities, RSVP history, and audit logs.
-- Core database keys, indexes, foreign keys, non-negative count constraints, and event-creation transaction handling.
-- Supabase-compatible passwordless phone authentication and API-side JWT verification.
-- A local-only test-login path that is accepted only when both the API and web run in the exact `development` environment.
-- Event list and event creation endpoints backed by PostgreSQL.
-- Event creation atomically creates owner membership and an audit record.
-- Zod validation for event creation and a consistent API error envelope.
-- Invitation structure and RSVP calculation rules in the domain package.
-- Four invitation/RSVP invariant tests and three development-auth safety tests.
-- Canonical design tokens with generated web CSS, Swift, and Kotlin outputs.
-- Ten production TypeScript UI components derived from the supplied Dawah design system.
-- Arabic RTL authentication and event-list/create screens with loading, empty, and error states.
-- A manually maintained OpenAPI 3.1 contract for liveness and the two event endpoints.
-- Basic GitHub Actions checks for installation, generation, formatting, OpenAPI linting, type checking, tests, and builds.
-- Local PostgreSQL and Redis services through Docker Compose.
-- Initial ADRs, architecture/security documents, and short operational runbooks.
+- A strict `pnpm`/Turborepo workspace with Next.js, NestJS, BullMQ, Prisma,
+  PostgreSQL, Redis, private object storage, generated API clients, production
+  containers, and repeatable CI/repository validation.
+- A complete Arabic RTL and English LTR design-system foundation with responsive
+  host/guest shells, local fonts, Storybook, accessibility checks, and visual
+  regression baselines.
+- Authenticated event onboarding, lifecycle management, settings, switching,
+  dashboard summaries, central event access checks, cross-tenant denial, and
+  append-only audit evidence.
+- Invitation-group and named-guest management for every supported invitation
+  type, including search, pagination, bulk actions, phone normalization,
+  duplicate control, hardened CSV/XLSX preparation imports, private assets,
+  templates, previews, readiness, and immutable snapshots.
+- Provider-neutral WhatsApp messaging with idempotent batches, bounded workers,
+  durable attempts, retries, permanent-failure review, signed private media,
+  verified/deduplicated webhooks, out-of-order reduction, and safe resends.
+- Secure accountless invitation capabilities and a mobile-first guest RSVP flow,
+  including atomic member coverage, history, idempotency, host and guest edits,
+  deterministic WhatsApp actions, and serialized confirmation delivery.
+- Verified forward migrations and broad unit, contract, component, accessibility,
+  visual, database, queue, startup, and production-container coverage through
+  Stage 7.
 
 ### Important gaps and risks
 
-1. **The core product loop is missing.** There is no invitation CRUD, guest management, WhatsApp send, public invitation, RSVP submission, reminder, or report flow.
-2. **Authorization is not complete.** Event listing is membership-scoped, but the permission map is not enforced by a central authorization service and has no cross-event isolation suite.
-3. **The schema is only the first subset.** Message, attempt, batch, webhook, reminder, import, template, asset, export, notification, credit, and check-in models are absent.
-4. **Redis is running but unused.** There is no `apps/worker`, BullMQ queue, retry policy, idempotency store, or dead-letter handling.
-5. **The design-system port is partial.** Ten of the 31 supplied component families have been converted; the full dashboard, guest invitation, WhatsApp, and onboarding kits are not implemented.
-6. **Localization is not established.** Visible Arabic is hard-coded and English LTR is not available through translation keys.
-7. **The API contract can drift.** Static OpenAPI and NestJS runtime documentation are separate, and no generated TypeScript/Swift/Kotlin client pipeline exists.
-8. **Testing is far below the production bar.** There are seven unit tests, with no database integration suite, cross-tenant tests, Playwright E2E, Storybook visual tests, axe checks, webhook fixtures, or load tests.
-9. **Production operations are documents rather than capabilities.** There are no API/worker container images, staging/prod deployment definitions, structured logging, Sentry, metrics, alerting, proven backup restore, or rollback exercise.
-10. **Saudi PDPL readiness is incomplete.** Data locations, subprocessors, retention, deletion, access/export handling, incident response, and production-access logging still require implementation and review.
+1. **Reminders and collaboration are still absent.** Stage 8 must add safe
+   reminder eligibility/scheduling and the complete co-host lifecycle without
+   weakening event isolation.
+2. **Reporting, exports, commercial accounting, and check-in are still absent.**
+   Stage 9 must add reconciled server queries, asynchronous private exports, an
+   append-only credit ledger, and feature-flagged event-day scanning.
+3. **No real staging provider exercise has been recorded.** Repository mocks and
+   contract tests are comprehensive, but Stage 10 must exercise Meta templates,
+   signed media, callbacks, and RSVP confirmations using deployed
+   non-production configuration.
+4. **Production operations remain unproven.** Isolated environments,
+   observability, alerting, backup/PITR recovery, rollback, outage, queue-backlog,
+   and credential-rotation drills remain Stage 10 work.
+5. **Release governance remains open.** Saudi PDPL operational/legal review,
+   security review, staging acceptance, the controlled Saudi pilot, remediation,
+   named ownership, and final go/no-go approval have not occurred.
 
 ## Delivery rules for all stages
 
@@ -93,7 +107,11 @@ These percentages are planning indicators, not delivery estimates.
 - Add reviewed forward migrations; never use `db push` as a release mechanism.
 - Do not advance a stage while its exit gate has blocking failures.
 
-## Eleven-stage production roadmap
+## Ten-stage production roadmap
+
+Scope decision (2026-09-12): the former post-release Stage 11 import expansion
+has been removed. The secure CSV/XLSX preparation import delivered in Stage 5
+remains supported; no separate follow-on import stage is planned.
 
 ### Stage 1 — Harden the engineering baseline
 
@@ -251,10 +269,8 @@ Verification record:
 
 Goal: complete MVP 4 with safe, observable, asynchronous Meta WhatsApp delivery.
 
-Status: **Repository complete; staging exercise pending** — implementation, the
-localized sending-center experience, and the complete repository validation
-gate pass. A live non-production Meta provider/webhook exercise still requires
-deployed credentials and provider-side configuration.
+Status: **Complete** — repository exit gate verified on 2026-09-10. Live Meta
+provider acceptance is tracked as deployed-environment evidence in Stage 10.
 
 Work:
 
@@ -324,12 +340,15 @@ Implementation record:
   integration tests; format; lint; OpenAPI validation and drift; Prisma
   validation; type checks; production builds; tracked-artifact checks; startup
   smoke; 42 Storybook accessibility/visual cases; and production API/worker
-  container readiness passed. The repository exit gate is closed; the live
-  non-production Meta exercise remains a staging promotion requirement.
+  container readiness passed. The repository exit gate is closed. The live
+  non-production Meta exercise is tracked under Stage 10 because it requires
+  deployed credentials and provider-side configuration.
 
 ### Stage 7 — Deliver accountless public invitations and RSVP
 
 Goal: complete MVP 5 with a simple, private, mobile-first guest journey.
+
+Status: **Complete** — exit gate verified on 2026-09-12.
 
 Work:
 
@@ -347,9 +366,47 @@ Exit gate:
 - Every invitation type completes end to end from private link or mock WhatsApp response to accurate dashboard counts and history.
 - Repeated or concurrent submissions cannot corrupt attendance totals or expose another invitation.
 
+Implementation record (completed 2026-09-12):
+
+- Public links use 256-bit opaque capabilities. Only SHA-256 hashes are stored;
+  issue, rotation, expiry, cancellation/archive state, and revocation are
+  enforced with uniform public not-found responses and audited host controls.
+  Guest GET/POST routes have private no-store/noindex headers, strict response
+  schemas, trusted-proxy handling, and per-client/per-capability rate-limit
+  buckets that do not retain raw tokens or collapse server-rendered links into
+  one shared limiter.
+- The localized, mobile-first guest route supports single, named-group, and
+  companion invitations in Arabic/RTL and English/LTR, including open, closed,
+  completed, existing, edited, retry, duplicate-click, and API failure states.
+  Guest copy uses the elderly-user body scale, and the two representative
+  390-pixel viewport stories are covered by axe and visual baselines.
+- RSVP writes are serialized on the invitation and atomically replace complete
+  member coverage, derive status/count, append immutable before/after history,
+  persist canonical idempotency results, audit the actor/source, and create a
+  durable confirmation outbox entry. The migration repairs legacy sparse member
+  coverage and reconstructs internally consistent history snapshots before
+  enabling deferred cross-table aggregate constraints.
+- WhatsApp sends carry stable callback payloads from an immutable invitation and
+  member binding. Presentations stay within Meta's three-button limit and avoid
+  non-actionable selection replies. Delayed callbacks cannot overwrite newer
+  web/host intent; same-second callbacks use a durable ingestion sequence.
+  Pending confirmations are superseded by newer edits, and an already-started
+  confirmation serializes later sends for that invitation. API and sweeper jobs
+  both honor the configured bounded retry ceiling.
+- Verification recorded on 2026-09-12: all 295 unit, contract, component,
+  provider, storage, API, and worker tests; all 32 real-PostgreSQL integration
+  tests; format; lint; OpenAPI validation and generated-client drift; Prisma
+  validation and schema drift; type checks; production builds; tracked-artifact
+  checks; startup smoke; all 46 Storybook accessibility/visual cases; and
+  production API/worker container readiness passed. The repository exit gate is
+  closed. Live provider acceptance remains Stage 10 deployed-environment work
+  and does not reopen the Stage 7 implementation gate.
+
 ### Stage 8 — Add reminders, team collaboration, and full authorization
 
 Goal: complete MVP 6 and MVP 7 without weakening event isolation or causing reminder spam.
+
+Status: **Next** — active implementation stage after the completed Stage 7 gate.
 
 Work:
 
@@ -369,6 +426,8 @@ Exit gate:
 ### Stage 9 — Complete reports, exports, credits, and event-day check-in
 
 Goal: deliver MVP 8 and a feature-flagged MVP 9 suitable for a controlled event pilot.
+
+Status: **Planned** — begins after the Stage 8 exit gate closes.
 
 Work:
 
@@ -390,10 +449,17 @@ Exit gate:
 
 Goal: prove that the complete system can be deployed, operated, recovered, and safely released.
 
+Status: **Planned** — external environment preparation may proceed in parallel;
+pilot and release gates follow Stage 9.
+
 Work:
 
 - Provision isolated development, staging, and production environments in an approved region/provider configuration.
 - Configure domains, TLS, restrictive CORS/CSP, secret management, rotation, Supabase Auth, Meta WhatsApp, object storage, and managed PostgreSQL/Redis.
+- Exercise approved non-production Meta templates end to end in staging,
+  including a real signed image fetch, outbound delivery, verified status and
+  interactive callbacks, RSVP reconciliation, and the latest confirmation send.
+  Record provider evidence without retaining guest PII or credentials.
 - Add structured redacted logging, Sentry, request/error/queue/provider metrics, dashboards, alerts, and trace/correlation IDs.
 - Configure automated backups and point-in-time recovery, then perform and record a non-production restore drill.
 - Complete the Saudi PDPL data map, processor/location inventory, privacy notice, retention schedule, deletion/recovery workflow, access/export workflow, incident response, and production-access policy with legal/operational review.
@@ -409,30 +475,6 @@ Exit gate:
 - The pilot succeeds without data-isolation, message-duplication, attendance-count, privacy, or recovery failures.
 - Product, engineering, security, operations, and business owners approve general availability.
 
-### Stage 11 — Guest import from Excel / CSV
-
-Goal: add a secure, reviewable bulk guest-import experience after Stage 10 release readiness is complete, without changing the established guest-management architecture.
-
-Status: **Planned** — scheduled after Stage 10.
-
-Work:
-
-- Add an **Import Guests** action alongside manual guest creation, including empty-state guidance and downloadable Arabic and English Excel templates.
-- Support private `.xlsx`, reasonable `.xls`, and UTF-8 CSV uploads (including Arabic and detectable comma/semicolon delimiters), with file type, size, and parser-limit validation.
-- Parse the first relevant worksheet safely, read cell values only, ignore empty rows, and detect Arabic/English name and phone headers; provide worksheet selection and manual column mapping when detection is uncertain.
-- Normalize Saudi numbers to E.164 with an established phone parser while preserving valid international numbers; validate required name and phone fields before any persistence.
-- Show a pre-import preview with totals, ready rows, invalid rows, missing phones, and duplicates; allow row corrections and make skipping duplicates the default.
-- Detect duplicate normalized phone numbers within the upload and against the current event, and provide explicit skip or update behavior for existing guests.
-- Add an authorized backend preview/confirmation flow that validates before insertion and creates accepted guests in a single transaction or bulk operation, never one request per guest.
-- Reuse the existing invitation-group and guest-member models, validation, permissions, audit conventions, and downstream WhatsApp/invitation workflows; add import-batch metadata to support auditing and future undo.
-- Ensure temporary uploaded files are private, never publicly exposed, and deleted once parsing is complete unless a later approved retention policy requires otherwise.
-- Add domain, API, integration, accessibility, RTL/LTR UI, malformed-file, Arabic CSV, duplicate, phone-normalization, authorization, and large-file tests.
-
-Exit gate:
-
-- An authorized owner or manager can upload an Arabic or English Excel/CSV guest list, map uncertain columns, review validation and duplicates, and import valid guests in one confirmed operation.
-- Imported guests immediately behave exactly like manually created guests across guest management, invitations, and WhatsApp workflows, with no public access to original files or cross-event data exposure.
-
 ## Release milestones
 
 | Milestone                          | Required stages                   | Audience                                                        |
@@ -442,13 +484,13 @@ Exit gate:
 | Messaging/RSVP staging beta        | Stages 6–8                        | Selected stakeholders using non-production provider credentials |
 | Controlled real-event pilot        | Stage 9 plus Stage 10 pilot gates | A small number of explicitly supported Saudi events             |
 | Production v1 general availability | All Stage 10 exit criteria        | Public hosts                                                    |
-| Guest import enhancement           | Stage 11                          | Hosts importing existing guest lists after the Stage 10 release |
 | Native host/check-in applications  | Post-release roadmap              | iOS and Android users after the API is stable                   |
 
 ## Immediate next action
 
-Exercise the provider/webhook contract in staging with approved non-production
-Meta credentials, including a real image-template fetch through the signed media
-route. Preserve the recorded Stage 6 evidence for duplicate logical-send and
-credit-unit prevention, monotonic webhook reconciliation, deterministic queue
-recovery, and PII-safe failure review.
+Begin Stage 8 with the reminder eligibility domain model and event-scoped team
+permission matrix, then carry each vertical slice through persistence, API,
+authorization, tests, and localized UI. In parallel, prepare the Stage 10
+staging dependencies needed for the live Meta acceptance exercise: approved
+templates, a non-production phone-number ID and recipient, public HTTPS media and
+webhook routes, and securely managed credentials.

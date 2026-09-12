@@ -24,6 +24,15 @@ describe("locale proxy", () => {
     );
   });
 
+  it("preserves a private invitation capability while adding the locale", () => {
+    const token = "a".repeat(43);
+    const response = proxy(request(`/i/${token}?source=whatsapp`, "en-US"));
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(response.status).toBe(307);
+    expect(location.pathname).toBe(`/en/i/${token}`);
+    expect(location.search).toBe("?source=whatsapp");
+  });
+
   it("passes localized routes and static assets through unchanged", () => {
     for (const pathname of ["/ar-SA/events", "/en/events", "/logo.svg"]) {
       const response = proxy(request(pathname));

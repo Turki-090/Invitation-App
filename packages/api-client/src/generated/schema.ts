@@ -160,6 +160,52 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/public/invitations/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Opaque, high-entropy capability returned only when private-link access is issued. */
+                token: components["parameters"]["PublicInvitationToken"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Retrieve one private invitation
+         * @description Resolves an opaque capability to the minimum localized event, invitation, member, RSVP, and lifecycle fields required by the guest journey. Invalid, expired, and revoked capabilities share one not-found response.
+         */
+        get: operations["getPublicInvitation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/invitations/{token}/rsvp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Opaque, high-entropy capability returned only when private-link access is issued. */
+                token: components["parameters"]["PublicInvitationToken"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit or edit a guest RSVP
+         * @description Applies a capability-scoped, idempotent attendance selection and returns the resulting server-calculated state. The submission UUID may be safely retried with the identical payload.
+         */
+        post: operations["submitPublicInvitationRsvp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events/{eventId}/invitations": {
         parameters: {
             query?: never;
@@ -256,6 +302,68 @@ export type paths = {
          */
         post: operations["cancelInvitation"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/invitations/{invitationId}/rsvp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-group UUID. */
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Get an invitation RSVP and history
+         * @description Returns the current RSVP selection and strictly shaped change history to an authorized host.
+         */
+        get: operations["getHostRsvp"];
+        put?: never;
+        /**
+         * Submit or edit an RSVP as a host
+         * @description Atomically replaces the current invitation selection and records a host-manual history entry under the supplied submission UUID.
+         */
+        post: operations["submitHostRsvp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/invitations/{invitationId}/public-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-group UUID. */
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Get private-link access status
+         * @description Reports only capability lifecycle metadata; raw capability tokens and hashes are never returned by status reads.
+         */
+        get: operations["getPublicInvitationAccess"];
+        put?: never;
+        /**
+         * Issue or rotate private-link access
+         * @description Revokes any active invitation capability and returns a new high-entropy raw token exactly once. Only its hash is retained by the service.
+         */
+        post: operations["issuePublicInvitationAccess"];
+        /**
+         * Revoke private-link access
+         * @description Revokes the invitation's active capability without deleting its issuance history.
+         */
+        delete: operations["revokePublicInvitationAccess"];
         options?: never;
         head?: never;
         patch?: never;
@@ -982,6 +1090,151 @@ export type components = {
         /** @enum {string} */
         RsvpStatus: "PENDING" | "ACCEPTED" | "PARTIALLY_ACCEPTED" | "DECLINED";
         /** @enum {string} */
+        RsvpSource: "WHATSAPP" | "GUEST_WEB" | "HOST_MANUAL" | "SYSTEM";
+        /** @enum {string} */
+        GuestRsvpLifecycleState: "OPEN" | "CLOSED" | "COMPLETED";
+        /** @enum {string} */
+        GuestRsvpPolicyReason: "INITIAL_RESPONSE_AVAILABLE" | "EDITS_AVAILABLE" | "EDITS_DISABLED" | "RSVP_NOT_OPEN" | "RSVP_CLOSED" | "DEADLINE_PASSED" | "EVENT_STARTED" | "EVENT_COMPLETED" | "EVENT_ARCHIVED";
+        SubmitRsvp: {
+            /**
+             * Format: uuid
+             * @description Client-generated logical-submission UUID used for idempotent retries.
+             */
+            submissionId: string;
+            attendingMemberIds: string[];
+            companionCount: number;
+        };
+        PublicInvitationMember: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            isPrimary: boolean;
+            position: number;
+        };
+        PublicRsvpState: {
+            status: components["schemas"]["RsvpStatus"];
+            attendingMemberIds: string[];
+            companionCount: number;
+            expectedAttendees: number;
+            /** Format: date-time */
+            respondedAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            isEdited: boolean;
+        };
+        GuestRsvpPolicy: {
+            lifecycleState: components["schemas"]["GuestRsvpLifecycleState"];
+            canRespond: boolean;
+            canEdit: boolean;
+            reason: components["schemas"]["GuestRsvpPolicyReason"];
+        };
+        PublicInvitation: {
+            locale: components["schemas"]["PreparationLocale"];
+            event: {
+                name: string;
+                eventType: components["schemas"]["EventType"];
+                /** Format: date */
+                eventDate: string;
+                startTime: string;
+                endTime: string | null;
+                timezone: string;
+                venueName: string;
+                city: string;
+                /** Format: uri */
+                mapUrl: string | null;
+                /** Format: date */
+                rsvpDeadline: string | null;
+            };
+            invitation: {
+                displayName: string;
+                invitationType: components["schemas"]["InvitationType"];
+                maxCompanions: number;
+                members: components["schemas"]["PublicInvitationMember"][];
+            };
+            currentRsvp: components["schemas"]["PublicRsvpState"] | null;
+            policy: components["schemas"]["GuestRsvpPolicy"];
+        };
+        RsvpResult: {
+            /** Format: uuid */
+            submissionId: string;
+            status: components["schemas"]["RsvpStatus"];
+            attendingMemberIds: string[];
+            companionCount: number;
+            expectedAttendees: number;
+            /** Format: date-time */
+            respondedAt: string;
+            isEdited: boolean;
+            changed: boolean;
+            confirmationQueued: boolean;
+        };
+        HistoricalRsvpResponse: {
+            status: components["schemas"]["RsvpStatus"];
+            attendingMemberIds: string[];
+            companionCount: number;
+            expectedAttendees: number;
+        };
+        RsvpHistoryEntry: {
+            /** Format: uuid */
+            id: string;
+            previousStatus: components["schemas"]["RsvpStatus"];
+            newStatus: components["schemas"]["RsvpStatus"];
+            previousCount: number;
+            newCount: number;
+            previousResponse: components["schemas"]["HistoricalRsvpResponse"];
+            newResponse: components["schemas"]["HistoricalRsvpResponse"];
+            source: components["schemas"]["RsvpSource"];
+            actorReference: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        HostRsvpState: {
+            status: components["schemas"]["RsvpStatus"];
+            attendingMemberIds: string[];
+            companionCount: number;
+            expectedAttendees: number;
+            /** Format: date-time */
+            respondedAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            isEdited: boolean;
+            source: components["schemas"]["RsvpSource"];
+        };
+        HostRsvpDetail: {
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            invitationId: string;
+            displayName: string;
+            invitationType: components["schemas"]["InvitationType"];
+            maxCompanions: number;
+            members: components["schemas"]["PublicInvitationMember"][];
+            currentRsvp: components["schemas"]["HostRsvpState"] | null;
+            history: components["schemas"]["RsvpHistoryEntry"][];
+        };
+        IssuePublicInvitationCapability: {
+            /** Format: date-time */
+            expiresAt?: string;
+        };
+        PublicInvitationCapabilityStatus: {
+            active: boolean;
+            /** Format: date-time */
+            createdAt: string | null;
+            /** Format: date-time */
+            expiresAt: string | null;
+            /** Format: date-time */
+            revokedAt: string | null;
+        };
+        IssuedPublicInvitationCapability: {
+            /** @constant */
+            active: true;
+            token: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string | null;
+            revokedAt: null;
+        };
+        /** @enum {string} */
         GccPhoneCountry: "SA" | "AE" | "BH" | "KW" | "OM" | "QA";
         InvitationMemberInput: {
             name: string;
@@ -1584,6 +1837,15 @@ export type components = {
                 "application/json": components["schemas"]["ApiError"];
             };
         };
+        /** @description The public invitation capability is invalid, expired, revoked, cancelled, or otherwise unavailable. These cases intentionally share one response. */
+        PublicInvitationNotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ApiError"];
+            };
+        };
         /** @description The operation conflicts with the current event lifecycle state. */
         Conflict: {
             headers: {
@@ -1635,6 +1897,10 @@ export type components = {
         EventId: string;
         /** @description Invitation-group UUID. */
         InvitationId: string;
+        /** @description Opaque, high-entropy capability returned only when private-link access is issued. */
+        PublicInvitationToken: string;
+        /** @description Locale used to shape localized public invitation fields and RSVP confirmation content. */
+        PublicInvitationLocale: components["schemas"]["PreparationLocale"];
         /** @description Guest import-job UUID. */
         ImportJobId: string;
         /** @description Import-row UUID. */
@@ -1927,6 +2193,81 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    getPublicInvitation: {
+        parameters: {
+            query?: {
+                /** @description Locale used to shape localized public invitation fields and RSVP confirmation content. */
+                locale?: components["parameters"]["PublicInvitationLocale"];
+            };
+            header?: never;
+            path: {
+                /** @description Opaque, high-entropy capability returned only when private-link access is issued. */
+                token: components["parameters"]["PublicInvitationToken"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Localized invitation data scoped to exactly one capability. */
+            200: {
+                headers: {
+                    /** @description Prevents browsers and intermediaries from retaining private invitation data. */
+                    "Cache-Control"?: "private, no-store, max-age=0, must-revalidate";
+                    Pragma?: "no-cache";
+                    Expires?: "0";
+                    "Referrer-Policy"?: "no-referrer";
+                    "X-Robots-Tag"?: "noindex, nofollow, noarchive";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicInvitation"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["PublicInvitationNotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    submitPublicInvitationRsvp: {
+        parameters: {
+            query?: {
+                /** @description Locale used to shape localized public invitation fields and RSVP confirmation content. */
+                locale?: components["parameters"]["PublicInvitationLocale"];
+            };
+            header?: never;
+            path: {
+                /** @description Opaque, high-entropy capability returned only when private-link access is issued. */
+                token: components["parameters"]["PublicInvitationToken"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitRsvp"];
+            };
+        };
+        responses: {
+            /** @description Canonical RSVP result, including whether the selection changed and whether confirmation delivery was queued. */
+            200: {
+                headers: {
+                    /** @description Prevents browsers and intermediaries from retaining private RSVP data. */
+                    "Cache-Control"?: "private, no-store, max-age=0, must-revalidate";
+                    Pragma?: "no-cache";
+                    Expires?: "0";
+                    "Referrer-Policy"?: "no-referrer";
+                    "X-Robots-Tag"?: "noindex, nofollow, noarchive";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RsvpResult"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["PublicInvitationNotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
     listInvitations: {
         parameters: {
             query?: {
@@ -2137,6 +2478,163 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getHostRsvp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-group UUID. */
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current RSVP and ordered history for the event-owned invitation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostRsvpDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    submitHostRsvp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-group UUID. */
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitRsvp"];
+            };
+        };
+        responses: {
+            /** @description Canonical server-calculated RSVP result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RsvpResult"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getPublicInvitationAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-group UUID. */
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Latest public-access status for the event-owned invitation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicInvitationCapabilityStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    issuePublicInvitationAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-group UUID. */
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssuePublicInvitationCapability"];
+            };
+        };
+        responses: {
+            /** @description Newly issued raw capability and its lifecycle metadata. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedPublicInvitationCapability"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    revokePublicInvitationAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Invitation-group UUID. */
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Public access is inactive after the idempotent revocation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicInvitationCapabilityStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
         };
     };

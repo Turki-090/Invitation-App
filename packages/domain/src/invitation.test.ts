@@ -73,6 +73,23 @@ describe("calculateRsvp", () => {
       }),
     ).toMatchObject({ status: RsvpStatus.DECLINED, expectedAttendeeCount: 0 });
   });
+
+  it("does not let companions attend without the primary named member", () => {
+    expect(() =>
+      calculateRsvp({
+        invitationType: InvitationType.PRIMARY_WITH_COMPANIONS,
+        memberCount: 1,
+        primaryMemberCount: 1,
+        maxCompanions: 2,
+        attendingMemberCount: 0,
+        companionCount: 1,
+      }),
+    ).toThrowError(
+      expect.objectContaining({
+        code: "RSVP_COMPANIONS_REQUIRE_PRIMARY_MEMBER",
+      }),
+    );
+  });
 });
 
 describe("invitation structures", () => {

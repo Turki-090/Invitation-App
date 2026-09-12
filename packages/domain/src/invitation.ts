@@ -173,6 +173,17 @@ export function calculateRsvp(input: RsvpCalculationInput): RsvpCalculation {
     );
   }
 
+  if (
+    input.invitationType === InvitationType.PRIMARY_WITH_COMPANIONS &&
+    input.attendingMemberCount === 0 &&
+    input.companionCount > 0
+  ) {
+    throw new InvitationInvariantError(
+      "RSVP_COMPANIONS_REQUIRE_PRIMARY_MEMBER",
+      "Companions cannot attend when the invitation's primary named member is not attending.",
+    );
+  }
+
   if (input.companionCount > input.maxCompanions) {
     throw new InvitationInvariantError(
       "RSVP_COMPANION_COUNT_EXCEEDS_LIMIT",

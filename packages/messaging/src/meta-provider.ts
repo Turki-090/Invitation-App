@@ -59,6 +59,12 @@ export class MetaWhatsAppProvider implements MessagingProvider {
   private async sendTemplate(
     input: MessagingTemplateSendInput,
   ): Promise<ProviderMessageResult> {
+    if ((input.quickReplyPayloads?.length ?? 0) > 3) {
+      throw new MessagingProviderError("PROVIDER_TEMPLATE_BUTTON_LIMIT", {
+        failureClass: "PERMANENT",
+        retryable: false,
+      });
+    }
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
@@ -147,6 +153,14 @@ export class MetaWhatsAppProvider implements MessagingProvider {
           type: "text",
           text: value,
         })),
+      });
+    }
+    for (const [index, payload] of (input.quickReplyPayloads ?? []).entries()) {
+      components.push({
+        type: "button",
+        sub_type: "quick_reply",
+        index: String(index),
+        parameters: [{ type: "payload", payload }],
       });
     }
 

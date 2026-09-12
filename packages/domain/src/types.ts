@@ -16,6 +16,15 @@ export const RsvpStatus = {
 
 export type RsvpStatus = (typeof RsvpStatus)[keyof typeof RsvpStatus];
 
+export const RsvpSource = {
+  WHATSAPP: "WHATSAPP",
+  GUEST_WEB: "GUEST_WEB",
+  HOST_MANUAL: "HOST_MANUAL",
+  SYSTEM: "SYSTEM",
+} as const;
+
+export type RsvpSource = (typeof RsvpSource)[keyof typeof RsvpSource];
+
 export const EventStatus = {
   DRAFT: "DRAFT",
   ACTIVE: "ACTIVE",

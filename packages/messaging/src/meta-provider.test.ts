@@ -53,6 +53,71 @@ describe("MetaWhatsAppProvider", () => {
     expect(request.headers.Authorization).toBe("Bearer secret");
   });
 
+  it("binds stable RSVP actions to Meta quick-reply callback payloads", async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ messages: [{ id: "wamid.buttons" }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const provider = new MetaWhatsAppProvider({
+      accessToken: "secret",
+      phoneNumberId: "123456",
+      graphApiVersion: "v25.0",
+      fetch,
+    });
+
+    await provider.sendInvitation({
+      ...input,
+      quickReplyPayloads: ["ATTEND", "DECLINE"],
+    });
+
+    const [, request] = fetch.mock.calls[0]!;
+    expect(JSON.parse(String(request.body)).template.components).toEqual([
+      {
+        type: "body",
+        parameters: [
+          { type: "text", text: "Sarah" },
+          { type: "text", text: "Wedding of Noura and Omar" },
+        ],
+      },
+      {
+        type: "button",
+        sub_type: "quick_reply",
+        index: "0",
+        parameters: [{ type: "payload", payload: "ATTEND" }],
+      },
+      {
+        type: "button",
+        sub_type: "quick_reply",
+        index: "1",
+        parameters: [{ type: "payload", payload: "DECLINE" }],
+      },
+    ]);
+  });
+
+  it("rejects more quick replies than Meta can represent", async () => {
+    const fetch = vi.fn();
+    const provider = new MetaWhatsAppProvider({
+      accessToken: "secret",
+      phoneNumberId: "123456",
+      graphApiVersion: "v25.0",
+      fetch,
+    });
+
+    await expect(
+      provider.sendInvitation({
+        ...input,
+        quickReplyPayloads: ["ONE", "TWO", "THREE", "FOUR"],
+      }),
+    ).rejects.toMatchObject({
+      providerCode: "PROVIDER_TEMPLATE_BUTTON_LIMIT",
+      failureClass: "PERMANENT",
+      retryable: false,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("classifies Meta rate limits as retryable without exposing response text", async () => {
     const fetch = vi.fn().mockResolvedValue(
       new Response(

@@ -164,7 +164,7 @@ describe("type-specific invitation presentation", () => {
     ).toEqual(["I will attend", "Decline"]);
   });
 
-  it("includes named members and a selection fallback for a family", () => {
+  it("includes named members with immediately actionable family replies", () => {
     const presentation = createInvitationPresentation({
       invitationType: InvitationType.NAMED_GROUP,
       locale: InvitationContentLocale.AR_SA,
@@ -185,12 +185,6 @@ describe("type-specific invitation presentation", () => {
         expectedAttendeeCount: 4,
       },
       {
-        id: "SELECT_MEMBERS",
-        intent: InvitationReplyIntent.SELECT_NAMED_MEMBERS,
-        attendingMemberCount: null,
-        expectedAttendeeCount: null,
-      },
-      {
         id: "DECLINE_ALL",
         attendingMemberCount: 0,
         expectedAttendeeCount: 0,
@@ -198,7 +192,7 @@ describe("type-specific invitation presentation", () => {
     ]);
   });
 
-  it("generates every allowed companion count with localized labels", () => {
+  it("keeps companion choices within Meta's three-button limit", () => {
     const arabic = createInvitationPresentation({
       invitationType: InvitationType.PRIMARY_WITH_COMPANIONS,
       locale: InvitationContentLocale.AR_SA,
@@ -209,12 +203,11 @@ describe("type-specific invitation presentation", () => {
     expect(arabic.replyActions.map(({ id, label }) => ({ id, label }))).toEqual(
       [
         { id: "ATTEND_WITH_0_COMPANIONS", label: "أنا فقط" },
-        { id: "ATTEND_WITH_1_COMPANIONS", label: "أنا + ١" },
         { id: "ATTEND_WITH_2_COMPANIONS", label: "أنا + ٢" },
         { id: "DECLINE", label: "أعتذر" },
       ],
     );
-    expect(arabic.replyActions[2]).toMatchObject({
+    expect(arabic.replyActions[1]).toMatchObject({
       attendingMemberCount: 1,
       companionCount: 2,
       expectedAttendeeCount: 3,
@@ -233,6 +226,19 @@ describe("type-specific invitation presentation", () => {
       "Me only",
       "Me + 1",
       "Decline",
+    ]);
+
+    const largest = createInvitationPresentation({
+      invitationType: InvitationType.PRIMARY_WITH_COMPANIONS,
+      locale: InvitationContentLocale.EN,
+      members: [{ name: "Mohammed", isPrimary: true }],
+      maxCompanions: 100,
+    });
+    expect(largest.replyActions).toHaveLength(3);
+    expect(largest.replyActions.map(({ id }) => id)).toEqual([
+      "ATTEND_WITH_0_COMPANIONS",
+      "ATTEND_WITH_100_COMPANIONS",
+      "DECLINE",
     ]);
   });
 

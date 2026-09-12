@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { reduceMessageDeliveryStatus } from "@dawah/domain";
+import {
+  evaluateGuestRsvpPolicy,
+  InvitationInvariantError,
+  mapInvitationReplyAction,
+  reduceMessageDeliveryStatus,
+  RsvpReplyActionMappingKind,
+} from "@dawah/domain";
 import {
   createSignedWhatsappMediaUrl,
   type ProviderMessageResult,
@@ -8,6 +14,8 @@ import type { WhatsappSendJobData } from "@dawah/queue";
 import { Prisma, PrismaClient } from "@prisma/client";
 import type {
   ClaimedMessage,
+  ClaimedRsvpConfirmation,
+  DeferredMessage,
   SkippedMessage,
   WhatsappSendRepository,
 } from "./whatsapp-send-processor";
@@ -20,6 +28,8 @@ export interface PrismaMessagingRepositoryOptions {
   readonly mediaPublicApiBaseUrl: string;
   readonly mediaSigningSecret: string;
   readonly mediaUrlTtlSeconds: number;
+  readonly rsvpConfirmationTemplateAr?: string;
+  readonly rsvpConfirmationTemplateEn?: string;
   readonly now?: () => Date;
 }
 
@@ -166,6 +176,9 @@ export class PrismaMessagingRepository
       });
       const parameterOrder = stringArray(message.templateParameterOrder);
       const variables = stringRecord(message.templateVariables);
+      const quickReplyPayloads = snapshotReplyActionIds(
+        message.renderedContent,
+      );
       return {
         outcome: "SEND",
         messageId,
@@ -178,6 +191,7 @@ export class PrismaMessagingRepository
           templateName: message.providerTemplateName,
           languageCode: message.locale === "ar_SA" ? "ar" : "en",
           bodyParameters: parameterOrder.map((key) => variables[key] ?? ""),
+          ...(quickReplyPayloads.length === 0 ? {} : { quickReplyPayloads }),
           ...(header ? { header } : {}),
         },
       };
@@ -306,6 +320,249 @@ export class PrismaMessagingRepository
     });
   }
 
+  public async listQueuedRsvpConfirmationIds(
+    limit = 100,
+  ): Promise<readonly string[]> {
+    const confirmations = await this.prisma.rsvpConfirmation.findMany({
+      where: { status: { in: ["PENDING", "QUEUED"] } },
+      select: { id: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: Math.max(1, Math.min(limit, 500)),
+    });
+    return confirmations.map(({ id }) => id);
+  }
+
+  public async claimRsvpConfirmation(
+    confirmationId: string,
+    maximumAttempts: number,
+  ): Promise<ClaimedRsvpConfirmation | SkippedMessage | DeferredMessage> {
+    return this.prisma.$transaction(async (transaction) => {
+      const target = await transaction.rsvpConfirmation.findUnique({
+        where: { id: confirmationId },
+        select: { invitationGroupId: true },
+      });
+      if (!target) {
+        return { outcome: "SKIP", reason: "CONFIRMATION_NOT_FOUND" };
+      }
+      await transaction.$queryRaw`
+        SELECT "id" FROM "invitation_groups"
+        WHERE "id" = ${target.invitationGroupId}::uuid
+        FOR UPDATE
+      `;
+      await transaction.$queryRaw`
+        SELECT "id" FROM "rsvp_confirmations"
+        WHERE "id" = ${confirmationId}::uuid
+        FOR UPDATE
+      `;
+      const confirmation = await transaction.rsvpConfirmation.findUnique({
+        where: { id: confirmationId },
+      });
+      if (!confirmation) {
+        return { outcome: "SKIP", reason: "CONFIRMATION_NOT_FOUND" };
+      }
+      if (confirmation.status === "SENDING") {
+        const now = new Date();
+        await transaction.rsvpConfirmation.update({
+          where: { id: confirmation.id },
+          data: {
+            status: "FAILED",
+            failureClass: "AMBIGUOUS",
+            failureCode: "WORKER_INTERRUPTED",
+            failureReason:
+              "The provider outcome is uncertain. Do not retry automatically.",
+            failedAt: now,
+          },
+        });
+        await transaction.auditLog.create({
+          data: {
+            eventId: confirmation.eventId,
+            actorType: "SYSTEM",
+            action: "rsvp_confirmation.ambiguous",
+            targetType: "RsvpConfirmation",
+            targetId: confirmation.id,
+            metadata: { reason: "WORKER_INTERRUPTED" },
+          },
+        });
+        return { outcome: "SKIP", reason: "AMBIGUOUS_PRIOR_ATTEMPT" };
+      }
+      if (!["PENDING", "QUEUED"].includes(confirmation.status)) {
+        return { outcome: "SKIP", reason: `STATUS_${confirmation.status}` };
+      }
+      const newer = await transaction.rsvpConfirmation.findFirst({
+        where: {
+          invitationGroupId: confirmation.invitationGroupId,
+          sequence: { gt: confirmation.sequence },
+        },
+        select: { id: true },
+        orderBy: { sequence: "desc" },
+      });
+      if (newer) {
+        const now = new Date();
+        await transaction.rsvpConfirmation.update({
+          where: { id: confirmation.id },
+          data: {
+            status: "FAILED",
+            failureClass: "PERMANENT",
+            failureCode: "SUPERSEDED_BY_NEWER_RESPONSE",
+            failureReason:
+              "A newer RSVP confirmation replaced this unsent response.",
+            failedAt: now,
+          },
+        });
+        await transaction.auditLog.create({
+          data: {
+            eventId: confirmation.eventId,
+            actorType: "SYSTEM",
+            action: "rsvp_confirmation.superseded",
+            targetType: "RsvpConfirmation",
+            targetId: confirmation.id,
+            metadata: { newerConfirmationId: newer.id },
+          },
+        });
+        return { outcome: "SKIP", reason: "SUPERSEDED_BY_NEWER_RESPONSE" };
+      }
+      const earlierSending = await transaction.rsvpConfirmation.findFirst({
+        where: {
+          invitationGroupId: confirmation.invitationGroupId,
+          id: { not: confirmation.id },
+          status: "SENDING",
+          sequence: { lt: confirmation.sequence },
+        },
+        select: { id: true },
+      });
+      if (earlierSending) {
+        return {
+          outcome: "DEFER",
+          reason: "EARLIER_CONFIRMATION_SENDING",
+        };
+      }
+      if (confirmation.attemptCount >= maximumAttempts) {
+        const now = new Date();
+        await transaction.rsvpConfirmation.update({
+          where: { id: confirmation.id },
+          data: {
+            status: "FAILED",
+            failureClass: "TRANSIENT",
+            failureCode: "RETRY_LIMIT_REACHED",
+            failureReason: "The bounded provider retry limit was reached.",
+            failedAt: now,
+          },
+        });
+        return { outcome: "SKIP", reason: "RETRY_LIMIT_REACHED" };
+      }
+
+      const attemptNumber = confirmation.attemptCount + 1;
+      await transaction.rsvpConfirmation.update({
+        where: { id: confirmation.id },
+        data: {
+          status: "SENDING",
+          attemptCount: attemptNumber,
+          sendingAt: new Date(),
+          failureClass: null,
+          failureCode: null,
+          failureReason: null,
+          failedAt: null,
+        },
+      });
+      const parameterOrder = stringArray(confirmation.templateParameterOrder);
+      const variables = stringRecord(confirmation.templateVariables);
+      return {
+        outcome: "SEND",
+        confirmationId: confirmation.id,
+        attemptNumber,
+        input: {
+          logicalMessageId: confirmation.id,
+          to: confirmation.recipientPhoneE164,
+          templateName: confirmation.providerTemplateName,
+          languageCode: confirmation.locale === "ar_SA" ? "ar" : "en",
+          bodyParameters: parameterOrder.map((key) => variables[key] ?? ""),
+        },
+      };
+    });
+  }
+
+  public async recordRsvpConfirmationAccepted(
+    claim: ClaimedRsvpConfirmation,
+    result: ProviderMessageResult,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.$queryRaw`
+        SELECT "id" FROM "rsvp_confirmations"
+        WHERE "id" = ${claim.confirmationId}::uuid
+        FOR UPDATE
+      `;
+      const confirmation = await transaction.rsvpConfirmation.findUnique({
+        where: { id: claim.confirmationId },
+      });
+      if (
+        !confirmation ||
+        confirmation.status !== "SENDING" ||
+        confirmation.attemptCount !== claim.attemptNumber
+      ) {
+        return;
+      }
+      await transaction.rsvpConfirmation.update({
+        where: { id: confirmation.id },
+        data: {
+          status: "SENT",
+          providerMessageId: result.providerMessageId,
+          sentAt: result.acceptedAt,
+          failureClass: null,
+          failureCode: null,
+          failureReason: null,
+          failedAt: null,
+        },
+      });
+    });
+  }
+
+  public async recordRsvpConfirmationFailure(
+    claim: ClaimedRsvpConfirmation,
+    failure: {
+      readonly failureClass: "TRANSIENT" | "PERMANENT" | "AMBIGUOUS";
+      readonly providerCode: string;
+      readonly retry: boolean;
+    },
+  ): Promise<void> {
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.$queryRaw`
+        SELECT "id" FROM "rsvp_confirmations"
+        WHERE "id" = ${claim.confirmationId}::uuid
+        FOR UPDATE
+      `;
+      const confirmation = await transaction.rsvpConfirmation.findUnique({
+        where: { id: claim.confirmationId },
+      });
+      if (
+        !confirmation ||
+        confirmation.status !== "SENDING" ||
+        confirmation.attemptCount !== claim.attemptNumber
+      ) {
+        return;
+      }
+      const now = new Date();
+      await transaction.rsvpConfirmation.update({
+        where: { id: confirmation.id },
+        data: failure.retry
+          ? {
+              status: "QUEUED",
+              queuedAt: now,
+              failureClass: failure.failureClass,
+              failureCode: failure.providerCode,
+              failureReason: safeFailureReason(failure.failureClass),
+              failedAt: null,
+            }
+          : {
+              status: "FAILED",
+              failureClass: failure.failureClass,
+              failureCode: failure.providerCode,
+              failureReason: safeFailureReason(failure.failureClass),
+              failedAt: now,
+            },
+      });
+    });
+  }
+
   public async recordExhaustedSendJob(
     job: WhatsappSendJobData,
     exhaustedAt = new Date(),
@@ -363,6 +620,51 @@ export class PrismaMessagingRepository
           });
         }
         await this.updateBatchState(transaction, batch.id);
+      });
+      return;
+    }
+
+    if (job.operation === "SEND_RSVP_CONFIRMATION") {
+      await this.prisma.$transaction(async (transaction) => {
+        await transaction.$queryRaw`
+          SELECT "id" FROM "rsvp_confirmations"
+          WHERE "id" = ${job.confirmationId}::uuid
+          FOR UPDATE
+        `;
+        const confirmation = await transaction.rsvpConfirmation.findUnique({
+          where: { id: job.confirmationId },
+        });
+        if (
+          !confirmation ||
+          !["PENDING", "QUEUED", "SENDING"].includes(confirmation.status)
+        ) {
+          return;
+        }
+        const ambiguous = confirmation.status === "SENDING";
+        await transaction.rsvpConfirmation.update({
+          where: { id: confirmation.id },
+          data: {
+            status: "FAILED",
+            failureClass: ambiguous ? "AMBIGUOUS" : "TRANSIENT",
+            failureCode: "JOB_RETRY_EXHAUSTED",
+            failureReason: ambiguous
+              ? "The provider outcome is uncertain. Do not retry automatically."
+              : "Confirmation processing could not complete after bounded queue retries.",
+            failedAt: exhaustedAt,
+          },
+        });
+        await transaction.auditLog.create({
+          data: {
+            eventId: confirmation.eventId,
+            actorType: "SYSTEM",
+            action: "rsvp_confirmation.job_exhausted",
+            targetType: "RsvpConfirmation",
+            targetId: confirmation.id,
+            metadata: {
+              failureClass: ambiguous ? "AMBIGUOUS" : "TRANSIENT",
+            },
+          },
+        });
       });
       return;
     }
@@ -454,7 +756,7 @@ export class PrismaMessagingRepository
       `;
       const webhook = await transaction.webhookEvent.findUnique({
         where: { id: webhookEventId },
-        select: { status: true },
+        select: { status: true, ingestionSequence: true },
       });
       if (!webhook || ["PROCESSED", "IGNORED"].includes(webhook.status)) {
         return "IGNORED";
@@ -525,6 +827,16 @@ export class PrismaMessagingRepository
         data.failureReason = null;
         data.failedAt = null;
       }
+      const rsvpOutcome =
+        evidence.kind === "RESPONSE"
+          ? await this.applyWhatsappRsvp(
+              transaction,
+              webhookEventId,
+              webhook.ingestionSequence,
+              current,
+              evidence,
+            )
+          : null;
       await transaction.message.update({ where: { id: message.id }, data });
       await transaction.webhookEvent.update({
         where: { id: webhookEventId },
@@ -547,6 +859,7 @@ export class PrismaMessagingRepository
             provider: "META_WHATSAPP",
             evidenceType: evidence.kind,
             resultingStatus: status,
+            ...(rsvpOutcome ? { rsvpOutcome } : {}),
             ...(evidence.kind === "STATUS" && evidence.failureCode
               ? { failureCode: evidence.failureCode }
               : {}),
@@ -591,6 +904,309 @@ export class PrismaMessagingRepository
         ...(this.options.now ? { now: this.options.now() } : {}),
       }),
     };
+  }
+
+  private async applyWhatsappRsvp(
+    transaction: Prisma.TransactionClient,
+    webhookEventId: string,
+    webhookIngestionSequence: bigint,
+    message: {
+      readonly id: string;
+      readonly eventId: string;
+      readonly invitationGroupId: string;
+      readonly locale: "ar_SA" | "en";
+      readonly recipientPhoneE164: string;
+      readonly renderedContent: Prisma.JsonValue;
+    },
+    evidence: Extract<PersistedWebhookEvidence, { readonly kind: "RESPONSE" }>,
+  ): Promise<string> {
+    if (evidence.responseType !== "BUTTON" || !evidence.responseValue) {
+      return "NO_MAPPABLE_ACTION";
+    }
+    const snapshot = readRsvpSnapshot(
+      message.renderedContent,
+      evidence.responseValue,
+    );
+    if (!snapshot) return "NO_MAPPABLE_ACTION";
+
+    await transaction.$queryRaw`
+      SELECT "id" FROM "invitation_groups"
+      WHERE "id" = ${message.invitationGroupId}::uuid
+        AND "event_id" = ${message.eventId}::uuid
+      FOR UPDATE
+    `;
+    const invitation = await transaction.invitationGroup.findFirst({
+      where: {
+        id: message.invitationGroupId,
+        eventId: message.eventId,
+      },
+      include: {
+        event: true,
+        members: { orderBy: [{ position: "asc" }, { id: "asc" }] },
+        rsvp: { include: { members: true } },
+      },
+    });
+    if (!invitation || invitation.cancelledAt) return "INVITATION_UNAVAILABLE";
+
+    if (
+      snapshot.binding.invitationId !== invitation.id ||
+      snapshot.binding.invitationType !== invitation.invitationType ||
+      snapshot.binding.maxCompanions !== invitation.maxCompanions ||
+      !sameStrings(
+        snapshot.binding.memberIds,
+        invitation.members.map(({ id }) => id),
+      )
+    ) {
+      return "STALE_INVITATION_SNAPSHOT";
+    }
+
+    let mapping: ReturnType<typeof mapInvitationReplyAction>;
+    try {
+      mapping = mapInvitationReplyAction({
+        invitationType: invitation.invitationType,
+        members: invitation.members,
+        maxCompanions: invitation.maxCompanions,
+        actionId: evidence.responseValue,
+      });
+    } catch (error) {
+      if (error instanceof InvitationInvariantError) return error.code;
+      throw error;
+    }
+    if (mapping.kind === RsvpReplyActionMappingKind.MEMBER_SELECTION_REQUIRED) {
+      return "MEMBER_SELECTION_REQUIRED";
+    }
+
+    if (
+      snapshot.action.attendingMemberCount !== mapping.attendingMemberCount ||
+      snapshot.action.companionCount !== mapping.companionCount ||
+      snapshot.action.expectedAttendeeCount !== mapping.expectedAttendeeCount
+    ) {
+      return "STALE_INVITATION_SNAPSHOT";
+    }
+
+    if (
+      invitation.rsvp &&
+      (evidence.occurredAt.getTime() < invitation.rsvp.respondedAt.getTime() ||
+        (evidence.occurredAt.getTime() ===
+          invitation.rsvp.respondedAt.getTime() &&
+          (invitation.rsvp.responseWebhookSequence === null ||
+            webhookIngestionSequence <=
+              invitation.rsvp.responseWebhookSequence)))
+    ) {
+      return "STALE_RSVP_RESPONSE";
+    }
+
+    const policy = evaluateGuestRsvpPolicy({
+      eventStatus: invitation.event.status,
+      currentDate: dateInTimeZone(
+        evidence.occurredAt,
+        invitation.event.timezone,
+      ),
+      rsvpDeadline: invitation.event.rsvpDeadline
+        ? invitation.event.rsvpDeadline.toISOString().slice(0, 10)
+        : null,
+      allowRsvpEdits: invitation.event.allowRsvpEdits,
+      hasExistingRsvp: invitation.rsvp !== null,
+    });
+    if (
+      (!invitation.rsvp && !policy.canRespond) ||
+      (invitation.rsvp && !policy.canEdit)
+    ) {
+      return `POLICY_${policy.reason}`;
+    }
+
+    const keyHash = fingerprint({ source: "WHATSAPP", webhookEventId });
+    const requestHash = fingerprint({
+      actionId: mapping.actionId,
+      attendingMemberIds: [...mapping.attendingMemberIds],
+      companionCount: mapping.companionCount,
+    });
+    const existingSubmission = await transaction.rsvpSubmission.findUnique({
+      where: {
+        invitationGroupId_source_keyHash: {
+          invitationGroupId: invitation.id,
+          source: "WHATSAPP",
+          keyHash,
+        },
+      },
+    });
+    if (existingSubmission) {
+      return existingSubmission.requestHash === requestHash
+        ? "IDEMPOTENT_REPLAY"
+        : "IDEMPOTENCY_CONFLICT";
+    }
+
+    const attendingIds = new Set(mapping.attendingMemberIds);
+    const previousAttendingMemberIds = invitation.members
+      .filter((member) =>
+        invitation.rsvp?.members.some(
+          (response) =>
+            response.guestMemberId === member.id && response.attending,
+        ),
+      )
+      .map(({ id }) => id);
+    const previousResponse = {
+      status: invitation.rsvp?.status ?? "PENDING",
+      attendingMemberIds: previousAttendingMemberIds,
+      companionCount: invitation.rsvp?.companionCount ?? 0,
+      expectedAttendees: invitation.expectedAttendees,
+    } satisfies Prisma.InputJsonObject;
+    const newResponse = {
+      status: mapping.status,
+      attendingMemberIds: [...mapping.attendingMemberIds],
+      companionCount: mapping.companionCount,
+      expectedAttendees: mapping.expectedAttendeeCount,
+    } satisfies Prisma.InputJsonObject;
+    const unchanged =
+      fingerprint(previousResponse) === fingerprint(newResponse) &&
+      invitation.rsvp !== null;
+    if (unchanged) {
+      await transaction.rsvp.update({
+        where: { invitationGroupId: invitation.id },
+        data: {
+          source: "WHATSAPP",
+          respondedAt: evidence.occurredAt,
+          responseWebhookSequence: webhookIngestionSequence,
+        },
+      });
+      await transaction.rsvpSubmission.create({
+        data: {
+          invitationGroupId: invitation.id,
+          source: "WHATSAPP",
+          keyHash,
+          requestHash,
+          response: newResponse,
+        },
+      });
+      return "NO_CHANGE";
+    }
+
+    const rsvp = await transaction.rsvp.upsert({
+      where: { invitationGroupId: invitation.id },
+      create: {
+        invitationGroupId: invitation.id,
+        status: mapping.status,
+        companionCount: mapping.companionCount,
+        source: "WHATSAPP",
+        respondedAt: evidence.occurredAt,
+        responseWebhookSequence: webhookIngestionSequence,
+      },
+      update: {
+        status: mapping.status,
+        companionCount: mapping.companionCount,
+        source: "WHATSAPP",
+        respondedAt: evidence.occurredAt,
+        responseWebhookSequence: webhookIngestionSequence,
+      },
+    });
+    await transaction.rsvpMember.deleteMany({ where: { rsvpId: rsvp.id } });
+    await transaction.rsvpMember.createMany({
+      data: invitation.members.map((member) => ({
+        invitationGroupId: invitation.id,
+        rsvpId: rsvp.id,
+        guestMemberId: member.id,
+        attending: attendingIds.has(member.id),
+      })),
+    });
+    await transaction.invitationGroup.update({
+      where: { id: invitation.id },
+      data: {
+        rsvpStatus: mapping.status,
+        expectedAttendees: mapping.expectedAttendeeCount,
+      },
+    });
+    const history = await transaction.rsvpHistory.create({
+      data: {
+        invitationGroupId: invitation.id,
+        previousStatus: previousResponse.status,
+        newStatus: mapping.status,
+        previousCount: previousResponse.expectedAttendees,
+        newCount: mapping.expectedAttendeeCount,
+        previousResponse,
+        newResponse,
+        source: "WHATSAPP",
+        actorReference: message.id,
+      },
+    });
+    const now = new Date();
+    const variables = {
+      guest_name: snapshot.recipientName,
+      rsvp_status: localizedRsvpStatus(mapping.status, message.locale),
+      expected_attendees: String(mapping.expectedAttendeeCount),
+    } satisfies Prisma.InputJsonObject;
+    await transaction.rsvpConfirmation.updateMany({
+      where: {
+        invitationGroupId: invitation.id,
+        status: { in: ["PENDING", "QUEUED"] },
+      },
+      data: {
+        status: "FAILED",
+        failureClass: "PERMANENT",
+        failureCode: "SUPERSEDED_BY_NEWER_RESPONSE",
+        failureReason:
+          "A newer RSVP confirmation replaced this unsent response.",
+        failedAt: evidence.occurredAt,
+      },
+    });
+    const confirmation = await transaction.rsvpConfirmation.create({
+      data: {
+        eventId: invitation.eventId,
+        invitationGroupId: invitation.id,
+        rsvpHistoryId: history.id,
+        status: "QUEUED",
+        recipientPhoneE164: message.recipientPhoneE164,
+        locale: message.locale,
+        providerTemplateName: this.confirmationTemplate(message.locale),
+        templateVariables: variables,
+        templateParameterOrder: [
+          "guest_name",
+          "rsvp_status",
+          "expected_attendees",
+        ],
+        queuedAt: now,
+      },
+    });
+    await transaction.rsvpSubmission.create({
+      data: {
+        invitationGroupId: invitation.id,
+        rsvpHistoryId: history.id,
+        source: "WHATSAPP",
+        keyHash,
+        requestHash,
+        response: newResponse,
+      },
+    });
+    await transaction.auditLog.create({
+      data: {
+        eventId: invitation.eventId,
+        actorType: "PROVIDER",
+        action: invitation.rsvp ? "rsvp.edited" : "rsvp.created",
+        targetType: "InvitationGroup",
+        targetId: invitation.id,
+        metadata: {
+          source: "WHATSAPP",
+          historyId: history.id,
+          confirmationId: confirmation.id,
+          providerOccurredAt: evidence.occurredAt.toISOString(),
+          previousStatus: previousResponse.status,
+          newStatus: mapping.status,
+          previousExpectedAttendees: previousResponse.expectedAttendees,
+          newExpectedAttendees: mapping.expectedAttendeeCount,
+        },
+      },
+    });
+    return "RSVP_APPLIED";
+  }
+
+  private confirmationTemplate(locale: "ar_SA" | "en"): string {
+    if (locale === "ar_SA") {
+      return (
+        this.options?.rsvpConfirmationTemplateAr ?? "dawah_rsvp_confirmation_ar"
+      );
+    }
+    return (
+      this.options?.rsvpConfirmationTemplateEn ?? "dawah_rsvp_confirmation_en"
+    );
   }
 
   private async updateBatchState(
@@ -670,6 +1286,168 @@ function stringRecord(value: Prisma.JsonValue): Record<string, string> {
       (entry): entry is [string, string] => typeof entry[1] === "string",
     ),
   );
+}
+
+interface SnapshottedRsvpContext {
+  readonly recipientName: string;
+  readonly binding: {
+    readonly invitationId: string;
+    readonly invitationType: string;
+    readonly memberIds: readonly string[];
+    readonly maxCompanions: number;
+  };
+  readonly action: {
+    readonly attendingMemberCount: number | null;
+    readonly companionCount: number | null;
+    readonly expectedAttendeeCount: number | null;
+  };
+}
+
+function snapshotReplyActionIds(
+  renderedContent: Prisma.JsonValue,
+): readonly string[] {
+  if (
+    typeof renderedContent !== "object" ||
+    renderedContent === null ||
+    Array.isArray(renderedContent) ||
+    !Array.isArray(renderedContent.replyActions)
+  ) {
+    return [];
+  }
+  const ids = renderedContent.replyActions.map((action) => {
+    if (
+      typeof action !== "object" ||
+      action === null ||
+      Array.isArray(action) ||
+      typeof action.id !== "string" ||
+      !/^[A-Z0-9_]{1,128}$/.test(action.id)
+    ) {
+      throw new Error("Stored message reply actions are invalid.");
+    }
+    return action.id;
+  });
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("Stored message reply action IDs must be unique.");
+  }
+  return ids;
+}
+
+function readRsvpSnapshot(
+  renderedContent: Prisma.JsonValue,
+  actionId: string,
+): SnapshottedRsvpContext | null {
+  if (
+    typeof renderedContent !== "object" ||
+    renderedContent === null ||
+    Array.isArray(renderedContent)
+  ) {
+    return null;
+  }
+  const binding = renderedContent.rsvpBinding;
+  if (
+    typeof binding !== "object" ||
+    binding === null ||
+    Array.isArray(binding) ||
+    binding.version !== 1 ||
+    typeof binding.invitationId !== "string" ||
+    typeof binding.invitationType !== "string" ||
+    typeof binding.maxCompanions !== "number" ||
+    !Number.isSafeInteger(binding.maxCompanions) ||
+    binding.maxCompanions < 0 ||
+    !Array.isArray(binding.memberIds) ||
+    binding.memberIds.length === 0 ||
+    !binding.memberIds.every(
+      (memberId): memberId is string =>
+        typeof memberId === "string" && memberId.length > 0,
+    ) ||
+    typeof renderedContent.recipientName !== "string" ||
+    renderedContent.recipientName.trim().length === 0
+  ) {
+    return null;
+  }
+  const actions = renderedContent.replyActions;
+  if (!Array.isArray(actions)) return null;
+  const action = actions.find(
+    (candidate) =>
+      typeof candidate === "object" &&
+      candidate !== null &&
+      !Array.isArray(candidate) &&
+      candidate.id === actionId,
+  );
+  if (typeof action !== "object" || action === null || Array.isArray(action)) {
+    return null;
+  }
+  const attendingMemberCount = snapshotCount(action.attendingMemberCount);
+  const companionCount = snapshotCount(action.companionCount);
+  const expectedAttendeeCount = snapshotCount(action.expectedAttendeeCount);
+  if (!attendingMemberCount || !companionCount || !expectedAttendeeCount) {
+    return null;
+  }
+  return {
+    recipientName: renderedContent.recipientName,
+    binding: {
+      invitationId: binding.invitationId,
+      invitationType: binding.invitationType,
+      memberIds: binding.memberIds,
+      maxCompanions: binding.maxCompanions,
+    },
+    action: {
+      attendingMemberCount: attendingMemberCount.value,
+      companionCount: companionCount.value,
+      expectedAttendeeCount: expectedAttendeeCount.value,
+    },
+  };
+}
+
+function snapshotCount(
+  value: unknown,
+): { readonly value: number | null } | null {
+  if (value === null) return { value: null };
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? { value }
+    : null;
+}
+
+function sameStrings(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+function dateInTimeZone(value: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: "year" | "month" | "day") =>
+    parts.find((entry) => entry.type === type)?.value;
+  const year = part("year");
+  const month = part("month");
+  const day = part("day");
+  if (!year || !month || !day) {
+    throw new Error("The event time zone could not be formatted.");
+  }
+  return `${year}-${month}-${day}`;
+}
+
+function localizedRsvpStatus(
+  status: "ACCEPTED" | "PARTIALLY_ACCEPTED" | "DECLINED",
+  locale: "ar_SA" | "en",
+): string {
+  if (locale === "en") {
+    if (status === "ACCEPTED") return "Attending";
+    if (status === "PARTIALLY_ACCEPTED") return "Partially attending";
+    return "Not attending";
+  }
+  if (status === "ACCEPTED") return "حضور مؤكد";
+  if (status === "PARTIALLY_ACCEPTED") return "حضور جزئي";
+  return "اعتذار عن الحضور";
 }
 
 function toPurpose(value: string): ClaimedMessage["purpose"] {

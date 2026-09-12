@@ -6,6 +6,7 @@ import {
   defaultJobOptions,
   queueNames,
   whatsappBatchJobId,
+  whatsappRsvpConfirmationJobs,
   whatsappWebhookJobId,
   type WhatsappSendJobData,
   type WhatsappWebhookJobData,
@@ -17,11 +18,16 @@ export class MessagingQueueService implements OnModuleDestroy {
   private readonly connection;
   private readonly sendQueue: Queue<WhatsappSendJobData>;
   private readonly webhookQueue: Queue<WhatsappWebhookJobData>;
+  private readonly confirmationMaximumAttempts: number;
 
   public constructor(config: ConfigService<ApiEnvironment, true>) {
     this.connection = createProducerRedis(
       config.get("REDIS_URL", { infer: true }),
       "dawah-api-messaging",
+    );
+    this.confirmationMaximumAttempts = config.get(
+      "META_WHATSAPP_MAX_ATTEMPTS",
+      { infer: true },
     );
     const queueOptions = {
       connection: this.connection,
@@ -58,6 +64,22 @@ export class MessagingQueueService implements OnModuleDestroy {
     );
     await Promise.all(jobs.map((job) => this.retryFailedJob(job)));
     return jobs;
+  }
+
+  public async enqueueRsvpConfirmation(
+    confirmationId: string,
+  ): Promise<unknown> {
+    const definition = whatsappRsvpConfirmationJobs(
+      [confirmationId],
+      this.confirmationMaximumAttempts,
+    )[0]!;
+    const job = await this.sendQueue.add(
+      definition.name,
+      definition.data,
+      definition.opts,
+    );
+    await this.retryFailedJob(job);
+    return job;
   }
 
   public async onModuleDestroy(): Promise<void> {
