@@ -83,7 +83,8 @@ export function EventSending({
   const approvedTemplates = useMemo(
     () =>
       (templates.data ?? []).filter(
-        (template) => template.status === "APPROVED",
+        (template) =>
+          template.purpose === "INVITATION" && template.status === "APPROVED",
       ),
     [templates.data],
   );

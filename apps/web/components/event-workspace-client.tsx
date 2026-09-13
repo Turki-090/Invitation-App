@@ -39,7 +39,10 @@ import { useForm } from "react-hook-form";
 import { LocaleSwitcher } from "./locale-switcher";
 import { GuestManagement } from "./guest-management";
 import { EventPreparation } from "./event-preparation";
+import { EventReminders } from "./event-reminders";
 import { EventSending } from "./event-sending";
+import { EventTeam } from "./event-team";
+import { NotificationCenter } from "./notification-center";
 import type { AppLocale } from "../i18n/config";
 import type { Dictionary } from "../i18n/dictionaries";
 import {
@@ -54,7 +57,13 @@ import {
 import { getSupabaseClient } from "../lib/supabase";
 
 type WorkspaceSection =
-  "overview" | "guests" | "preparation" | "sending" | "settings";
+  | "overview"
+  | "guests"
+  | "preparation"
+  | "sending"
+  | "reminders"
+  | "team"
+  | "settings";
 type EditableEventStatus = Exclude<EventDetail["status"], "ARCHIVED">;
 
 interface EventWorkspaceClientProps {
@@ -63,8 +72,11 @@ interface EventWorkspaceClientProps {
   section: WorkspaceSection;
   copy: Dictionary["workspace"];
   guestsCopy: Dictionary["guests"];
+  notificationsCopy: Dictionary["notifications"];
   preparationCopy: Dictionary["preparation"];
+  remindersCopy: Dictionary["reminders"];
   sendingCopy: Dictionary["sending"];
+  teamCopy: Dictionary["team"];
   eventsCopy: Dictionary["events"];
   common: Dictionary["common"];
   shellCopy: Dictionary["shell"];
@@ -93,8 +105,11 @@ export function EventWorkspaceClient({
   section,
   copy,
   guestsCopy,
+  notificationsCopy,
   preparationCopy,
+  remindersCopy,
   sendingCopy,
+  teamCopy,
   eventsCopy,
   common,
   shellCopy,
@@ -142,23 +157,30 @@ export function EventWorkspaceClient({
       icon: "layout-dashboard" as const,
       active: section === "overview",
     },
-    {
-      id: "guests",
-      label: guestsCopy.navigation,
-      href: `/${locale}/events/${eventId}/guests`,
-      icon: "users" as const,
-      active: section === "guests",
-    },
-    {
-      id: "preparation",
-      label: preparationCopy.navigation,
-      href: `/${locale}/events/${eventId}/preparation`,
-      icon: "file-text" as const,
-      active: section === "preparation",
-    },
-    ...(event.data?.canSendInvitations === false
-      ? []
-      : [
+    ...(event.data?.canViewGuests
+      ? [
+          {
+            id: "guests",
+            label: guestsCopy.navigation,
+            href: `/${locale}/events/${eventId}/guests`,
+            icon: "users" as const,
+            active: section === "guests",
+          },
+        ]
+      : []),
+    ...(event.data?.canPrepareInvitations
+      ? [
+          {
+            id: "preparation",
+            label: preparationCopy.navigation,
+            href: `/${locale}/events/${eventId}/preparation`,
+            icon: "file-text" as const,
+            active: section === "preparation",
+          },
+        ]
+      : []),
+    ...(event.data?.canSendInvitations
+      ? [
           {
             id: "sending",
             label: sendingCopy.navigation,
@@ -166,14 +188,41 @@ export function EventWorkspaceClient({
             icon: "send" as const,
             active: section === "sending",
           },
-        ]),
-    {
-      id: "settings",
-      label: copy.settings,
-      href: `/${locale}/events/${eventId}/settings`,
-      icon: "settings" as const,
-      active: section === "settings",
-    },
+        ]
+      : []),
+    ...(event.data?.canSendReminders
+      ? [
+          {
+            id: "reminders",
+            label: remindersCopy.navigation,
+            href: `/${locale}/events/${eventId}/reminders`,
+            icon: "bell" as const,
+            active: section === "reminders",
+          },
+        ]
+      : []),
+    ...(event.data?.canManageTeam
+      ? [
+          {
+            id: "team",
+            label: teamCopy.navigation,
+            href: `/${locale}/events/${eventId}/team`,
+            icon: "user-plus" as const,
+            active: section === "team",
+          },
+        ]
+      : []),
+    ...(event.data?.canEditEvent || event.data?.canArchiveEvent
+      ? [
+          {
+            id: "settings",
+            label: copy.settings,
+            href: `/${locale}/events/${eventId}/settings`,
+            icon: "settings" as const,
+            active: section === "settings",
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -230,6 +279,14 @@ export function EventWorkspaceClient({
             label={common.language}
             locale={locale}
           />
+          <NotificationCenter
+            common={common}
+            copy={notificationsCopy}
+            enabled={apiAvailable}
+            eventId={eventId}
+            locale={locale}
+            supabase={supabase}
+          />
         </div>
       }
       utility={
@@ -266,6 +323,8 @@ export function EventWorkspaceClient({
             icon="circle-alert"
             title={copy.loadErrorTitle}
           />
+        ) : section === "guests" && !event.data.canViewGuests ? (
+          <PermissionDenied copy={copy} />
         ) : section === "guests" ? (
           <GuestManagement
             common={common}
@@ -274,6 +333,8 @@ export function EventWorkspaceClient({
             locale={locale}
             supabase={supabase}
           />
+        ) : section === "preparation" && !event.data.canPrepareInvitations ? (
+          <PermissionDenied copy={copy} />
         ) : section === "preparation" ? (
           <EventPreparation
             common={common}
@@ -296,6 +357,38 @@ export function EventWorkspaceClient({
             locale={locale}
             supabase={supabase}
           />
+        ) : section === "reminders" && !event.data.canSendReminders ? (
+          <EmptyState
+            description={remindersCopy.permissionDeniedDescription}
+            icon="circle-alert"
+            title={remindersCopy.permissionDeniedTitle}
+          />
+        ) : section === "reminders" ? (
+          <EventReminders
+            common={common}
+            copy={remindersCopy}
+            eventId={eventId}
+            locale={locale}
+            supabase={supabase}
+          />
+        ) : section === "team" && !event.data.canManageTeam ? (
+          <EmptyState
+            description={teamCopy.permissionDeniedDescription}
+            icon="circle-alert"
+            title={teamCopy.permissionDeniedTitle}
+          />
+        ) : section === "team" ? (
+          <EventTeam
+            common={common}
+            copy={teamCopy}
+            eventId={eventId}
+            locale={locale}
+            supabase={supabase}
+          />
+        ) : section === "settings" &&
+          !event.data.canEditEvent &&
+          !event.data.canArchiveEvent ? (
+          <PermissionDenied copy={copy} />
         ) : section === "settings" ? (
           <EventSettings
             common={common}
@@ -324,6 +417,16 @@ export function EventWorkspaceClient({
         )}
       </section>
     </HostShell>
+  );
+}
+
+function PermissionDenied({ copy }: { copy: Dictionary["workspace"] }) {
+  return (
+    <EmptyState
+      description={copy.permissionDeniedDescription}
+      icon="circle-alert"
+      title={copy.permissionDeniedTitle}
+    />
   );
 }
 
@@ -504,7 +607,7 @@ function EventOverview({
         subtitle={copy.lifecycleDescription}
         title={copy.lifecycleTitle}
       >
-        {event.role === "OWNER" && event.availableTransitions.length ? (
+        {event.canEditEvent && event.availableTransitions.length ? (
           <div className="lifecycle-actions">
             {event.availableTransitions
               .filter(
@@ -594,7 +697,7 @@ function EventSettings({
           <h1>{copy.settingsTitle}</h1>
           <p>{copy.settingsDescription}</p>
         </div>
-        {event.role === "OWNER" ? (
+        {event.canEditEvent ? (
           <div className="workspace-header-actions">
             <Button
               disabled={save.isPending}
@@ -614,9 +717,7 @@ function EventSettings({
         ) : null}
       </header>
 
-      {event.role !== "OWNER" ? (
-        <Banner icon="lock" kind="warning" title={copy.ownerOnly} />
-      ) : (
+      {event.canEditEvent ? (
         <form
           className="workspace-settings-grid"
           id="event-settings-form"
@@ -769,21 +870,39 @@ function EventSettings({
                 />
               </div>
             </Card>
-            <Card
-              className="workspace-danger-card"
-              subtitle={copy.dangerDescription}
-              title={copy.dangerTitle}
-            >
-              <Button
-                icon="archive"
-                onClick={() => setArchiveOpen(true)}
-                variant="danger-soft"
+            {event.canArchiveEvent ? (
+              <Card
+                className="workspace-danger-card"
+                subtitle={copy.dangerDescription}
+                title={copy.dangerTitle}
               >
-                {copy.archive}
-              </Button>
-            </Card>
+                <Button
+                  icon="archive"
+                  onClick={() => setArchiveOpen(true)}
+                  variant="danger-soft"
+                >
+                  {copy.archive}
+                </Button>
+              </Card>
+            ) : null}
           </div>
         </form>
+      ) : event.canArchiveEvent ? (
+        <Card
+          className="workspace-danger-card"
+          subtitle={copy.dangerDescription}
+          title={copy.dangerTitle}
+        >
+          <Button
+            icon="archive"
+            onClick={() => setArchiveOpen(true)}
+            variant="danger-soft"
+          >
+            {copy.archive}
+          </Button>
+        </Card>
+      ) : (
+        <Banner icon="lock" kind="warning" title={copy.permissionDeniedTitle} />
       )}
 
       {save.isError ? (

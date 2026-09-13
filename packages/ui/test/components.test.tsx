@@ -1,5 +1,5 @@
 import "./setup";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { useState } from "react";
@@ -177,6 +177,48 @@ describe("design-system interactions", () => {
     );
     expect(screen.getAllByRole("link", { name: "Overview" })).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+  });
+
+  it("keeps every item exposed in mobile navigation", () => {
+    const items = [
+      "Overview",
+      "Guests",
+      "Preparation",
+      "Sending",
+      "Reminders",
+      "Team",
+      "Settings",
+    ].map((label, index) => ({
+      href: `#section-${index + 1}`,
+      icon: "layout-dashboard" as const,
+      id: `section-${index + 1}`,
+      label,
+    }));
+    const { container } = render(
+      <HostShell
+        brand={<span>Dawah</span>}
+        collapseLabel="Collapse navigation"
+        expandLabel="Expand navigation"
+        items={items}
+        navigationLabel="Primary navigation"
+      >
+        <p>Workspace</p>
+      </HostShell>,
+    );
+    const mobileNavigation =
+      container.querySelector<HTMLElement>(".dawah-bottom-nav");
+    expect(mobileNavigation).not.toBeNull();
+    const mobileLinks = within(mobileNavigation!).getAllByRole("link");
+    expect(mobileLinks).toHaveLength(items.length);
+    expect(mobileLinks.map((link) => link.textContent)).toEqual(
+      items.map((item) => item.label),
+    );
+    const finalLink = within(mobileNavigation!).getByRole("link", {
+      name: "Settings",
+    });
+    expect(finalLink.getAttribute("href")).toBe("#section-7");
+    finalLink.focus();
+    expect(document.activeElement).toBe(finalLink);
   });
 
   it("propagates required and invalid field semantics to the native control", () => {

@@ -1,9 +1,9 @@
 # Dawah production and release plan
 
-Status date: 2026-09-12
+Status date: 2026-09-13
 
 The “Current position” section reflects the verified repository state through
-Stage 7. Dated completion records under each roadmap stage remain the detailed
+Stage 8. Dated completion records under each roadmap stage remain the detailed
 source of evidence.
 
 This plan maps the current repository to the requirements in `GPT — Wedding Platform Master Business & Technical Build Specification.md` and the visual rules in `System Design/`. It targets a production web release for Saudi Arabia and the GCC. Native iOS and Android applications remain a post-web-release phase and are not a launch dependency.
@@ -29,29 +29,29 @@ QR check-in can launch behind a feature flag during the controlled pilot. Native
 
 ### Executive assessment
 
-Stages 1 through 7 have closed their repository exit gates. The application now
+Stages 1 through 8 have closed their repository exit gates. The application now
 has a tested end-to-end host and guest loop: authentication, localized event
 management, guest preparation, asynchronous WhatsApp delivery, accountless
 public invitations, RSVP edits, confirmation messages, and reconciled dashboard
-counts. The product is not ready for general availability: reminders and team
-collaboration, reports/exports/credits/check-in, and production assurance remain
-in Stages 8 through 10.
+counts, plus explainable reminders and event-scoped team collaboration. The
+product is not ready for general availability: reports, exports, credits,
+check-in, and production assurance remain in Stages 9 and 10.
 
 Current delivery state:
 
-| Scope                       | Status          | Remaining work                                                                      |
-| --------------------------- | --------------- | ----------------------------------------------------------------------------------- |
-| Engineering foundation      | Complete        | Production deployment and operations are intentionally completed in Stage 10.       |
-| MVP 1 — Foundation          | Complete        | No open repository exit-gate work.                                                  |
-| MVP 2 — Event creation      | Complete        | No open repository exit-gate work.                                                  |
-| MVP 3 — Guest management    | Complete        | No separate post-release import expansion is planned.                               |
-| MVP 4 — WhatsApp            | Complete        | Live provider acceptance is tracked under Stage 10 staging assurance.               |
-| MVP 5 — RSVP                | Complete        | Live provider acceptance is tracked under Stage 10 staging assurance.               |
-| MVP 6 — Reminders           | Not started     | Stage 8 reminder rules, scheduling, history, and duplicate protection.              |
-| MVP 7 — Team                | Foundation only | Stage 8 co-host lifecycle, full permission enforcement, UI, and matrix tests.       |
-| MVP 8 — Reports and billing | Not started     | Stage 9 reports, private exports, credit ledger, and payment abstraction.           |
-| MVP 9 — Check-in            | Not started     | Stage 9 feature-flagged QR and event-day workflow.                                  |
-| Public-release readiness    | Not started     | Stage 10 environments, assurance, compliance, pilot, and general-availability work. |
+| Scope                       | Status      | Remaining work                                                                      |
+| --------------------------- | ----------- | ----------------------------------------------------------------------------------- |
+| Engineering foundation      | Complete    | Production deployment and operations are intentionally completed in Stage 10.       |
+| MVP 1 — Foundation          | Complete    | No open repository exit-gate work.                                                  |
+| MVP 2 — Event creation      | Complete    | No open repository exit-gate work.                                                  |
+| MVP 3 — Guest management    | Complete    | No separate post-release import expansion is planned.                               |
+| MVP 4 — WhatsApp            | Complete    | Live provider acceptance is tracked under Stage 10 staging assurance.               |
+| MVP 5 — RSVP                | Complete    | Live provider acceptance is tracked under Stage 10 staging assurance.               |
+| MVP 6 — Reminders           | Complete    | No open repository exit-gate work; live provider acceptance remains Stage 10.       |
+| MVP 7 — Team                | Complete    | No open repository exit-gate work.                                                  |
+| MVP 8 — Reports and billing | Not started | Stage 9 reports, private exports, credit ledger, and payment abstraction.           |
+| MVP 9 — Check-in            | Not started | Stage 9 feature-flagged QR and event-day workflow.                                  |
+| Public-release readiness    | Not started | Stage 10 environments, assurance, compliance, pilot, and general-availability work. |
 
 ### What is implemented now
 
@@ -74,26 +74,30 @@ Current delivery state:
 - Secure accountless invitation capabilities and a mobile-first guest RSVP flow,
   including atomic member coverage, history, idempotency, host and guest edits,
   deterministic WhatsApp actions, and serialized confirmation delivery.
+- Event-scoped co-host and check-in-staff invitations with phone-bound one-time
+  acceptance credentials, revocation, default roles, exact custom allow-lists,
+  delegation ceilings, owner-only capabilities, team screens, and operational
+  notifications.
+- Manual and scheduled reminders with server-confirmed eligibility, immutable
+  decisions, cooldown and maximum-send controls, claim-time revalidation,
+  deterministic queue identity, pending-batch recovery, and localized host UI.
 - Verified forward migrations and broad unit, contract, component, accessibility,
   visual, database, queue, startup, and production-container coverage through
-  Stage 7.
+  Stage 8.
 
 ### Important gaps and risks
 
-1. **Reminders and collaboration are still absent.** Stage 8 must add safe
-   reminder eligibility/scheduling and the complete co-host lifecycle without
-   weakening event isolation.
-2. **Reporting, exports, commercial accounting, and check-in are still absent.**
+1. **Reporting, exports, commercial accounting, and check-in are still absent.**
    Stage 9 must add reconciled server queries, asynchronous private exports, an
    append-only credit ledger, and feature-flagged event-day scanning.
-3. **No real staging provider exercise has been recorded.** Repository mocks and
+2. **No real staging provider exercise has been recorded.** Repository mocks and
    contract tests are comprehensive, but Stage 10 must exercise Meta templates,
    signed media, callbacks, and RSVP confirmations using deployed
    non-production configuration.
-4. **Production operations remain unproven.** Isolated environments,
+3. **Production operations remain unproven.** Isolated environments,
    observability, alerting, backup/PITR recovery, rollback, outage, queue-backlog,
    and credential-rotation drills remain Stage 10 work.
-5. **Release governance remains open.** Saudi PDPL operational/legal review,
+4. **Release governance remains open.** Saudi PDPL operational/legal review,
    security review, staging acceptance, the controlled Saudi pilot, remediation,
    named ownership, and final go/no-go approval have not occurred.
 
@@ -406,7 +410,7 @@ Implementation record (completed 2026-09-12):
 
 Goal: complete MVP 6 and MVP 7 without weakening event isolation or causing reminder spam.
 
-Status: **Next** — active implementation stage after the completed Stage 7 gate.
+Status: **Complete** — repository exit gate verified on 2026-09-13.
 
 Work:
 
@@ -423,11 +427,42 @@ Exit gate:
 - Owners and co-hosts can collaborate according to explicit event-scoped permissions.
 - Reminder selection is explainable, audited, idempotent, and protected against accidental repeated sends.
 
+Implementation record:
+
+- Added event team invitations, phone-bound one-time acceptance, membership
+  lifecycle, default roles, exact custom permission allow-lists, delegation
+  ceilings, non-delegable owner capabilities, team management screens, and
+  localized invitation acceptance.
+- Routed event APIs through the central active-membership permission evaluator,
+  including purpose-scoped template preparation. Cross-event identifiers remain
+  indistinguishable from missing resources, and full phone visibility remains a
+  separate capability.
+- Added reminder rules, immutable run decisions, recipient cooldown state,
+  manual confirmation, scheduled evaluation, claim-time RSVP/cancellation
+  revalidation, idempotent send batches, history, audits, and meaningful
+  completion/failure notifications.
+- Added deterministic reminder sweep and dispatch jobs. Each sweep also
+  reconciles durable queued reminder batches so an enqueue interruption after
+  database commit cannot strand work or create a duplicate logical send.
+- Added Arabic/English reminder, team, acceptance, and notification interfaces,
+  including creation, approval, and snapshot preparation for reminder-purpose
+  templates.
+- Added the reviewed Stage 8 forward migration with tenant-safe composite keys,
+  lifecycle and JSON-shape checks, one-pending-invite and reminder-run uniqueness,
+  immutable decision evidence, and owner-membership protection triggers.
+- Verification recorded on 2026-09-13: all 374 unit, contract, component,
+  provider, storage, API, and worker tests; all 35 real-PostgreSQL integration
+  tests; format; lint; OpenAPI validation and generated-client drift; Prisma
+  validation and schema drift; type checks; production builds; tracked-artifact
+  checks; startup smoke; all 46 Storybook accessibility/visual cases; and
+  production API/worker container readiness passed. The repository exit gate is
+  closed. Live provider acceptance remains Stage 10 deployed-environment work.
+
 ### Stage 9 — Complete reports, exports, credits, and event-day check-in
 
 Goal: deliver MVP 8 and a feature-flagged MVP 9 suitable for a controlled event pilot.
 
-Status: **Planned** — begins after the Stage 8 exit gate closes.
+Status: **Next** — active implementation stage after the completed Stage 8 gate.
 
 Work:
 
@@ -488,9 +523,9 @@ Exit gate:
 
 ## Immediate next action
 
-Begin Stage 8 with the reminder eligibility domain model and event-scoped team
-permission matrix, then carry each vertical slice through persistence, API,
-authorization, tests, and localized UI. In parallel, prepare the Stage 10
-staging dependencies needed for the live Meta acceptance exercise: approved
-templates, a non-production phone-number ID and recipient, public HTTPS media and
-webhook routes, and securely managed credentials.
+Begin Stage 9 with reconciled report aggregates and asynchronous private exports,
+then add the append-only credit ledger and feature-flagged check-in workflow. In
+parallel, prepare the Stage 10 staging dependencies needed for the live Meta
+acceptance exercise: approved templates, a non-production phone-number ID and
+recipient, public HTTPS media and webhook routes, and securely managed
+credentials.

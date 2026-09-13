@@ -34,29 +34,41 @@ export class TestDatabase {
   public async clean(): Promise<void> {
     assertTestDatabase(this.databaseUrl);
 
-    await this.prisma.$transaction([
-      this.prisma.webhookEvent.deleteMany(),
-      this.prisma.messageAttempt.deleteMany(),
-      this.prisma.idempotencyRecord.deleteMany(),
-      this.prisma.message.deleteMany(),
-      this.prisma.sendBatch.deleteMany(),
-      this.prisma.rsvpConfirmation.deleteMany(),
-      this.prisma.rsvpSubmission.deleteMany(),
-      this.prisma.rsvpMember.deleteMany(),
-      this.prisma.rsvpHistory.deleteMany(),
-      this.prisma.rsvp.deleteMany(),
-      this.prisma.publicInvitationCapability.deleteMany(),
-      this.prisma.invitationContentSnapshot.deleteMany(),
-      this.prisma.guestMember.deleteMany(),
-      this.prisma.importRow.deleteMany(),
-      this.prisma.importJob.deleteMany(),
-      this.prisma.invitationTemplate.deleteMany(),
-      this.prisma.storedAsset.deleteMany(),
-      this.prisma.invitationGroup.deleteMany(),
-      this.prisma.auditLog.deleteMany(),
-      this.prisma.eventMembership.deleteMany(),
-      this.prisma.event.deleteMany(),
-      this.prisma.user.deleteMany(),
-    ]);
+    // Row-level lifecycle triggers intentionally make reminder decisions and
+    // audit evidence append-only in production. TRUNCATE is appropriate only
+    // in the guarded disposable integration database and keeps test isolation
+    // independent of those production invariants.
+    await this.prisma.$executeRawUnsafe(`
+      TRUNCATE TABLE
+        "webhook_events",
+        "message_attempts",
+        "notifications",
+        "reminder_recipient_states",
+        "reminder_run_items",
+        "idempotency_records",
+        "reminder_runs",
+        "messages",
+        "send_batches",
+        "rsvp_confirmations",
+        "rsvp_submissions",
+        "rsvp_members",
+        "rsvp_history",
+        "rsvps",
+        "public_invitation_capabilities",
+        "invitation_content_snapshots",
+        "guest_members",
+        "import_rows",
+        "import_jobs",
+        "reminder_rules",
+        "invitation_templates",
+        "stored_assets",
+        "invitation_groups",
+        "audit_logs",
+        "team_invitations",
+        "event_memberships",
+        "events",
+        "users"
+      RESTART IDENTITY CASCADE
+    `);
   }
 }

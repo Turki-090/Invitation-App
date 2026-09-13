@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultJobOptions,
+  reminderRunJobId,
+  reminderRunJobs,
+  reminderSweepJobData,
+  reminderSweepSchedulerId,
   whatsappBatchJobId,
   whatsappMessageJobId,
   whatsappMessageJobs,
@@ -8,6 +12,35 @@ import {
   whatsappRsvpConfirmationJobs,
   whatsappWebhookJobId,
 } from "./index";
+
+describe("reminder queue identifiers", () => {
+  it("creates stable PII-free sweep and rule-run definitions", () => {
+    expect(reminderSweepSchedulerId).toBe("automatic-reminder-sweep");
+    expect(reminderSweepJobData()).toEqual({ operation: "SWEEP" });
+    expect(reminderRunJobId("rule-id", "a".repeat(64))).toBe(
+      `reminder-run-rule-id-${"a".repeat(64)}`,
+    );
+  });
+
+  it("builds deterministic bounded rule jobs", () => {
+    const run = {
+      eventId: "event-id",
+      ruleId: "rule-id",
+      scheduleKey: "b".repeat(64),
+      scheduledFor: "2026-09-12T12:00:00.000Z",
+    };
+    expect(reminderRunJobs([run])).toEqual([
+      {
+        name: "run",
+        data: { operation: "RUN", ...run },
+        opts: {
+          jobId: `reminder-run-rule-id-${"b".repeat(64)}`,
+          ...defaultJobOptions,
+        },
+      },
+    ]);
+  });
+});
 
 describe("WhatsApp queue identifiers", () => {
   it("creates deterministic PII-free job identifiers", () => {

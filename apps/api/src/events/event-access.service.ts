@@ -8,6 +8,7 @@ import {
   hasPermission,
   MembershipRole,
   Permission,
+  type PermissionConfiguration,
   type Permission as PermissionValue,
 } from "@dawah/domain";
 import type { EventMembership, Prisma, User } from "@prisma/client";
@@ -43,13 +44,35 @@ export class EventAccessService {
     });
   }
 
-  public async resolve(
+  public resolve(
     principal: AuthPrincipal,
     eventId: string,
     permission: PermissionValue,
     client: EventAccessClient = this.prisma,
   ) {
+    return this.resolveAny(principal, eventId, [permission], client);
+  }
+
+  public async resolveAny(
+    principal: AuthPrincipal,
+    eventId: string,
+    permissions: readonly PermissionValue[],
+    client: EventAccessClient = this.prisma,
+  ) {
+    if (permissions.length === 0) {
+      throw new RangeError("At least one event permission is required.");
+    }
     const user = await this.ensureUser(principal, client);
+    if (client !== this.prisma) {
+      await client.$queryRaw`
+        SELECT "id"
+        FROM "event_memberships"
+        WHERE "event_id" = ${eventId}::uuid
+          AND "user_id" = ${user.id}::uuid
+          AND "status" = 'ACTIVE'
+        FOR SHARE
+      `;
+    }
     const membership = await client.eventMembership.findFirst({
       where: { eventId, userId: user.id, status: "ACTIVE" },
       include: { event: true },
@@ -64,7 +87,9 @@ export class EventAccessService {
       });
     }
 
-    if (!this.allows(membership, permission)) {
+    if (
+      !permissions.some((permission) => this.allows(membership, permission))
+    ) {
       throw new ForbiddenException({
         code: "EVENT_PERMISSION_DENIED",
         message: "The event membership lacks the required permission.",
@@ -86,16 +111,44 @@ export class EventAccessService {
     return hasPermission(
       membership.role as MembershipRole,
       permission,
-      this.permissionOverrides(membership.permissionsJson),
+      this.permissionConfiguration(membership.permissionsJson),
     );
   }
 
-  private permissionOverrides(value: Prisma.JsonValue): PermissionValue[] {
-    if (!Array.isArray(value)) return [];
-    return value.filter(
-      (entry): entry is PermissionValue =>
-        typeof entry === "string" &&
-        knownPermissions.has(entry as PermissionValue),
+  public effectivePermissions(
+    membership: EventAccessMembership,
+  ): readonly PermissionValue[] {
+    return Object.values(Permission).filter((permission) =>
+      this.allows(membership, permission),
     );
+  }
+
+  public permissionConfiguration(
+    value: Prisma.JsonValue,
+  ): PermissionConfiguration {
+    if (Array.isArray(value)) {
+      return value.filter(
+        (entry): entry is PermissionValue =>
+          typeof entry === "string" &&
+          knownPermissions.has(entry as PermissionValue),
+      );
+    }
+    if (
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      value.mode === "CUSTOM" &&
+      Array.isArray(value.permissions)
+    ) {
+      return {
+        mode: "CUSTOM",
+        permissions: value.permissions.filter(
+          (entry): entry is PermissionValue =>
+            typeof entry === "string" &&
+            knownPermissions.has(entry as PermissionValue),
+        ),
+      };
+    }
+    return [];
   }
 }

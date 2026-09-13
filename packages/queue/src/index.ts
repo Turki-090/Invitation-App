@@ -31,6 +31,46 @@ export interface WhatsappWebhookJobData {
   readonly webhookEventId: string;
 }
 
+export type ReminderJobData =
+  | { readonly operation: "SWEEP" }
+  | {
+      readonly operation: "RUN";
+      readonly eventId: string;
+      readonly ruleId: string;
+      /** SHA-256 persistence key for one rule/evaluation slot. */
+      readonly scheduleKey: string;
+      /** ISO instant at the start of the deterministic evaluation slot. */
+      readonly scheduledFor: string;
+    };
+
+export interface ReminderRunJob {
+  readonly eventId: string;
+  readonly ruleId: string;
+  readonly scheduleKey: string;
+  readonly scheduledFor: string;
+}
+
+export const reminderSweepSchedulerId = "automatic-reminder-sweep";
+
+export function reminderSweepJobData(): ReminderJobData {
+  return { operation: "SWEEP" };
+}
+
+export function reminderRunJobId(ruleId: string, scheduleKey: string): string {
+  return `reminder-run-${ruleId}-${scheduleKey}`;
+}
+
+export function reminderRunJobs(runs: readonly ReminderRunJob[]) {
+  return runs.map((run) => ({
+    name: "run" as const,
+    data: { operation: "RUN" as const, ...run },
+    opts: {
+      jobId: reminderRunJobId(run.ruleId, run.scheduleKey),
+      ...defaultJobOptions,
+    },
+  }));
+}
+
 export function whatsappBatchJobId(batchId: string): string {
   return `batch-${batchId}`;
 }

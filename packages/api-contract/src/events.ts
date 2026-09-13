@@ -1,4 +1,4 @@
-import { EventStatus } from "@dawah/domain";
+import { ALL_PERMISSIONS, EventStatus } from "@dawah/domain";
 import { z } from "zod";
 
 export const EVENT_TYPES = [
@@ -184,6 +184,7 @@ const eventStatusSchema = z.enum([
 ]);
 
 const membershipRoleSchema = z.enum(["OWNER", "CO_HOST", "CHECK_IN_STAFF"]);
+const eventPermissionSchema = z.enum(ALL_PERMISSIONS);
 
 export const eventSummarySchema = z.object({
   id: z.uuid(),
@@ -197,7 +198,15 @@ export const eventSummarySchema = z.object({
   city: z.string(),
   status: eventStatusSchema,
   role: membershipRoleSchema,
+  effectivePermissions: z.array(eventPermissionSchema),
+  canViewGuests: z.boolean(),
+  canManageGuests: z.boolean(),
+  canPrepareInvitations: z.boolean(),
   canSendInvitations: z.boolean(),
+  canSendReminders: z.boolean(),
+  canManageTeam: z.boolean(),
+  canEditEvent: z.boolean(),
+  canArchiveEvent: z.boolean(),
 });
 
 export type EventSummary = z.infer<typeof eventSummarySchema>;

@@ -15,6 +15,24 @@ const principal: AuthPrincipal = { subject: "stage-5-assets-host" };
 const now = new Date("2026-09-08T12:00:00.000Z");
 
 describe("AssetsService", () => {
+  it("does not expose invitation artwork to an event viewer without invitation permission", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const prisma = prismaMock({ storedAsset: { findMany } });
+    const access = accessMock();
+    vi.mocked(access.allows).mockReturnValue(false);
+    const service = serviceWith(prisma, access, storageMock());
+
+    await expect(
+      service.list(principal, eventId, { includeArchived: false }),
+    ).resolves.toEqual({ items: [] });
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ kind: { in: ["EVENT_IMAGE"] } }),
+      }),
+    );
+  });
+
   it("rejects an image whose extension, declared MIME, and magic bytes disagree", async () => {
     const storage = storageMock();
     const prisma = prismaMock();
@@ -243,6 +261,7 @@ function accessMock(): EventAccessService {
       membership: { role: "OWNER", permissionsJson: [] },
       user: { id: userId },
     }),
+    allows: vi.fn().mockReturnValue(true),
   } as unknown as EventAccessService;
 }
 

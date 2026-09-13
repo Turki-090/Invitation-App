@@ -60,13 +60,25 @@ export class AssetsService {
     eventId: string,
     query: ListAssetsQuery,
   ): Promise<ListAssetsResponse> {
-    await this.access.resolve(principal, eventId, Permission.EVENT_VIEW);
+    const { membership } = await this.access.resolve(
+      principal,
+      eventId,
+      Permission.EVENT_VIEW,
+    );
+    const canUseInvitationAssets = this.access.allows(
+      membership,
+      Permission.INVITATION_SEND,
+    );
+    if (query.kind === "INVITATION_ASSET" && !canUseInvitationAssets) {
+      await this.access.resolve(principal, eventId, Permission.INVITATION_SEND);
+    }
+    const visibleKinds = canUseInvitationAssets
+      ? (["EVENT_IMAGE", "INVITATION_ASSET"] as const)
+      : (["EVENT_IMAGE"] as const);
     const items = await this.prisma.storedAsset.findMany({
       where: {
         eventId,
-        kind: query.kind
-          ? query.kind
-          : { in: ["EVENT_IMAGE", "INVITATION_ASSET"] },
+        kind: query.kind ? query.kind : { in: [...visibleKinds] },
         ...(query.includeArchived ? {} : { deletedAt: null }),
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -184,6 +196,9 @@ export class AssetsService {
   ): Promise<{ body: Uint8Array; mediaType: string }> {
     await this.access.resolve(principal, eventId, Permission.EVENT_VIEW);
     const asset = await this.findAsset(eventId, assetId);
+    if (asset.kind === "INVITATION_ASSET") {
+      await this.access.resolve(principal, eventId, Permission.INVITATION_SEND);
+    }
     if (asset.deletedAt || asset.status !== "READY") this.throwNotFound();
     const object = await this.storage.getObject({
       bucket: asset.bucket,

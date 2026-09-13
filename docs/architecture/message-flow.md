@@ -6,6 +6,30 @@ persists a batch and one immutable logical message per invitation group in a
 `ReadCommitted` transaction protected by transaction-scoped advisory and row
 locks. Only after commit does it enqueue a deterministic batch-dispatch job.
 
+Reminder sends use the same immutable message and provider pipeline, with an
+additional server-authoritative eligibility layer:
+
+```text
+manual readiness + confirmation OR due ReminderRule
+                         |
+                         v
+lock selection -> re-evaluate RSVP/cancellation/cooldown/max-count
+                         |
+                         v
+ReminderRun + one immutable decision per invitation + SendBatch
+                         |
+                         v
+deterministic reminder dispatch -> normal message claim/provider flow
+```
+
+Accepted, partially accepted, declined, cancelled, unsent, recently reminded,
+and maximum-count recipients are excluded with durable reason codes. The worker
+checks eligibility again while claiming each message so an RSVP or cancellation
+that races the batch is cancelled before provider contact. The hourly reminder
+sweep enqueues due rules and also redrives every durable reminder batch that
+still has queued messages. Deterministic job IDs and logical-message uniqueness
+make this outbox reconciliation safe to repeat.
+
 ```text
 Host -> readiness -> confirmation + Idempotency-Key -> API transaction
                                                        |

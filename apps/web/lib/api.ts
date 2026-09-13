@@ -1,13 +1,16 @@
 import {
+  type AcceptTeamInvitationResult,
   DEVELOPMENT_ACCESS_TOKEN,
   type BulkCancelInvitationsInput,
   type BulkCancelInvitationsResult,
   type ConfirmImportInput,
   type ConfirmImportResult,
+  type CreateReminderRuleInput,
   type CreateInvitationTemplateInput,
   type CreatePreparationSnapshotsInput,
   type CreatePreparationSnapshotsResult,
   type CreateInvitationInput,
+  type CreateTeamInvitationInput,
   type GetImportJobQuery,
   type ImportJobDetailResponse,
   type ImportJobSummary,
@@ -20,24 +23,39 @@ import {
   type ListAssetsResponse,
   type ListImportJobsResponse,
   type ListInvitationsQuery,
+  type ListNotificationsQuery,
+  type ListNotificationsResponse,
+  type ListReminderRunsResponse,
   type ReadinessResponse,
   type CreateSendBatchInput,
   type ListSendBatchesResponse,
   type MessageListQuery,
   type PublicInvitation,
   type PublicInvitationLocaleQuery,
+  type ReminderReadinessRequest,
+  type ReminderReadinessResponse,
+  type ReminderRule,
+  type ReminderRun,
+  type ReminderRunDetail,
   type ResendMessageInput,
   type ResendReadinessResponse,
   type SendBatch,
   type SendBatchDetail,
   type SendReadinessRequest,
   type SendReadinessResponse,
+  type SendRemindersInput,
   type StoredAsset,
   type SubmitRsvpInput,
+  type TeamInvitation,
+  type TeamInvitationCredential,
+  type TeamOverview,
+  type TeamMember,
   type UpdateImportMappingInput,
   type UpdateImportRowInput,
   type UpdateInvitationTemplateInput,
   type UpdateInvitationInput,
+  type UpdateReminderRuleInput,
+  type UpdateTeamMemberInput,
   publicInvitationSchema,
   rsvpResultSchema,
   type RsvpResult,
@@ -635,6 +653,199 @@ export async function resendMessage(
     supabase,
     `/events/${eventId}/messages/${messageId}/resend`,
     jsonRequest("POST", input, { "Idempotency-Key": idempotencyKey }),
+  );
+}
+
+export async function getReminderReadiness(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: ReminderReadinessRequest,
+): Promise<ReminderReadinessResponse> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/reminders/readiness`,
+    jsonRequest("POST", input),
+  );
+}
+
+export async function sendReminders(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: SendRemindersInput,
+  idempotencyKey: string,
+): Promise<ReminderRun> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/reminders/send`,
+    jsonRequest("POST", input, { "Idempotency-Key": idempotencyKey }),
+  );
+}
+
+export async function listReminderRuns(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  page = 1,
+  pageSize = 20,
+): Promise<ListReminderRunsResponse> {
+  const search = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/reminders/runs?${search.toString()}`,
+  );
+}
+
+export async function getReminderRun(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  runId: string,
+): Promise<ReminderRunDetail> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/reminders/runs/${runId}`,
+  );
+}
+
+export async function listReminderRules(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<readonly ReminderRule[]> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/reminders/rules`,
+  );
+}
+
+export async function createReminderRule(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: CreateReminderRuleInput,
+): Promise<ReminderRule> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/reminders/rules`,
+    jsonRequest("POST", input),
+  );
+}
+
+export async function updateReminderRule(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  ruleId: string,
+  input: UpdateReminderRuleInput,
+): Promise<ReminderRule> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/reminders/rules/${ruleId}`,
+    jsonRequest("PATCH", input),
+  );
+}
+
+export async function getTeamOverview(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<TeamOverview> {
+  return requestAuthenticatedJson(supabase, `/events/${eventId}/team`);
+}
+
+export async function createTeamInvitation(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: CreateTeamInvitationInput,
+): Promise<TeamInvitationCredential> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/team-invitations`,
+    jsonRequest("POST", input),
+  );
+}
+
+export async function resendTeamInvitation(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  invitationId: string,
+): Promise<TeamInvitationCredential> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/team-invitations/${invitationId}/resend`,
+    { method: "POST" },
+  );
+}
+
+export async function revokeTeamInvitation(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  invitationId: string,
+): Promise<TeamInvitation> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/team-invitations/${invitationId}/revoke`,
+    { method: "POST" },
+  );
+}
+
+export async function updateTeamMember(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  membershipId: string,
+  input: UpdateTeamMemberInput,
+): Promise<TeamMember> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/memberships/${membershipId}`,
+    jsonRequest("PATCH", input),
+  );
+}
+
+export async function revokeTeamMember(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  membershipId: string,
+): Promise<TeamMember> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/memberships/${membershipId}/revoke`,
+    { method: "POST" },
+  );
+}
+
+export async function acceptTeamInvitation(
+  supabase: SupabaseClient | null,
+  token: string,
+): Promise<AcceptTeamInvitationResult> {
+  return requestAuthenticatedJson(
+    supabase,
+    "/team-invitations/accept",
+    jsonRequest("POST", { token }),
+  );
+}
+
+export async function listNotifications(
+  supabase: SupabaseClient | null,
+  query: ListNotificationsQuery,
+): Promise<ListNotificationsResponse> {
+  const search = new URLSearchParams({
+    page: String(query.page),
+    pageSize: String(query.pageSize),
+    unreadOnly: String(query.unreadOnly),
+  });
+  if (query.eventId) search.set("eventId", query.eventId);
+  return requestAuthenticatedJson(
+    supabase,
+    `/notifications?${search.toString()}`,
+  );
+}
+
+export async function markNotificationRead(
+  supabase: SupabaseClient | null,
+  notificationId: string,
+): Promise<void> {
+  await requestAuthenticatedJson(
+    supabase,
+    `/notifications/${notificationId}/read`,
+    { method: "POST" },
   );
 }
 

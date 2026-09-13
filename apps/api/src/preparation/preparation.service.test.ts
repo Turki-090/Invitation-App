@@ -37,6 +37,7 @@ describe("PreparationService", () => {
 
     const result = await service.createTemplate(principal, eventId, {
       name: "English invitation",
+      purpose: "INVITATION",
       locale: InvitationContentLocale.EN,
       body: "Dear {{guest_name}}, join {{event_name}} at {{venue}}.",
     });
@@ -70,6 +71,42 @@ describe("PreparationService", () => {
       version: 1,
       variableKeys: ["guest_name", "event_name", "venue"],
     });
+  });
+
+  it("authorizes reminder-purpose template creation with reminder permission", async () => {
+    const created = template({ purpose: "REMINDER" });
+    const create = vi.fn().mockResolvedValue(created);
+    const transaction = {
+      invitationTemplate: { create },
+      auditLog: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const prisma = prismaMock({
+      $transaction: vi.fn(
+        async (operation: (client: typeof transaction) => Promise<unknown>) =>
+          operation(transaction),
+      ),
+    });
+    const access = accessMock();
+    const service = new PreparationService(prisma, access);
+
+    const result = await service.createTemplate(principal, eventId, {
+      body: "A reminder for {{guest_name}} about {{event_name}}.",
+      locale: InvitationContentLocale.EN,
+      name: "RSVP reminder",
+      providerTemplateName: "rsvp_reminder",
+      purpose: "REMINDER",
+    });
+
+    expect(access.resolve).toHaveBeenCalledWith(
+      principal,
+      eventId,
+      Permission.REMINDER_SEND,
+    );
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ purpose: "REMINDER" }),
+      include: { asset: true },
+    });
+    expect(result.purpose).toBe("REMINDER");
   });
 
   it("updates by creating a new version and leaves the approved source immutable", async () => {
@@ -428,7 +465,7 @@ describe("PreparationService", () => {
 
   it("does not query templates when a foreign event is inaccessible", async () => {
     const access = accessMock();
-    vi.mocked(access.resolve).mockRejectedValueOnce(
+    vi.mocked(access.resolveAny).mockRejectedValueOnce(
       new NotFoundException({
         code: "EVENT_NOT_FOUND",
         message: "The event does not exist or is not accessible.",
@@ -451,6 +488,12 @@ function accessMock(): EventAccessService {
       membership: { role: "OWNER", permissionsJson: [] },
       user: { id: userId },
     }),
+    resolveAny: vi.fn().mockResolvedValue({
+      event: eventFixture(),
+      membership: { role: "OWNER", permissionsJson: [] },
+      user: { id: userId },
+    }),
+    allows: vi.fn().mockReturnValue(true),
   } as unknown as EventAccessService;
 }
 

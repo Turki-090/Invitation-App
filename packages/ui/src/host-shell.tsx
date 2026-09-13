@@ -100,7 +100,7 @@ export function HostShell({
         <main className="dawah-host-shell__main">{children}</main>
       </div>
       <nav aria-label={navigationLabel} className="dawah-bottom-nav">
-        <NavigationItems items={items.slice(0, 5)} />
+        <NavigationItems items={items} />
       </nav>
     </div>
   );

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -32,6 +33,7 @@ import {
 import {
   Prisma,
   type Event,
+  type EventMembership,
   type InvitationTemplate,
   type StoredAsset,
 } from "@prisma/client";
@@ -70,9 +72,27 @@ export class PreparationService {
     principal: AuthPrincipal,
     eventId: string,
   ): Promise<ListInvitationTemplatesResponse> {
-    await this.access.resolve(principal, eventId, Permission.INVITATION_SEND);
+    const { membership } = await this.access.resolveAny(principal, eventId, [
+      Permission.INVITATION_SEND,
+      Permission.REMINDER_SEND,
+    ]);
+    const mayUseInvitationTemplates = this.access.allows(
+      membership,
+      Permission.INVITATION_SEND,
+    );
+    const mayUseReminderTemplates = this.access.allows(
+      membership,
+      Permission.REMINDER_SEND,
+    );
     const templates = await this.prisma.invitationTemplate.findMany({
-      where: { eventId },
+      where: {
+        eventId,
+        ...(!mayUseInvitationTemplates && mayUseReminderTemplates
+          ? { purpose: "REMINDER" as const }
+          : mayUseInvitationTemplates && !mayUseReminderTemplates
+            ? { purpose: "INVITATION" as const }
+            : {}),
+      },
       include: { asset: true },
       orderBy: [
         { status: "asc" },
@@ -92,7 +112,7 @@ export class PreparationService {
     const { event, user } = await this.access.resolve(
       principal,
       eventId,
-      Permission.INVITATION_SEND,
+      this.templatePermission(input.purpose),
     );
     this.assertEventWritable(event);
     const asset = await this.resolveAsset(eventId, input.assetId ?? null);
@@ -102,6 +122,7 @@ export class PreparationService {
     const contentHash = this.templateContentHash({
       name: input.name,
       locale: input.locale,
+      purpose: input.purpose,
       body: input.body,
       extraMessage: input.extraMessage ?? null,
       providerTemplateName: input.providerTemplateName ?? null,
@@ -117,6 +138,7 @@ export class PreparationService {
           templateKey,
           version: 1,
           locale: this.toDatabaseLocale(input.locale),
+          purpose: input.purpose,
           displayName: input.name,
           bodyTemplate: input.body,
           extraMessageTemplate: input.extraMessage?.trim() || null,
@@ -140,6 +162,7 @@ export class PreparationService {
             templateKey,
             version: created.version,
             locale: input.locale,
+            purpose: input.purpose,
             variableKeys: [...variables],
             assetId: asset?.id ?? null,
           },
@@ -156,19 +179,20 @@ export class PreparationService {
     templateId: string,
     input: UpdateInvitationTemplateInput,
   ): Promise<InvitationTemplateContract> {
-    const { event, user } = await this.access.resolve(
-      principal,
-      eventId,
-      Permission.INVITATION_SEND,
-    );
-    this.assertEventWritable(event);
-
     const created = await this.prisma.$transaction(async (transaction) => {
+      const { event, membership, user } = await this.access.resolveAny(
+        principal,
+        eventId,
+        [Permission.INVITATION_SEND, Permission.REMINDER_SEND],
+        transaction,
+      );
+      this.assertEventWritable(event);
       const candidate = await this.findTemplate(
         transaction,
         eventId,
         templateId,
       );
+      this.assertTemplatePermission(membership, candidate.purpose);
       await transaction.$queryRaw`
         SELECT pg_advisory_xact_lock(hashtextextended(${`template-family:${eventId}:${candidate.templateKey}`}, 0)) IS NULL AS locked
       `;
@@ -218,6 +242,7 @@ export class PreparationService {
       const contentHash = this.templateContentHash({
         name,
         locale,
+        purpose: existing.purpose,
         body,
         extraMessage,
         providerTemplateName,
@@ -238,6 +263,7 @@ export class PreparationService {
           templateKey: existing.templateKey,
           version: nextVersion,
           locale: this.toDatabaseLocale(locale),
+          purpose: existing.purpose,
           displayName: name,
           bodyTemplate: body,
           extraMessageTemplate: extraMessage,
@@ -278,18 +304,20 @@ export class PreparationService {
     templateId: string,
     input: ApproveInvitationTemplateInput,
   ): Promise<InvitationTemplateContract> {
-    const { event, user } = await this.access.resolve(
-      principal,
-      eventId,
-      Permission.INVITATION_SEND,
-    );
-    this.assertEventWritable(event);
     const approved = await this.prisma.$transaction(async (transaction) => {
+      const { event, membership, user } = await this.access.resolveAny(
+        principal,
+        eventId,
+        [Permission.INVITATION_SEND, Permission.REMINDER_SEND],
+        transaction,
+      );
+      this.assertEventWritable(event);
       const candidate = await this.findTemplate(
         transaction,
         eventId,
         templateId,
       );
+      this.assertTemplatePermission(membership, candidate.purpose);
       await transaction.$queryRaw`
         SELECT pg_advisory_xact_lock(hashtextextended(${`template-family:${eventId}:${candidate.templateKey}`}, 0)) IS NULL AS locked
       `;
@@ -349,18 +377,20 @@ export class PreparationService {
     eventId: string,
     templateId: string,
   ): Promise<InvitationTemplateContract> {
-    const { event, user } = await this.access.resolve(
-      principal,
-      eventId,
-      Permission.INVITATION_SEND,
-    );
-    this.assertEventWritable(event);
     const archived = await this.prisma.$transaction(async (transaction) => {
+      const { event, membership, user } = await this.access.resolveAny(
+        principal,
+        eventId,
+        [Permission.INVITATION_SEND, Permission.REMINDER_SEND],
+        transaction,
+      );
+      this.assertEventWritable(event);
       const candidate = await this.findTemplate(
         transaction,
         eventId,
         templateId,
       );
+      this.assertTemplatePermission(membership, candidate.purpose);
       await transaction.$queryRaw`
         SELECT pg_advisory_xact_lock(hashtextextended(${`template-family:${eventId}:${candidate.templateKey}`}, 0)) IS NULL AS locked
       `;
@@ -395,13 +425,8 @@ export class PreparationService {
     eventId: string,
     input: InvitationPreviewRequest,
   ): Promise<InvitationPreview> {
-    const { event } = await this.access.resolve(
+    const { event, template } = await this.resolveTemplateAccess(
       principal,
-      eventId,
-      Permission.INVITATION_SEND,
-    );
-    const template = await this.findTemplate(
-      this.prisma,
       eventId,
       input.templateId,
     );
@@ -446,13 +471,8 @@ export class PreparationService {
     eventId: string,
     query: ReadinessQuery,
   ): Promise<ReadinessResponse> {
-    const { event } = await this.access.resolve(
+    const { event, template } = await this.resolveTemplateAccess(
       principal,
-      eventId,
-      Permission.INVITATION_SEND,
-    );
-    const template = await this.findTemplate(
-      this.prisma,
       eventId,
       query.templateId,
     );
@@ -535,10 +555,10 @@ export class PreparationService {
       : undefined;
     return this.prisma.$transaction(
       async (transaction) => {
-        const { user } = await this.access.resolve(
+        const { membership, user } = await this.access.resolveAny(
           principal,
           eventId,
-          Permission.INVITATION_SEND,
+          [Permission.INVITATION_SEND, Permission.REMINDER_SEND],
           transaction,
         );
         await transaction.$queryRaw`
@@ -558,6 +578,7 @@ export class PreparationService {
           eventId,
           input.templateId,
         );
+        this.assertTemplatePermission(membership, currentTemplate.purpose);
         if (currentTemplate.assetId) {
           await transaction.$queryRaw`
             SELECT "id" FROM "stored_assets"
@@ -943,6 +964,39 @@ export class PreparationService {
       });
   }
 
+  private async resolveTemplateAccess(
+    principal: AuthPrincipal,
+    eventId: string,
+    templateId: string,
+  ) {
+    const resolved = await this.access.resolveAny(principal, eventId, [
+      Permission.INVITATION_SEND,
+      Permission.REMINDER_SEND,
+    ]);
+    const template = await this.findTemplate(this.prisma, eventId, templateId);
+    this.assertTemplatePermission(resolved.membership, template.purpose);
+    return { ...resolved, template };
+  }
+
+  private templatePermission(purpose: InvitationTemplate["purpose"]) {
+    return purpose === "REMINDER"
+      ? Permission.REMINDER_SEND
+      : Permission.INVITATION_SEND;
+  }
+
+  private assertTemplatePermission(
+    membership: Pick<EventMembership, "role" | "permissionsJson">,
+    purpose: InvitationTemplate["purpose"],
+  ): void {
+    if (this.access.allows(membership, this.templatePermission(purpose))) {
+      return;
+    }
+    throw new ForbiddenException({
+      code: "EVENT_PERMISSION_DENIED",
+      message: "The event membership lacks the required permission.",
+    });
+  }
+
   private findInvitation(
     eventId: string,
     invitationId: string,
@@ -1020,6 +1074,7 @@ export class PreparationService {
       id: template.id,
       eventId: template.eventId,
       name: template.displayName,
+      purpose: template.purpose,
       locale: this.toContractLocale(template.locale),
       body: template.bodyTemplate,
       extraMessage: template.extraMessageTemplate,

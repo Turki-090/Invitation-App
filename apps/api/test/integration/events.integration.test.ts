@@ -76,6 +76,7 @@ describe("EventsService PostgreSQL integration", () => {
         userId: host.id,
         role: "CO_HOST",
         status: "REVOKED",
+        revokedAt: new Date(),
       },
     });
 
@@ -452,6 +453,7 @@ describe("EventsService PostgreSQL integration", () => {
         userId: revoked.id,
         role: "CO_HOST",
         status: "REVOKED",
+        revokedAt: new Date(),
       },
     });
     const checkInMembership = await prisma.eventMembership.create({

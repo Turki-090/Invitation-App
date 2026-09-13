@@ -260,12 +260,14 @@ export class MessagingService {
     await this.access.resolve(principal, eventId, Permission.INVITATION_SEND);
     const [items, totalItems] = await Promise.all([
       this.prisma.sendBatch.findMany({
-        where: { eventId },
+        where: { eventId, messageType: "INVITATION" },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
       }),
-      this.prisma.sendBatch.count({ where: { eventId } }),
+      this.prisma.sendBatch.count({
+        where: { eventId, messageType: "INVITATION" },
+      }),
     ]);
     const counts = await this.batchCounts(items.map(({ id }) => id));
     return {
@@ -372,7 +374,7 @@ export class MessagingService {
           FOR UPDATE
         `;
         const lockTarget = await transaction.message.findFirst({
-          where: { id: messageId, eventId },
+          where: { id: messageId, eventId, messageType: "INVITATION" },
           select: { invitationGroupId: true, templateId: true },
         });
         if (!lockTarget) {
@@ -554,7 +556,7 @@ export class MessagingService {
       await client.$queryRaw(invitationLock);
     }
     const template = await client.invitationTemplate.findFirst({
-      where: { id: templateId, eventId: event.id },
+      where: { id: templateId, eventId: event.id, purpose: "INVITATION" },
       include: { asset: true },
     });
     if (!template) {
@@ -725,7 +727,7 @@ export class MessagingService {
     messageId: string,
   ) {
     const message = await client.message.findFirst({
-      where: { id: messageId, eventId: event.id },
+      where: { id: messageId, eventId: event.id, messageType: "INVITATION" },
       include: {
         invitationGroup: {
           include: { members: { orderBy: { position: "asc" } } },
@@ -944,7 +946,7 @@ export class MessagingService {
     batchId: string,
   ): Promise<SendBatch> {
     const batch = await this.prisma.sendBatch.findFirst({
-      where: { id: batchId, eventId },
+      where: { id: batchId, eventId, messageType: "INVITATION" },
     });
     if (!batch) {
       throw new NotFoundException({

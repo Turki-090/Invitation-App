@@ -59,7 +59,23 @@ vi.mock("../lib/api", () => ({
 }));
 
 const event: EventDetail = {
+  effectivePermissions: [
+    "event.view",
+    "event.edit",
+    "guest.view",
+    "invitation.send",
+    "reminder.send",
+    "team.manage",
+    "event.archive",
+  ],
+  canViewGuests: true,
+  canManageGuests: true,
+  canPrepareInvitations: true,
   canSendInvitations: true,
+  canSendReminders: true,
+  canManageTeam: true,
+  canEditEvent: true,
+  canArchiveEvent: true,
   id: eventId,
   nameAr: "زواج خالد ونورة",
   nameEn: "Khalid & Nora Wedding",
@@ -86,7 +102,15 @@ const event: EventDetail = {
 };
 
 const secondEvent: EventSummary = {
+  effectivePermissions: ["event.view", "invitation.send"],
+  canViewGuests: true,
+  canManageGuests: true,
+  canPrepareInvitations: true,
   canSendInvitations: true,
+  canSendReminders: true,
+  canManageTeam: true,
+  canEditEvent: true,
+  canArchiveEvent: true,
   id: secondEventId,
   nameAr: "حفل التخرج",
   nameEn: "Graduation",
@@ -116,10 +140,13 @@ function renderWorkspace(section: "overview" | "sending" | "settings") {
         eventsCopy={en.events}
         guestsCopy={en.guests}
         locale="en"
+        notificationsCopy={en.notifications}
         preparationCopy={en.preparation}
+        remindersCopy={en.reminders}
         sendingCopy={en.sending}
         section={section}
         shellCopy={en.shell}
+        teamCopy={en.team}
       />
     </QueryClientProvider>,
   );
@@ -253,5 +280,25 @@ describe("event workspace", () => {
     expect(
       screen.queryByRole("link", { name: en.sending.navigation }),
     ).toBeNull();
+  });
+
+  it("shows only the archive action to an archive-only co-host", async () => {
+    api.getEvent.mockResolvedValue({
+      ...event,
+      effectivePermissions: ["event.view", "event.archive"],
+      canEditEvent: false,
+      canArchiveEvent: true,
+      role: "CO_HOST",
+    });
+
+    renderWorkspace("settings");
+
+    expect(
+      await screen.findByRole("button", { name: en.workspace.archive }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: en.workspace.saveChanges }),
+    ).toBeNull();
+    expect(screen.queryByLabelText(new RegExp(en.events.nameAr))).toBeNull();
   });
 });
