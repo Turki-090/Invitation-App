@@ -44,6 +44,7 @@ const template: InvitationTemplate = {
   id: templateId,
   locale: "en",
   name: "Approved invitation",
+  purpose: "INVITATION",
   providerTemplateName: "wedding_invitation_en",
   status: "APPROVED",
   updatedAt: "2026-09-09T10:00:00.000Z",

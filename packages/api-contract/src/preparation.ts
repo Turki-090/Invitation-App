@@ -2,6 +2,7 @@ import { z } from "zod";
 import { invitationTypeSchema } from "./invitations";
 
 export const TEMPLATE_STATUSES = ["DRAFT", "APPROVED", "ARCHIVED"] as const;
+export const TEMPLATE_PURPOSES = ["INVITATION", "REMINDER"] as const;
 export const PREPARATION_LOCALES = ["ar-SA", "en"] as const;
 export const MESSAGE_VARIABLES = [
   "guest_name",
@@ -13,6 +14,7 @@ export const MESSAGE_VARIABLES = [
 ] as const;
 
 export const templateStatusSchema = z.enum(TEMPLATE_STATUSES);
+export const templatePurposeSchema = z.enum(TEMPLATE_PURPOSES);
 export const preparationLocaleSchema = z.enum(PREPARATION_LOCALES);
 export const messageVariableSchema = z.enum(MESSAGE_VARIABLES);
 
@@ -28,6 +30,7 @@ const providerTemplateNameSchema = z
 
 export const createInvitationTemplateSchema = z.object({
   name: templateNameSchema,
+  purpose: templatePurposeSchema.default("INVITATION"),
   locale: preparationLocaleSchema,
   body: templateBodySchema,
   extraMessage: extraMessageSchema.optional(),
@@ -64,6 +67,7 @@ export const invitationTemplateSchema = z.object({
   id: z.uuid(),
   eventId: z.uuid(),
   name: z.string(),
+  purpose: templatePurposeSchema,
   locale: preparationLocaleSchema,
   body: z.string(),
   extraMessage: z.string().nullable(),

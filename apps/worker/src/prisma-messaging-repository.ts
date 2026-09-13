@@ -1,17 +1,27 @@
 import { createHash } from "node:crypto";
 import {
   evaluateGuestRsvpPolicy,
+  hasPermission,
   InvitationInvariantError,
   mapInvitationReplyAction,
+  MembershipRole,
+  Permission,
   reduceMessageDeliveryStatus,
   RsvpReplyActionMappingKind,
+  type PermissionConfiguration,
 } from "@dawah/domain";
 import {
   createSignedWhatsappMediaUrl,
   type ProviderMessageResult,
 } from "@dawah/messaging";
 import type { WhatsappSendJobData } from "@dawah/queue";
-import { Prisma, PrismaClient } from "@prisma/client";
+import {
+  Prisma,
+  PrismaClient,
+  type MessageStatus,
+  type SendBatch,
+  type SendBatchStatus,
+} from "@prisma/client";
 import type {
   ClaimedMessage,
   ClaimedRsvpConfirmation,
@@ -147,6 +157,35 @@ export class PrismaMessagingRepository
         });
         await this.updateBatchState(transaction, message.sendBatchId);
         return { outcome: "SKIP", reason: "RETRY_LIMIT_REACHED" };
+      }
+
+      if (message.messageType === "REMINDER") {
+        const ineligibleReason = await this.reminderClaimIneligibility(
+          transaction,
+          message,
+        );
+        if (ineligibleReason) {
+          const cancelledAt = this.options?.now?.() ?? new Date();
+          await transaction.message.update({
+            where: { id: message.id },
+            data: { status: "CANCELLED", cancelledAt },
+          });
+          await transaction.reminderRecipientState.deleteMany({
+            where: { lastReminderMessageId: message.id },
+          });
+          await transaction.auditLog.create({
+            data: {
+              eventId: message.eventId,
+              actorType: "SYSTEM",
+              action: "reminder_message.cancelled_before_send",
+              targetType: "Message",
+              targetId: message.id,
+              metadata: { reasonCode: ineligibleReason },
+            },
+          });
+          await this.updateBatchState(transaction, message.sendBatchId);
+          return { outcome: "SKIP", reason: ineligibleReason };
+        }
       }
 
       const attemptNumber = message.attemptCount + 1;
@@ -1209,6 +1248,81 @@ export class PrismaMessagingRepository
     );
   }
 
+  private async reminderClaimIneligibility(
+    transaction: Prisma.TransactionClient,
+    message: {
+      readonly id: string;
+      readonly eventId: string;
+      readonly invitationGroupId: string;
+      readonly templateId: string;
+    },
+  ): Promise<string | null> {
+    await transaction.$queryRaw`
+      SELECT "id" FROM "invitation_groups"
+      WHERE "id" = ${message.invitationGroupId}::uuid
+        AND "event_id" = ${message.eventId}::uuid
+      FOR SHARE
+    `;
+    const [invitation, latestInitial, template, recipientState] =
+      await Promise.all([
+        transaction.invitationGroup.findFirst({
+          where: {
+            id: message.invitationGroupId,
+            eventId: message.eventId,
+          },
+          include: { event: { select: { status: true } } },
+        }),
+        transaction.message.findFirst({
+          where: {
+            eventId: message.eventId,
+            invitationGroupId: message.invitationGroupId,
+            messageType: "INVITATION",
+          },
+          select: { status: true, sentAt: true },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        }),
+        transaction.invitationTemplate.findFirst({
+          where: {
+            id: message.templateId,
+            eventId: message.eventId,
+            purpose: "REMINDER",
+            status: "APPROVED",
+            provider: "META_WHATSAPP",
+            providerTemplateName: { not: null },
+          },
+          select: { id: true },
+        }),
+        transaction.reminderRecipientState.findUnique({
+          where: {
+            eventId_invitationGroupId: {
+              eventId: message.eventId,
+              invitationGroupId: message.invitationGroupId,
+            },
+          },
+          select: { lastReminderMessageId: true },
+        }),
+      ]);
+
+    if (!invitation || invitation.event.status !== "RSVP_OPEN") {
+      return "EVENT_NOT_REMINDABLE";
+    }
+    if (invitation.cancelledAt) return "INVITATION_CANCELLED";
+    if (invitation.rsvpStatus !== "PENDING") return "RSVP_NOT_PENDING";
+    if (
+      !latestInitial ||
+      !latestInitial.sentAt ||
+      !["SENT", "DELIVERED", "READ", "RESPONDED"].includes(latestInitial.status)
+    ) {
+      return "INITIAL_INVITATION_NOT_SENT";
+    }
+    if (!template) return "TEMPLATE_NOT_APPROVED";
+    if (!recipientState) return "REMINDER_STATE_MISSING";
+    if (recipientState.lastReminderMessageId !== message.id) {
+      return "SUPERSEDED_BY_NEWER_REMINDER";
+    }
+    return null;
+  }
+
   private async updateBatchState(
     transaction: Prisma.TransactionClient,
     batchId: string,
@@ -1238,18 +1352,101 @@ export class PrismaMessagingRepository
       return;
     }
     const failed = counts.get("FAILED") ?? 0;
+    const cancelled = counts.get("CANCELLED") ?? 0;
+    const terminalStatus: SendBatchStatus =
+      failed === batch.totalMessages
+        ? "FAILED"
+        : failed > 0
+          ? "PARTIALLY_FAILED"
+          : "COMPLETED";
+    const completedAt = batch.completedAt ?? new Date();
     await transaction.sendBatch.update({
       where: { id: batchId },
       data: {
-        status:
-          failed === batch.totalMessages
-            ? "FAILED"
-            : failed > 0
-              ? "PARTIALLY_FAILED"
-              : "COMPLETED",
+        status: terminalStatus,
         startedAt: batch.startedAt ?? new Date(),
-        completedAt: batch.completedAt ?? new Date(),
+        completedAt,
       },
+    });
+    await transaction.reminderRun.updateMany({
+      where: { sendBatchId: batchId },
+      data: { status: terminalStatus, completedAt },
+    });
+    if (batch.status !== terminalStatus) {
+      await transaction.auditLog.create({
+        data: {
+          eventId: batch.eventId,
+          actorType: "SYSTEM",
+          action:
+            batch.messageType === "REMINDER"
+              ? "reminder_run.completed"
+              : "send_batch.completed",
+          targetType: "SendBatch",
+          targetId: batch.id,
+          metadata: {
+            messageType: batch.messageType,
+            status: terminalStatus,
+            totalMessages: batch.totalMessages,
+            failedMessages: failed,
+            cancelledMessages: cancelled,
+          },
+        },
+      });
+    }
+    await this.createBatchNotifications(
+      transaction,
+      batch,
+      terminalStatus,
+      counts,
+    );
+  }
+
+  private async createBatchNotifications(
+    transaction: Prisma.TransactionClient,
+    batch: Pick<SendBatch, "id" | "eventId" | "messageType" | "totalMessages">,
+    status: SendBatchStatus,
+    counts: ReadonlyMap<MessageStatus, number>,
+  ): Promise<void> {
+    const requiredPermission =
+      batch.messageType === "REMINDER"
+        ? Permission.REMINDER_SEND
+        : Permission.INVITATION_SEND;
+    const memberships = await transaction.eventMembership.findMany({
+      where: { eventId: batch.eventId, status: "ACTIVE" },
+      select: { userId: true, role: true, permissionsJson: true },
+    });
+    const recipients = memberships.filter((membership) =>
+      hasPermission(
+        membership.role as MembershipRole,
+        requiredPermission,
+        permissionConfiguration(membership.permissionsJson),
+      ),
+    );
+    if (recipients.length === 0) return;
+    const failedMessages = counts.get("FAILED") ?? 0;
+    const kind =
+      status === "FAILED" || status === "PARTIALLY_FAILED"
+        ? ("MESSAGE_BATCH_FAILED" as const)
+        : batch.messageType === "REMINDER"
+          ? ("REMINDER_BATCH_COMPLETED" as const)
+          : ("MESSAGE_BATCH_COMPLETED" as const);
+    await transaction.notification.createMany({
+      data: recipients.map(({ userId }) => ({
+        eventId: batch.eventId,
+        userId,
+        kind,
+        sourceType: "SendBatch",
+        sourceId: batch.id,
+        data: {
+          batchId: batch.id,
+          messageType: batch.messageType,
+          status,
+          totalMessages: batch.totalMessages,
+          failedMessages,
+          cancelledMessages: counts.get("CANCELLED") ?? 0,
+        },
+      })),
+      skipDuplicates: true,
     });
   }
 }
@@ -1265,6 +1462,35 @@ function stable(value: unknown): string {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, entry]) => `${JSON.stringify(key)}:${stable(entry)}`)
     .join(",")}}`;
+}
+
+const knownPermissions = new Set<string>(Object.values(Permission));
+
+function permissionConfiguration(
+  value: Prisma.JsonValue,
+): PermissionConfiguration {
+  if (Array.isArray(value)) {
+    return value.filter(
+      (entry): entry is (typeof Permission)[keyof typeof Permission] =>
+        typeof entry === "string" && knownPermissions.has(entry),
+    );
+  }
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    value.mode === "CUSTOM" &&
+    Array.isArray(value.permissions)
+  ) {
+    return {
+      mode: "CUSTOM",
+      permissions: value.permissions.filter(
+        (entry): entry is (typeof Permission)[keyof typeof Permission] =>
+          typeof entry === "string" && knownPermissions.has(entry),
+      ),
+    };
+  }
+  return [];
 }
 
 function stringArray(value: Prisma.JsonValue): string[] {

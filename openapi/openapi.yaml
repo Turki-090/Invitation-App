@@ -21,11 +21,17 @@ tags:
   - name: assets
     description: Private event imagery and invitation assets.
   - name: templates
-    description: Versioned invitation message templates.
+    description: Versioned invitation and reminder message templates with purpose-scoped authorization.
   - name: preparation
     description: Invitation previews, readiness checks, and immutable content snapshots.
   - name: messaging
     description: Idempotent WhatsApp send batches, delivery progress, and safe resend review.
+  - name: reminders
+    description: Explainable reminder eligibility, idempotent manual sends, scheduled rules, and run history.
+  - name: team
+    description: Event co-host invitations, membership roles, and explicit permission configuration.
+  - name: notifications
+    description: Event-scoped operational notifications for authenticated team members.
   - name: rsvp
     description: Private accountless invitation access and atomic guest or host RSVP changes.
   - name: webhooks
@@ -903,13 +909,13 @@ paths:
     parameters:
       - $ref: "#/components/parameters/EventId"
     get:
-      summary: List invitation templates
+      summary: List message templates
       tags: [templates]
       operationId: listInvitationTemplates
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Every versioned template owned by the event.
+          description: Every versioned invitation or reminder template owned by the event.
           content:
             application/json:
               schema:
@@ -919,8 +925,8 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
     post:
-      summary: Create an invitation template
-      description: Creates the first immutable version of a locale-specific invitation template.
+      summary: Create a message template
+      description: Creates the first immutable locale-specific version and requires invitation.send for invitation templates or reminder.send for reminder templates.
       tags: [templates]
       operationId: createInvitationTemplate
       security: [{ bearerAuth: [] }]
@@ -946,8 +952,8 @@ paths:
       - $ref: "#/components/parameters/EventId"
       - $ref: "#/components/parameters/TemplateId"
     patch:
-      summary: Create a new invitation template version
-      description: Applies an optimistic edit by creating a new immutable draft version and retaining prior versions.
+      summary: Create a new message-template version
+      description: Applies an optimistic, purpose-authorized edit by creating a new immutable draft version and retaining prior versions.
       tags: [templates]
       operationId: updateInvitationTemplate
       security: [{ bearerAuth: [] }]
@@ -973,7 +979,8 @@ paths:
       - $ref: "#/components/parameters/EventId"
       - $ref: "#/components/parameters/TemplateId"
     post:
-      summary: Approve an invitation template version
+      summary: Approve a message-template version
+      description: Requires the permission associated with the template purpose.
       tags: [templates]
       operationId: approveInvitationTemplate
       security: [{ bearerAuth: [] }]
@@ -999,7 +1006,8 @@ paths:
       - $ref: "#/components/parameters/EventId"
       - $ref: "#/components/parameters/TemplateId"
     post:
-      summary: Archive an invitation template version
+      summary: Archive a message-template version
+      description: Requires the permission associated with the template purpose.
       tags: [templates]
       operationId: archiveInvitationTemplate
       security: [{ bearerAuth: [] }]
@@ -1076,8 +1084,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/EventId"
     post:
-      summary: Prepare immutable invitation snapshots
-      description: Atomically creates or reuses reproducible content snapshots for all invitations or an explicit bounded selection.
+      summary: Prepare immutable message snapshots
+      description: Atomically creates or reuses reproducible invitation or reminder content snapshots for all invitations or an explicit bounded selection, with permission determined by template purpose.
       tags: [preparation]
       operationId: createInvitationSnapshots
       security: [{ bearerAuth: [] }]
@@ -1257,6 +1265,378 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /events/{eventId}/reminders/readiness:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Review reminder eligibility
+      description: Evaluates the current event, invitation, RSVP, delivery, snapshot, audience, and cooldown state and returns stable exclusion reasons plus a short-lived confirmation.
+      tags: [reminders]
+      operationId: reviewReminderReadiness
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReminderReadinessRequest" }
+      responses:
+        "200":
+          description: Current server-authoritative reminder eligibility and exclusion summary.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReminderReadinessResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/reminders/send:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Confirm and queue eligible reminders
+      description: Re-evaluates the confirmed selection atomically, records every eligible or excluded decision, and queues immutable reminder messages without duplicating a logical request.
+      tags: [reminders]
+      operationId: sendReminders
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SendReminders" }
+      responses:
+        "202":
+          description: Durable reminder run accepted for asynchronous delivery.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReminderRun" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /events/{eventId}/reminders/runs:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: List reminder runs
+      tags: [reminders]
+      operationId: listReminderRuns
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Paged manual and scheduled reminder runs with derived send progress.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListReminderRunsResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/reminders/runs/{runId}:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/ReminderRunId"
+    get:
+      summary: Get explainable reminder-run decisions
+      tags: [reminders]
+      operationId: getReminderRun
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Reminder run with each selected invitation's immutable eligibility outcome and reason codes.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReminderRunDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/reminders/rules:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: List reminder rules
+      tags: [reminders]
+      operationId: listReminderRules
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: All automatic reminder rules configured for the event.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ReminderRule" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      summary: Create an automatic reminder rule
+      tags: [reminders]
+      operationId: createReminderRule
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateReminderRule" }
+      responses:
+        "201":
+          description: Configured reminder rule.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReminderRule" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/reminders/rules/{ruleId}:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/ReminderRuleId"
+    patch:
+      summary: Update an automatic reminder rule
+      tags: [reminders]
+      operationId: updateReminderRule
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateReminderRule" }
+      responses:
+        "200":
+          description: Updated reminder rule.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReminderRule" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/team:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: List the event team and pending invitations
+      tags: [team]
+      operationId: getEventTeam
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Active or revoked memberships and event-bound team invitations visible to a team manager.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TeamOverview" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/team-invitations:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Invite an event team member
+      description: Creates a phone-bound, expiring team invitation. The raw acceptance token is returned only by create and resend operations.
+      tags: [team]
+      operationId: createTeamInvitation
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTeamInvitation" }
+      responses:
+        "201":
+          description: Team invitation plus its one-time acceptance credential.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TeamInvitationCredential" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/team-invitations/{invitationId}/resend:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/TeamInvitationId"
+    post:
+      summary: Rotate and resend a pending team invitation
+      tags: [team]
+      operationId: resendTeamInvitation
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Updated invitation plus a newly rotated raw acceptance token.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TeamInvitationCredential" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/team-invitations/{invitationId}/revoke:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/TeamInvitationId"
+    post:
+      summary: Revoke a pending team invitation
+      tags: [team]
+      operationId: revokeTeamInvitation
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Revoked team invitation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TeamInvitation" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/memberships/{membershipId}:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/MembershipId"
+    patch:
+      summary: Update an event team membership
+      description: Updates a non-owner role and/or replaces its explicit permission configuration.
+      tags: [team]
+      operationId: updateTeamMembership
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateTeamMember" }
+      responses:
+        "200":
+          description: Updated event membership and resolved effective capabilities.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TeamMember" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/memberships/{membershipId}/revoke:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/MembershipId"
+    post:
+      summary: Revoke an event team membership
+      tags: [team]
+      operationId: revokeTeamMembership
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Revoked event membership.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TeamMember" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /team-invitations/accept:
+    post:
+      summary: Accept a phone-bound team invitation
+      description: Activates an event membership only when the authenticated user's verified phone matches the invitation credential.
+      tags: [team]
+      operationId: acceptTeamInvitation
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AcceptTeamInvitation" }
+      responses:
+        "200":
+          description: Active event membership, including an idempotent already-accepted result.
+          content:
+            application/json:
+              schema:
+                { $ref: "#/components/schemas/AcceptTeamInvitationResult" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /notifications:
+    get:
+      summary: List accessible operational notifications
+      tags: [notifications]
+      operationId: listNotifications
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: eventId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: unreadOnly
+          in: query
+          schema: { type: boolean, default: false }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Paged notifications scoped to active event memberships, with the caller's unread count.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListNotificationsResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /notifications/{notificationId}/read:
+    parameters:
+      - $ref: "#/components/parameters/NotificationId"
+    post:
+      summary: Mark an accessible notification as read
+      tags: [notifications]
+      operationId: markNotificationRead
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201":
+          description: Notification with an idempotently assigned read timestamp.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Notification" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /messaging/media/{snapshotId}:
     get:
       summary: Resolve a short-lived invitation image capability for WhatsApp
@@ -1423,6 +1803,36 @@ components:
       required: true
       description: Logical-message UUID.
       schema: { type: string, format: uuid }
+    ReminderRunId:
+      name: runId
+      in: path
+      required: true
+      description: Reminder-run UUID.
+      schema: { type: string, format: uuid }
+    ReminderRuleId:
+      name: ruleId
+      in: path
+      required: true
+      description: Reminder-rule UUID.
+      schema: { type: string, format: uuid }
+    TeamInvitationId:
+      name: invitationId
+      in: path
+      required: true
+      description: Team-invitation UUID.
+      schema: { type: string, format: uuid }
+    MembershipId:
+      name: membershipId
+      in: path
+      required: true
+      description: Event-membership UUID.
+      schema: { type: string, format: uuid }
+    NotificationId:
+      name: notificationId
+      in: path
+      required: true
+      description: Operational-notification UUID.
+      schema: { type: string, format: uuid }
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -1516,6 +1926,30 @@ components:
     MembershipRole:
       type: string
       enum: [OWNER, CO_HOST, CHECK_IN_STAFF]
+    Permission:
+      type: string
+      enum:
+        [
+          event.view,
+          event.edit,
+          guest.view,
+          guest.phone.view,
+          guest.create,
+          guest.edit,
+          guest.delete,
+          guest.import,
+          guest.export,
+          invitation.send,
+          invitation.resend,
+          reminder.send,
+          rsvp.edit,
+          reports.view,
+          checkin.use,
+          team.manage,
+          billing.manage,
+          event.archive,
+          event.delete,
+        ]
     CreateEvent:
       type: object
       additionalProperties: false
@@ -1610,7 +2044,15 @@ components:
           city,
           status,
           role,
+          effectivePermissions,
+          canViewGuests,
+          canManageGuests,
+          canPrepareInvitations,
           canSendInvitations,
+          canSendReminders,
+          canManageTeam,
+          canEditEvent,
+          canArchiveEvent,
         ]
       properties:
         id: { type: string, format: uuid }
@@ -1624,9 +2066,20 @@ components:
         city: { type: string }
         status: { $ref: "#/components/schemas/EventStatus" }
         role: { $ref: "#/components/schemas/MembershipRole" }
+        effectivePermissions:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/Permission" }
+        canViewGuests: { type: boolean }
+        canManageGuests: { type: boolean }
+        canPrepareInvitations: { type: boolean }
         canSendInvitations:
           type: boolean
-          description: Whether the current membership can send invitations, including additive permission overrides.
+          description: Whether the current membership can send initial invitations.
+        canSendReminders: { type: boolean }
+        canManageTeam: { type: boolean }
+        canEditEvent: { type: boolean }
+        canArchiveEvent: { type: boolean }
     EventDetail:
       type: object
       additionalProperties: false
@@ -1651,7 +2104,15 @@ components:
           qrEnabled,
           status,
           role,
+          effectivePermissions,
+          canViewGuests,
+          canManageGuests,
+          canPrepareInvitations,
           canSendInvitations,
+          canSendReminders,
+          canManageTeam,
+          canEditEvent,
+          canArchiveEvent,
           availableTransitions,
           createdAt,
           updatedAt,
@@ -1681,9 +2142,20 @@ components:
         qrEnabled: { type: boolean }
         status: { $ref: "#/components/schemas/EventStatus" }
         role: { $ref: "#/components/schemas/MembershipRole" }
+        effectivePermissions:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/Permission" }
+        canViewGuests: { type: boolean }
+        canManageGuests: { type: boolean }
+        canPrepareInvitations: { type: boolean }
         canSendInvitations:
           type: boolean
-          description: Whether the current membership can send invitations, including additive permission overrides.
+          description: Whether the current membership can send initial invitations.
+        canSendReminders: { type: boolean }
+        canManageTeam: { type: boolean }
+        canEditEvent: { type: boolean }
+        canArchiveEvent: { type: boolean }
         availableTransitions:
           type: array
           items: { $ref: "#/components/schemas/EventStatus" }
@@ -2632,6 +3104,9 @@ components:
     TemplateStatus:
       type: string
       enum: [DRAFT, APPROVED, ARCHIVED]
+    TemplatePurpose:
+      type: string
+      enum: [INVITATION, REMINDER]
     PreparationLocale:
       type: string
       enum: [ar-SA, en]
@@ -2659,9 +3134,12 @@ components:
     CreateInvitationTemplate:
       type: object
       additionalProperties: false
-      required: [name, locale, body]
+      required: [name, purpose, locale, body]
       properties:
         name: { type: string, minLength: 1, maxLength: 120 }
+        purpose:
+          $ref: "#/components/schemas/TemplatePurpose"
+          default: INVITATION
         locale: { $ref: "#/components/schemas/PreparationLocale" }
         body: { type: string, minLength: 1, maxLength: 1500 }
         extraMessage: { type: string, maxLength: 500 }
@@ -2703,6 +3181,7 @@ components:
           id,
           eventId,
           name,
+          purpose,
           locale,
           body,
           extraMessage,
@@ -2721,6 +3200,7 @@ components:
         id: { type: string, format: uuid }
         eventId: { type: string, format: uuid }
         name: { type: string }
+        purpose: { $ref: "#/components/schemas/TemplatePurpose" }
         locale: { $ref: "#/components/schemas/PreparationLocale" }
         body: { type: string }
         extraMessage: { type: [string, "null"] }
@@ -3151,3 +3631,555 @@ components:
         accepted: { type: boolean, const: true }
         queuedEvents: { type: integer, minimum: 0 }
         duplicateEvents: { type: integer, minimum: 0 }
+    ReminderAudience:
+      type: string
+      enum: [ALL_PENDING, SENT_UNREAD, READ_NO_RESPONSE, APPROACHING_DEADLINE]
+    ReminderTriggerKind:
+      type: string
+      enum: [AFTER_INITIAL_INVITATION, BEFORE_RSVP_DEADLINE]
+    ReminderExclusionReasonCode:
+      type: string
+      enum:
+        [
+          EVENT_NOT_REMINDABLE,
+          INVITATION_CANCELLED,
+          RSVP_NOT_PENDING,
+          INITIAL_INVITATION_NOT_SENT,
+          INITIAL_DELIVERY_FAILED,
+          COOLDOWN_ACTIVE,
+          TEMPLATE_NOT_APPROVED,
+          CURRENT_SNAPSHOT_REQUIRED,
+          AUDIENCE_MISMATCH,
+          RULE_NOT_DUE,
+          RULE_LIMIT_REACHED,
+        ]
+    ReminderRunSource:
+      type: string
+      enum: [MANUAL, SCHEDULED]
+    ReminderReadinessRequest:
+      type: object
+      additionalProperties: false
+      required: [templateId, audience, cooldownHours]
+      properties:
+        templateId: { type: string, format: uuid }
+        invitationIds:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items: { type: string, format: uuid }
+        audience:
+          $ref: "#/components/schemas/ReminderAudience"
+          default: ALL_PENDING
+        cooldownHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+          default: 72
+    ReminderReadinessResponse:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          template,
+          audience,
+          cooldownHours,
+          confirmationToken,
+          expiresAt,
+          summary,
+          eligibleInvitationIds,
+          excluded,
+        ]
+      properties:
+        template:
+          type: object
+          additionalProperties: false
+          required: [id, displayName, locale]
+          properties:
+            id: { type: string, format: uuid }
+            displayName: { type: string }
+            locale: { $ref: "#/components/schemas/PreparationLocale" }
+        audience: { $ref: "#/components/schemas/ReminderAudience" }
+        cooldownHours: { type: integer, minimum: 1 }
+        confirmationToken: { type: string, pattern: "^[a-f0-9]{64}$" }
+        expiresAt: { type: string, format: date-time }
+        summary:
+          type: object
+          additionalProperties: false
+          required:
+            [
+              selectedInvitations,
+              eligibleInvitations,
+              excludedInvitations,
+              recentlyRemindedInvitations,
+              estimatedCreditUnits,
+            ]
+          properties:
+            selectedInvitations: { type: integer, minimum: 0 }
+            eligibleInvitations: { type: integer, minimum: 0 }
+            excludedInvitations: { type: integer, minimum: 0 }
+            recentlyRemindedInvitations: { type: integer, minimum: 0 }
+            estimatedCreditUnits: { type: integer, minimum: 0 }
+        eligibleInvitationIds:
+          type: array
+          items: { type: string, format: uuid }
+        excluded:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [invitationId, reasonCodes, nextEligibleAt]
+            properties:
+              invitationId: { type: string, format: uuid }
+              reasonCodes:
+                type: array
+                minItems: 1
+                items:
+                  { $ref: "#/components/schemas/ReminderExclusionReasonCode" }
+              nextEligibleAt: { type: [string, "null"], format: date-time }
+    SendReminders:
+      type: object
+      additionalProperties: false
+      required: [templateId, audience, cooldownHours, confirmationToken]
+      properties:
+        templateId: { type: string, format: uuid }
+        invitationIds:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items: { type: string, format: uuid }
+        audience:
+          $ref: "#/components/schemas/ReminderAudience"
+          default: ALL_PENDING
+        cooldownHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+          default: 72
+        confirmationToken: { type: string, pattern: "^[a-f0-9]{64}$" }
+    ReminderRule:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          eventId,
+          templateId,
+          name,
+          triggerKind,
+          offsetDays,
+          cooldownHours,
+          maximumReminders,
+          enabled,
+          lastEvaluatedAt,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        templateId: { type: string, format: uuid }
+        name: { type: string }
+        triggerKind: { $ref: "#/components/schemas/ReminderTriggerKind" }
+        offsetDays: { type: integer, minimum: 1, maximum: 30 }
+        cooldownHours: { type: integer, minimum: 1, maximum: 720 }
+        maximumReminders: { type: integer, minimum: 1, maximum: 5 }
+        enabled: { type: boolean }
+        lastEvaluatedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CreateReminderRule:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          templateId,
+          name,
+          triggerKind,
+          offsetDays,
+          cooldownHours,
+          maximumReminders,
+          enabled,
+        ]
+      properties:
+        templateId: { type: string, format: uuid }
+        name: { type: string, minLength: 2, maxLength: 120 }
+        triggerKind: { $ref: "#/components/schemas/ReminderTriggerKind" }
+        offsetDays: { type: integer, minimum: 1, maximum: 30 }
+        cooldownHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+          default: 72
+        maximumReminders:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 1
+        enabled: { type: boolean, default: true }
+    UpdateReminderRule:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        templateId: { type: string, format: uuid }
+        name: { type: string, minLength: 2, maxLength: 120 }
+        triggerKind: { $ref: "#/components/schemas/ReminderTriggerKind" }
+        offsetDays: { type: integer, minimum: 1, maximum: 30 }
+        cooldownHours: { type: integer, minimum: 1, maximum: 720 }
+        maximumReminders: { type: integer, minimum: 1, maximum: 5 }
+        enabled: { type: boolean }
+    ReminderRun:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          eventId,
+          ruleId,
+          sendBatchId,
+          source,
+          status,
+          selectedCount,
+          eligibleCount,
+          excludedCount,
+          cooldownHours,
+          progress,
+          evaluatedAt,
+          completedAt,
+          createdAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        ruleId: { type: [string, "null"], format: uuid }
+        sendBatchId: { type: [string, "null"], format: uuid }
+        source: { $ref: "#/components/schemas/ReminderRunSource" }
+        status: { $ref: "#/components/schemas/SendBatchStatus" }
+        selectedCount: { type: integer, minimum: 0 }
+        eligibleCount: { type: integer, minimum: 0 }
+        excludedCount: { type: integer, minimum: 0 }
+        cooldownHours: { type: integer, minimum: 1 }
+        progress: { $ref: "#/components/schemas/SendBatchProgress" }
+        evaluatedAt: { type: string, format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    ReminderRunItem:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          invitationId,
+          outcome,
+          reasonCodes,
+          messageId,
+          initialInvitationSentAt,
+          lastReminderAt,
+        ]
+      properties:
+        invitationId: { type: string, format: uuid }
+        outcome: { type: string, enum: [ELIGIBLE, EXCLUDED] }
+        reasonCodes:
+          type: array
+          items: { $ref: "#/components/schemas/ReminderExclusionReasonCode" }
+        messageId: { type: [string, "null"], format: uuid }
+        initialInvitationSentAt: { type: [string, "null"], format: date-time }
+        lastReminderAt: { type: [string, "null"], format: date-time }
+    ReminderRunDetail:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          eventId,
+          ruleId,
+          sendBatchId,
+          source,
+          status,
+          selectedCount,
+          eligibleCount,
+          excludedCount,
+          cooldownHours,
+          progress,
+          evaluatedAt,
+          completedAt,
+          createdAt,
+          items,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        ruleId: { type: [string, "null"], format: uuid }
+        sendBatchId: { type: [string, "null"], format: uuid }
+        source: { $ref: "#/components/schemas/ReminderRunSource" }
+        status: { $ref: "#/components/schemas/SendBatchStatus" }
+        selectedCount: { type: integer, minimum: 0 }
+        eligibleCount: { type: integer, minimum: 0 }
+        excludedCount: { type: integer, minimum: 0 }
+        cooldownHours: { type: integer, minimum: 1 }
+        progress: { $ref: "#/components/schemas/SendBatchProgress" }
+        evaluatedAt: { type: string, format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ReminderRunItem" }
+    ListReminderRunsResponse:
+      type: object
+      additionalProperties: false
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ReminderRun" }
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, pageSize, totalItems, totalPages]
+          properties:
+            page: { type: integer, minimum: 1 }
+            pageSize: { type: integer, minimum: 1 }
+            totalItems: { type: integer, minimum: 0 }
+            totalPages: { type: integer, minimum: 0 }
+    NonOwnerMembershipRole:
+      type: string
+      enum: [CO_HOST, CHECK_IN_STAFF]
+    MembershipStatus:
+      type: string
+      enum: [PENDING, ACTIVE, REVOKED]
+    TeamInvitationStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, REVOKED, EXPIRED]
+    PermissionMode:
+      type: string
+      enum: [DEFAULT, CUSTOM]
+    PermissionConfiguration:
+      type: object
+      additionalProperties: false
+      required: [mode, permissions]
+      properties:
+        mode:
+          $ref: "#/components/schemas/PermissionMode"
+          default: DEFAULT
+        permissions:
+          type: array
+          maxItems: 19
+          uniqueItems: true
+          default: []
+          items: { $ref: "#/components/schemas/Permission" }
+    TeamMember:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          userId,
+          displayName,
+          email,
+          role,
+          status,
+          permissionMode,
+          configuredPermissions,
+          effectivePermissions,
+          invitedByUserId,
+          acceptedAt,
+          createdAt,
+          revokedAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        displayName: { type: [string, "null"] }
+        email: { type: [string, "null"] }
+        role: { $ref: "#/components/schemas/MembershipRole" }
+        status: { $ref: "#/components/schemas/MembershipStatus" }
+        permissionMode: { $ref: "#/components/schemas/PermissionMode" }
+        configuredPermissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
+        effectivePermissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
+        invitedByUserId: { type: [string, "null"], format: uuid }
+        acceptedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        revokedAt: { type: [string, "null"], format: date-time }
+    TeamInvitation:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          eventId,
+          maskedPhone,
+          phoneCountry,
+          role,
+          status,
+          permissionMode,
+          configuredPermissions,
+          effectivePermissions,
+          invitedByUserId,
+          expiresAt,
+          acceptedAt,
+          revokedAt,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        maskedPhone: { type: string }
+        phoneCountry: { $ref: "#/components/schemas/GccPhoneCountry" }
+        role: { $ref: "#/components/schemas/NonOwnerMembershipRole" }
+        status: { $ref: "#/components/schemas/TeamInvitationStatus" }
+        permissionMode: { $ref: "#/components/schemas/PermissionMode" }
+        configuredPermissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
+        effectivePermissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
+        invitedByUserId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+        acceptedAt: { type: [string, "null"], format: date-time }
+        revokedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    TeamOverview:
+      type: object
+      additionalProperties: false
+      required: [eventId, members, invitations]
+      properties:
+        eventId: { type: string, format: uuid }
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/TeamMember" }
+        invitations:
+          type: array
+          items: { $ref: "#/components/schemas/TeamInvitation" }
+    CreateTeamInvitation:
+      type: object
+      additionalProperties: false
+      required: [phoneNumber, phoneCountry, role, permissionConfiguration]
+      properties:
+        phoneNumber: { type: string, minLength: 3, maxLength: 40 }
+        phoneCountry:
+          $ref: "#/components/schemas/GccPhoneCountry"
+          default: SA
+        role: { $ref: "#/components/schemas/NonOwnerMembershipRole" }
+        permissionConfiguration:
+          $ref: "#/components/schemas/PermissionConfiguration"
+          default: { mode: DEFAULT, permissions: [] }
+    TeamInvitationCredential:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          eventId,
+          maskedPhone,
+          phoneCountry,
+          role,
+          status,
+          permissionMode,
+          configuredPermissions,
+          effectivePermissions,
+          invitedByUserId,
+          expiresAt,
+          acceptedAt,
+          revokedAt,
+          createdAt,
+          updatedAt,
+          acceptanceToken,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        maskedPhone: { type: string }
+        phoneCountry: { $ref: "#/components/schemas/GccPhoneCountry" }
+        role: { $ref: "#/components/schemas/NonOwnerMembershipRole" }
+        status: { $ref: "#/components/schemas/TeamInvitationStatus" }
+        permissionMode: { $ref: "#/components/schemas/PermissionMode" }
+        configuredPermissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
+        effectivePermissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
+        invitedByUserId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+        acceptedAt: { type: [string, "null"], format: date-time }
+        revokedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        acceptanceToken:
+          type: string
+          minLength: 43
+          maxLength: 256
+          pattern: "^[A-Za-z0-9_-]+$"
+    UpdateTeamMember:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        role: { $ref: "#/components/schemas/NonOwnerMembershipRole" }
+        permissionConfiguration:
+          { $ref: "#/components/schemas/PermissionConfiguration" }
+    AcceptTeamInvitation:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 43
+          maxLength: 256
+          pattern: "^[A-Za-z0-9_-]+$"
+    AcceptTeamInvitationResult:
+      type: object
+      additionalProperties: false
+      required: [eventId, membership, alreadyAccepted]
+      properties:
+        eventId: { type: string, format: uuid }
+        membership: { $ref: "#/components/schemas/TeamMember" }
+        alreadyAccepted: { type: boolean }
+    NotificationKind:
+      type: string
+      enum:
+        [
+          MESSAGE_BATCH_COMPLETED,
+          MESSAGE_BATCH_FAILED,
+          REMINDER_BATCH_COMPLETED,
+          TEAM_MEMBER_JOINED,
+        ]
+    Notification:
+      type: object
+      additionalProperties: false
+      required:
+        [id, eventId, kind, sourceType, sourceId, data, readAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        kind: { $ref: "#/components/schemas/NotificationKind" }
+        sourceType: { type: string }
+        sourceId: { type: string, format: uuid }
+        data: { type: object, additionalProperties: true }
+        readAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    ListNotificationsResponse:
+      type: object
+      additionalProperties: false
+      required: [items, unreadCount, pagination]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Notification" }
+        unreadCount: { type: integer, minimum: 0 }
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, pageSize, totalItems, totalPages]
+          properties:
+            page: { type: integer, minimum: 1 }
+            pageSize: { type: integer, minimum: 1 }
+            totalItems: { type: integer, minimum: 0 }
+            totalPages: { type: integer, minimum: 0 }

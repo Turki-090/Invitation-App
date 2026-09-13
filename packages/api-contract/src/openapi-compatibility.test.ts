@@ -32,6 +32,32 @@ import type {
   SendReadinessResponse,
   WhatsappWebhookAcknowledgement,
 } from "./messaging";
+import type { ListNotificationsResponse, Notification } from "./notifications";
+import type {
+  CreateInvitationTemplateInput,
+  InvitationTemplate,
+} from "./preparation";
+import type {
+  CreateReminderRuleInput,
+  ListReminderRunsResponse,
+  ReminderReadinessRequest,
+  ReminderReadinessResponse,
+  ReminderRule,
+  ReminderRun,
+  ReminderRunDetail,
+  SendRemindersInput,
+  UpdateReminderRuleInput,
+} from "./reminders";
+import type {
+  AcceptTeamInvitationInput,
+  AcceptTeamInvitationResult,
+  CreateTeamInvitationInput,
+  TeamInvitation,
+  TeamInvitationCredential,
+  TeamMember,
+  TeamOverview,
+  UpdateTeamMemberInput,
+} from "./team";
 
 type OpenApiCreateEvent = components["schemas"]["CreateEvent"];
 type OpenApiUpdateEvent = components["schemas"]["UpdateEvent"];
@@ -72,6 +98,36 @@ type OpenApiResendReadinessResponse =
   components["schemas"]["ResendReadinessResponse"];
 type OpenApiWebhookAcknowledgement =
   components["schemas"]["WhatsappWebhookAcknowledgement"];
+type OpenApiCreateInvitationTemplate =
+  components["schemas"]["CreateInvitationTemplate"];
+type OpenApiInvitationTemplate = components["schemas"]["InvitationTemplate"];
+type OpenApiReminderReadinessRequest =
+  components["schemas"]["ReminderReadinessRequest"];
+type OpenApiReminderReadinessResponse =
+  components["schemas"]["ReminderReadinessResponse"];
+type OpenApiSendReminders = components["schemas"]["SendReminders"];
+type OpenApiReminderRule = components["schemas"]["ReminderRule"];
+type OpenApiCreateReminderRule = components["schemas"]["CreateReminderRule"];
+type OpenApiUpdateReminderRule = components["schemas"]["UpdateReminderRule"];
+type OpenApiReminderRun = components["schemas"]["ReminderRun"];
+type OpenApiReminderRunDetail = components["schemas"]["ReminderRunDetail"];
+type OpenApiListReminderRunsResponse =
+  components["schemas"]["ListReminderRunsResponse"];
+type OpenApiTeamMember = components["schemas"]["TeamMember"];
+type OpenApiTeamInvitation = components["schemas"]["TeamInvitation"];
+type OpenApiTeamOverview = components["schemas"]["TeamOverview"];
+type OpenApiCreateTeamInvitation =
+  components["schemas"]["CreateTeamInvitation"];
+type OpenApiTeamInvitationCredential =
+  components["schemas"]["TeamInvitationCredential"];
+type OpenApiUpdateTeamMember = components["schemas"]["UpdateTeamMember"];
+type OpenApiAcceptTeamInvitation =
+  components["schemas"]["AcceptTeamInvitation"];
+type OpenApiAcceptTeamInvitationResult =
+  components["schemas"]["AcceptTeamInvitationResult"];
+type OpenApiNotification = components["schemas"]["Notification"];
+type OpenApiListNotificationsResponse =
+  components["schemas"]["ListNotificationsResponse"];
 
 function assertAssignable<Expected, _Actual extends Expected>(): void {}
 
@@ -172,6 +228,102 @@ describe("OpenAPI runtime contract compatibility", () => {
     assertAssignable<
       WhatsappWebhookAcknowledgement,
       OpenApiWebhookAcknowledgement
+    >();
+  });
+
+  it("keeps template-purpose contracts aligned", () => {
+    assertAssignable<
+      OpenApiCreateInvitationTemplate,
+      CreateInvitationTemplateInput
+    >();
+    assertAssignable<
+      CreateInvitationTemplateInput,
+      OpenApiCreateInvitationTemplate
+    >();
+    assertAssignable<OpenApiInvitationTemplate, InvitationTemplate>();
+    assertAssignable<InvitationTemplate, OpenApiInvitationTemplate>();
+  });
+
+  it("keeps Stage 8 reminder contracts aligned", () => {
+    assertAssignable<
+      OpenApiReminderReadinessRequest,
+      ReminderReadinessRequest
+    >();
+    assertAssignable<
+      ReminderReadinessRequest,
+      OpenApiReminderReadinessRequest
+    >();
+    assertAssignable<
+      OpenApiReminderReadinessResponse,
+      ReminderReadinessResponse
+    >();
+    assertAssignable<
+      ReminderReadinessResponse,
+      OpenApiReminderReadinessResponse
+    >();
+    assertAssignable<OpenApiSendReminders, SendRemindersInput>();
+    assertAssignable<SendRemindersInput, OpenApiSendReminders>();
+    assertAssignable<OpenApiReminderRule, ReminderRule>();
+    assertAssignable<ReminderRule, OpenApiReminderRule>();
+    assertAssignable<OpenApiCreateReminderRule, CreateReminderRuleInput>();
+    assertAssignable<CreateReminderRuleInput, OpenApiCreateReminderRule>();
+    assertAssignable<OpenApiUpdateReminderRule, UpdateReminderRuleInput>();
+    assertAssignable<UpdateReminderRuleInput, OpenApiUpdateReminderRule>();
+    assertAssignable<OpenApiReminderRun, ReminderRun>();
+    assertAssignable<ReminderRun, OpenApiReminderRun>();
+    assertAssignable<OpenApiReminderRunDetail, ReminderRunDetail>();
+    assertAssignable<ReminderRunDetail, OpenApiReminderRunDetail>();
+    assertAssignable<
+      OpenApiListReminderRunsResponse,
+      ListReminderRunsResponse
+    >();
+    assertAssignable<
+      ListReminderRunsResponse,
+      OpenApiListReminderRunsResponse
+    >();
+  });
+
+  it("keeps Stage 8 collaboration contracts aligned", () => {
+    assertAssignable<OpenApiTeamMember, TeamMember>();
+    assertAssignable<TeamMember, OpenApiTeamMember>();
+    assertAssignable<OpenApiTeamInvitation, TeamInvitation>();
+    assertAssignable<TeamInvitation, OpenApiTeamInvitation>();
+    assertAssignable<OpenApiTeamOverview, TeamOverview>();
+    assertAssignable<TeamOverview, OpenApiTeamOverview>();
+    assertAssignable<OpenApiCreateTeamInvitation, CreateTeamInvitationInput>();
+    assertAssignable<CreateTeamInvitationInput, OpenApiCreateTeamInvitation>();
+    assertAssignable<
+      OpenApiTeamInvitationCredential,
+      TeamInvitationCredential
+    >();
+    assertAssignable<
+      TeamInvitationCredential,
+      OpenApiTeamInvitationCredential
+    >();
+    assertAssignable<OpenApiUpdateTeamMember, UpdateTeamMemberInput>();
+    assertAssignable<UpdateTeamMemberInput, OpenApiUpdateTeamMember>();
+    assertAssignable<OpenApiAcceptTeamInvitation, AcceptTeamInvitationInput>();
+    assertAssignable<AcceptTeamInvitationInput, OpenApiAcceptTeamInvitation>();
+    assertAssignable<
+      OpenApiAcceptTeamInvitationResult,
+      AcceptTeamInvitationResult
+    >();
+    assertAssignable<
+      AcceptTeamInvitationResult,
+      OpenApiAcceptTeamInvitationResult
+    >();
+  });
+
+  it("keeps Stage 8 notification contracts aligned", () => {
+    assertAssignable<OpenApiNotification, Notification>();
+    assertAssignable<Notification, OpenApiNotification>();
+    assertAssignable<
+      OpenApiListNotificationsResponse,
+      ListNotificationsResponse
+    >();
+    assertAssignable<
+      ListNotificationsResponse,
+      OpenApiListNotificationsResponse
     >();
   });
 });

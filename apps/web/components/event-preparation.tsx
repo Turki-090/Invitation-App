@@ -139,6 +139,13 @@ function MessagePreparation({
     queryKey: ["events", eventId, "templates"],
     queryFn: () => listInvitationTemplates(supabase, eventId),
   });
+  const invitationTemplates = useMemo(
+    () =>
+      (templates.data ?? []).filter(
+        (template) => template.purpose === "INVITATION",
+      ),
+    [templates.data],
+  );
   const assets = useQuery({
     queryKey: ["events", eventId, "invitation-assets"],
     queryFn: () => listInvitationAssets(supabase, eventId),
@@ -152,19 +159,20 @@ function MessagePreparation({
     blankTemplate(copy, locale),
   );
   const [toast, setToast] = useState("");
-  const selectedTemplate = templates.data?.find(
+  const selectedTemplate = invitationTemplates.find(
     (template) => template.id === selectedTemplateId,
   );
 
   useEffect(() => {
-    if (!selectedTemplateId && templates.data?.length) {
+    if (!selectedTemplateId && invitationTemplates.length) {
       setSelectedTemplateId(
-        templates.data.find((template) => template.status !== "ARCHIVED")?.id ??
-          templates.data[0]?.id ??
+        invitationTemplates.find((template) => template.status !== "ARCHIVED")
+          ?.id ??
+          invitationTemplates[0]?.id ??
           "",
       );
     }
-  }, [selectedTemplateId, templates.data]);
+  }, [invitationTemplates, selectedTemplateId]);
 
   useEffect(() => {
     if (!selectedTemplate || creating) return;
@@ -219,6 +227,7 @@ function MessagePreparation({
             extraMessage: draft.extraMessage || undefined,
             locale: draft.locale,
             name: draft.name,
+            purpose: "INVITATION",
             providerTemplateName: draft.providerTemplateName || undefined,
           }),
     onSuccess: async (template) => {
@@ -325,7 +334,7 @@ function MessagePreparation({
               setCreating(false);
               setSelectedTemplateId(event.currentTarget.value);
             }}
-            options={(templates.data ?? []).map((template) => ({
+            options={invitationTemplates.map((template) => ({
               label: `${template.name} · ${templateStatusLabel(template.status, copy)}`,
               value: template.id,
             }))}

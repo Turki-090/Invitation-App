@@ -624,12 +624,12 @@ export type paths = {
             };
             cookie?: never;
         };
-        /** List invitation templates */
+        /** List message templates */
         get: operations["listInvitationTemplates"];
         put?: never;
         /**
-         * Create an invitation template
-         * @description Creates the first immutable version of a locale-specific invitation template.
+         * Create a message template
+         * @description Creates the first immutable locale-specific version and requires invitation.send for invitation templates or reminder.send for reminder templates.
          */
         post: operations["createInvitationTemplate"];
         delete?: never;
@@ -657,8 +657,8 @@ export type paths = {
         options?: never;
         head?: never;
         /**
-         * Create a new invitation template version
-         * @description Applies an optimistic edit by creating a new immutable draft version and retaining prior versions.
+         * Create a new message-template version
+         * @description Applies an optimistic, purpose-authorized edit by creating a new immutable draft version and retaining prior versions.
          */
         patch: operations["updateInvitationTemplate"];
         trace?: never;
@@ -677,7 +677,10 @@ export type paths = {
         };
         get?: never;
         put?: never;
-        /** Approve an invitation template version */
+        /**
+         * Approve a message-template version
+         * @description Requires the permission associated with the template purpose.
+         */
         post: operations["approveInvitationTemplate"];
         delete?: never;
         options?: never;
@@ -699,7 +702,10 @@ export type paths = {
         };
         get?: never;
         put?: never;
-        /** Archive an invitation template version */
+        /**
+         * Archive a message-template version
+         * @description Requires the permission associated with the template purpose.
+         */
         post: operations["archiveInvitationTemplate"];
         delete?: never;
         options?: never;
@@ -766,8 +772,8 @@ export type paths = {
         get?: never;
         put?: never;
         /**
-         * Prepare immutable invitation snapshots
-         * @description Atomically creates or reuses reproducible content snapshots for all invitations or an explicit bounded selection.
+         * Prepare immutable message snapshots
+         * @description Atomically creates or reuses reproducible invitation or reminder content snapshots for all invitations or an explicit bounded selection, with permission determined by template purpose.
          */
         post: operations["createInvitationSnapshots"];
         delete?: never;
@@ -889,6 +895,328 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/events/{eventId}/reminders/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review reminder eligibility
+         * @description Evaluates the current event, invitation, RSVP, delivery, snapshot, audience, and cooldown state and returns stable exclusion reasons plus a short-lived confirmation.
+         */
+        post: operations["reviewReminderReadiness"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/reminders/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm and queue eligible reminders
+         * @description Re-evaluates the confirmed selection atomically, records every eligible or excluded decision, and queues immutable reminder messages without duplicating a logical request.
+         */
+        post: operations["sendReminders"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/reminders/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** List reminder runs */
+        get: operations["listReminderRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/reminders/runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Reminder-run UUID. */
+                runId: components["parameters"]["ReminderRunId"];
+            };
+            cookie?: never;
+        };
+        /** Get explainable reminder-run decisions */
+        get: operations["getReminderRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/reminders/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** List reminder rules */
+        get: operations["listReminderRules"];
+        put?: never;
+        /** Create an automatic reminder rule */
+        post: operations["createReminderRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/reminders/rules/{ruleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Reminder-rule UUID. */
+                ruleId: components["parameters"]["ReminderRuleId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update an automatic reminder rule */
+        patch: operations["updateReminderRule"];
+        trace?: never;
+    };
+    "/events/{eventId}/team": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** List the event team and pending invitations */
+        get: operations["getEventTeam"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/team-invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invite an event team member
+         * @description Creates a phone-bound, expiring team invitation. The raw acceptance token is returned only by create and resend operations.
+         */
+        post: operations["createTeamInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/team-invitations/{invitationId}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Team-invitation UUID. */
+                invitationId: components["parameters"]["TeamInvitationId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate and resend a pending team invitation */
+        post: operations["resendTeamInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/team-invitations/{invitationId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Team-invitation UUID. */
+                invitationId: components["parameters"]["TeamInvitationId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke a pending team invitation */
+        post: operations["revokeTeamInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/memberships/{membershipId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Event-membership UUID. */
+                membershipId: components["parameters"]["MembershipId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update an event team membership
+         * @description Updates a non-owner role and/or replaces its explicit permission configuration.
+         */
+        patch: operations["updateTeamMembership"];
+        trace?: never;
+    };
+    "/events/{eventId}/memberships/{membershipId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Event-membership UUID. */
+                membershipId: components["parameters"]["MembershipId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke an event team membership */
+        post: operations["revokeTeamMembership"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/team-invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept a phone-bound team invitation
+         * @description Activates an event membership only when the authenticated user's verified phone matches the invitation credential.
+         */
+        post: operations["acceptTeamInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List accessible operational notifications */
+        get: operations["listNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{notificationId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Operational-notification UUID. */
+                notificationId: components["parameters"]["NotificationId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark an accessible notification as read */
+        post: operations["markNotificationRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/messaging/media/{snapshotId}": {
         parameters: {
             query?: never;
@@ -956,6 +1284,8 @@ export type components = {
         EventStatus: "DRAFT" | "ACTIVE" | "RSVP_OPEN" | "RSVP_CLOSED" | "EVENT_DAY" | "COMPLETED" | "ARCHIVED";
         /** @enum {string} */
         MembershipRole: "OWNER" | "CO_HOST" | "CHECK_IN_STAFF";
+        /** @enum {string} */
+        Permission: "event.view" | "event.edit" | "guest.view" | "guest.phone.view" | "guest.create" | "guest.edit" | "guest.delete" | "guest.import" | "guest.export" | "invitation.send" | "invitation.resend" | "reminder.send" | "rsvp.edit" | "reports.view" | "checkin.use" | "team.manage" | "billing.manage" | "event.archive" | "event.delete";
         CreateEvent: {
             nameAr: string;
             nameEn?: string;
@@ -1029,8 +1359,16 @@ export type components = {
             city: string;
             status: components["schemas"]["EventStatus"];
             role: components["schemas"]["MembershipRole"];
-            /** @description Whether the current membership can send invitations, including additive permission overrides. */
+            effectivePermissions: components["schemas"]["Permission"][];
+            canViewGuests: boolean;
+            canManageGuests: boolean;
+            canPrepareInvitations: boolean;
+            /** @description Whether the current membership can send initial invitations. */
             canSendInvitations: boolean;
+            canSendReminders: boolean;
+            canManageTeam: boolean;
+            canEditEvent: boolean;
+            canArchiveEvent: boolean;
         };
         EventDetail: {
             /** Format: uuid */
@@ -1058,8 +1396,16 @@ export type components = {
             qrEnabled: boolean;
             status: components["schemas"]["EventStatus"];
             role: components["schemas"]["MembershipRole"];
-            /** @description Whether the current membership can send invitations, including additive permission overrides. */
+            effectivePermissions: components["schemas"]["Permission"][];
+            canViewGuests: boolean;
+            canManageGuests: boolean;
+            canPrepareInvitations: boolean;
+            /** @description Whether the current membership can send initial invitations. */
             canSendInvitations: boolean;
+            canSendReminders: boolean;
+            canManageTeam: boolean;
+            canEditEvent: boolean;
+            canArchiveEvent: boolean;
             availableTransitions: components["schemas"]["EventStatus"][];
             /** Format: date-time */
             createdAt: string;
@@ -1542,6 +1888,8 @@ export type components = {
         /** @enum {string} */
         TemplateStatus: "DRAFT" | "APPROVED" | "ARCHIVED";
         /** @enum {string} */
+        TemplatePurpose: "INVITATION" | "REMINDER";
+        /** @enum {string} */
         PreparationLocale: "ar-SA" | "en";
         /** @enum {string} */
         MessageVariable: "guest_name" | "event_name" | "event_date" | "event_time" | "venue" | "allowed_companions";
@@ -1555,6 +1903,8 @@ export type components = {
         };
         CreateInvitationTemplate: {
             name: string;
+            /** @default INVITATION */
+            purpose: components["schemas"]["TemplatePurpose"];
             locale: components["schemas"]["PreparationLocale"];
             body: string;
             extraMessage?: string;
@@ -1578,6 +1928,7 @@ export type components = {
             /** Format: uuid */
             eventId: string;
             name: string;
+            purpose: components["schemas"]["TemplatePurpose"];
             locale: components["schemas"]["PreparationLocale"];
             body: string;
             extraMessage: string | null;
@@ -1808,6 +2159,320 @@ export type components = {
             queuedEvents: number;
             duplicateEvents: number;
         };
+        /** @enum {string} */
+        ReminderAudience: "ALL_PENDING" | "SENT_UNREAD" | "READ_NO_RESPONSE" | "APPROACHING_DEADLINE";
+        /** @enum {string} */
+        ReminderTriggerKind: "AFTER_INITIAL_INVITATION" | "BEFORE_RSVP_DEADLINE";
+        /** @enum {string} */
+        ReminderExclusionReasonCode: "EVENT_NOT_REMINDABLE" | "INVITATION_CANCELLED" | "RSVP_NOT_PENDING" | "INITIAL_INVITATION_NOT_SENT" | "INITIAL_DELIVERY_FAILED" | "COOLDOWN_ACTIVE" | "TEMPLATE_NOT_APPROVED" | "CURRENT_SNAPSHOT_REQUIRED" | "AUDIENCE_MISMATCH" | "RULE_NOT_DUE" | "RULE_LIMIT_REACHED";
+        /** @enum {string} */
+        ReminderRunSource: "MANUAL" | "SCHEDULED";
+        ReminderReadinessRequest: {
+            /** Format: uuid */
+            templateId: string;
+            invitationIds?: string[];
+            /** @default ALL_PENDING */
+            audience: components["schemas"]["ReminderAudience"];
+            /** @default 72 */
+            cooldownHours: number;
+        };
+        ReminderReadinessResponse: {
+            template: {
+                /** Format: uuid */
+                id: string;
+                displayName: string;
+                locale: components["schemas"]["PreparationLocale"];
+            };
+            audience: components["schemas"]["ReminderAudience"];
+            cooldownHours: number;
+            confirmationToken: string;
+            /** Format: date-time */
+            expiresAt: string;
+            summary: {
+                selectedInvitations: number;
+                eligibleInvitations: number;
+                excludedInvitations: number;
+                recentlyRemindedInvitations: number;
+                estimatedCreditUnits: number;
+            };
+            eligibleInvitationIds: string[];
+            excluded: {
+                /** Format: uuid */
+                invitationId: string;
+                reasonCodes: components["schemas"]["ReminderExclusionReasonCode"][];
+                /** Format: date-time */
+                nextEligibleAt: string | null;
+            }[];
+        };
+        SendReminders: {
+            /** Format: uuid */
+            templateId: string;
+            invitationIds?: string[];
+            /** @default ALL_PENDING */
+            audience: components["schemas"]["ReminderAudience"];
+            /** @default 72 */
+            cooldownHours: number;
+            confirmationToken: string;
+        };
+        ReminderRule: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            templateId: string;
+            name: string;
+            triggerKind: components["schemas"]["ReminderTriggerKind"];
+            offsetDays: number;
+            cooldownHours: number;
+            maximumReminders: number;
+            enabled: boolean;
+            /** Format: date-time */
+            lastEvaluatedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateReminderRule: {
+            /** Format: uuid */
+            templateId: string;
+            name: string;
+            triggerKind: components["schemas"]["ReminderTriggerKind"];
+            offsetDays: number;
+            /** @default 72 */
+            cooldownHours: number;
+            /** @default 1 */
+            maximumReminders: number;
+            /** @default true */
+            enabled: boolean;
+        };
+        UpdateReminderRule: {
+            /** Format: uuid */
+            templateId?: string;
+            name?: string;
+            triggerKind?: components["schemas"]["ReminderTriggerKind"];
+            offsetDays?: number;
+            cooldownHours?: number;
+            maximumReminders?: number;
+            enabled?: boolean;
+        };
+        ReminderRun: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            ruleId: string | null;
+            /** Format: uuid */
+            sendBatchId: string | null;
+            source: components["schemas"]["ReminderRunSource"];
+            status: components["schemas"]["SendBatchStatus"];
+            selectedCount: number;
+            eligibleCount: number;
+            excludedCount: number;
+            cooldownHours: number;
+            progress: components["schemas"]["SendBatchProgress"];
+            /** Format: date-time */
+            evaluatedAt: string;
+            /** Format: date-time */
+            completedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ReminderRunItem: {
+            /** Format: uuid */
+            invitationId: string;
+            /** @enum {string} */
+            outcome: "ELIGIBLE" | "EXCLUDED";
+            reasonCodes: components["schemas"]["ReminderExclusionReasonCode"][];
+            /** Format: uuid */
+            messageId: string | null;
+            /** Format: date-time */
+            initialInvitationSentAt: string | null;
+            /** Format: date-time */
+            lastReminderAt: string | null;
+        };
+        ReminderRunDetail: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            ruleId: string | null;
+            /** Format: uuid */
+            sendBatchId: string | null;
+            source: components["schemas"]["ReminderRunSource"];
+            status: components["schemas"]["SendBatchStatus"];
+            selectedCount: number;
+            eligibleCount: number;
+            excludedCount: number;
+            cooldownHours: number;
+            progress: components["schemas"]["SendBatchProgress"];
+            /** Format: date-time */
+            evaluatedAt: string;
+            /** Format: date-time */
+            completedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            items: components["schemas"]["ReminderRunItem"][];
+        };
+        ListReminderRunsResponse: {
+            items: components["schemas"]["ReminderRun"][];
+            pagination: {
+                page: number;
+                pageSize: number;
+                totalItems: number;
+                totalPages: number;
+            };
+        };
+        /** @enum {string} */
+        NonOwnerMembershipRole: "CO_HOST" | "CHECK_IN_STAFF";
+        /** @enum {string} */
+        MembershipStatus: "PENDING" | "ACTIVE" | "REVOKED";
+        /** @enum {string} */
+        TeamInvitationStatus: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+        /** @enum {string} */
+        PermissionMode: "DEFAULT" | "CUSTOM";
+        PermissionConfiguration: {
+            /** @default DEFAULT */
+            mode: components["schemas"]["PermissionMode"];
+            /** @default [] */
+            permissions: components["schemas"]["Permission"][];
+        };
+        TeamMember: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            userId: string;
+            displayName: string | null;
+            email: string | null;
+            role: components["schemas"]["MembershipRole"];
+            status: components["schemas"]["MembershipStatus"];
+            permissionMode: components["schemas"]["PermissionMode"];
+            configuredPermissions: components["schemas"]["Permission"][];
+            effectivePermissions: components["schemas"]["Permission"][];
+            /** Format: uuid */
+            invitedByUserId: string | null;
+            /** Format: date-time */
+            acceptedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            revokedAt: string | null;
+        };
+        TeamInvitation: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            maskedPhone: string;
+            phoneCountry: components["schemas"]["GccPhoneCountry"];
+            role: components["schemas"]["NonOwnerMembershipRole"];
+            status: components["schemas"]["TeamInvitationStatus"];
+            permissionMode: components["schemas"]["PermissionMode"];
+            configuredPermissions: components["schemas"]["Permission"][];
+            effectivePermissions: components["schemas"]["Permission"][];
+            /** Format: uuid */
+            invitedByUserId: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            acceptedAt: string | null;
+            /** Format: date-time */
+            revokedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        TeamOverview: {
+            /** Format: uuid */
+            eventId: string;
+            members: components["schemas"]["TeamMember"][];
+            invitations: components["schemas"]["TeamInvitation"][];
+        };
+        CreateTeamInvitation: {
+            phoneNumber: string;
+            /** @default SA */
+            phoneCountry: components["schemas"]["GccPhoneCountry"];
+            role: components["schemas"]["NonOwnerMembershipRole"];
+            /**
+             * @default {
+             *       "mode": "DEFAULT",
+             *       "permissions": []
+             *     }
+             */
+            permissionConfiguration: components["schemas"]["PermissionConfiguration"];
+        };
+        TeamInvitationCredential: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            maskedPhone: string;
+            phoneCountry: components["schemas"]["GccPhoneCountry"];
+            role: components["schemas"]["NonOwnerMembershipRole"];
+            status: components["schemas"]["TeamInvitationStatus"];
+            permissionMode: components["schemas"]["PermissionMode"];
+            configuredPermissions: components["schemas"]["Permission"][];
+            effectivePermissions: components["schemas"]["Permission"][];
+            /** Format: uuid */
+            invitedByUserId: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            acceptedAt: string | null;
+            /** Format: date-time */
+            revokedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            acceptanceToken: string;
+        };
+        UpdateTeamMember: {
+            role?: components["schemas"]["NonOwnerMembershipRole"];
+            permissionConfiguration?: components["schemas"]["PermissionConfiguration"];
+        };
+        AcceptTeamInvitation: {
+            token: string;
+        };
+        AcceptTeamInvitationResult: {
+            /** Format: uuid */
+            eventId: string;
+            membership: components["schemas"]["TeamMember"];
+            alreadyAccepted: boolean;
+        };
+        /** @enum {string} */
+        NotificationKind: "MESSAGE_BATCH_COMPLETED" | "MESSAGE_BATCH_FAILED" | "REMINDER_BATCH_COMPLETED" | "TEAM_MEMBER_JOINED";
+        Notification: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            kind: components["schemas"]["NotificationKind"];
+            sourceType: string;
+            /** Format: uuid */
+            sourceId: string;
+            data: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            readAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ListNotificationsResponse: {
+            items: components["schemas"]["Notification"][];
+            unreadCount: number;
+            pagination: {
+                page: number;
+                pageSize: number;
+                totalItems: number;
+                totalPages: number;
+            };
+        };
     };
     responses: {
         /** @description Missing, invalid, or expired host token. */
@@ -1913,6 +2578,16 @@ export type components = {
         SendBatchId: string;
         /** @description Logical-message UUID. */
         MessageId: string;
+        /** @description Reminder-run UUID. */
+        ReminderRunId: string;
+        /** @description Reminder-rule UUID. */
+        ReminderRuleId: string;
+        /** @description Team-invitation UUID. */
+        TeamInvitationId: string;
+        /** @description Event-membership UUID. */
+        MembershipId: string;
+        /** @description Operational-notification UUID. */
+        NotificationId: string;
         /** @description Caller-generated visible ASCII key unique to this logical mutation. */
         IdempotencyKey: string;
     };
@@ -3048,7 +3723,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Every versioned template owned by the event. */
+            /** @description Every versioned invitation or reminder template owned by the event. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3496,6 +4171,503 @@ export interface operations {
             409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
             503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    reviewReminderReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReminderReadinessRequest"];
+            };
+        };
+        responses: {
+            /** @description Current server-authoritative reminder eligibility and exclusion summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderReadinessResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    sendReminders: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated visible ASCII key unique to this logical mutation. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendReminders"];
+            };
+        };
+        responses: {
+            /** @description Durable reminder run accepted for asynchronous delivery. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderRun"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listReminderRuns: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paged manual and scheduled reminder runs with derived send progress. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListReminderRunsResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getReminderRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Reminder-run UUID. */
+                runId: components["parameters"]["ReminderRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reminder run with each selected invitation's immutable eligibility outcome and reason codes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderRunDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listReminderRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All automatic reminder rules configured for the event. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderRule"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    createReminderRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReminderRule"];
+            };
+        };
+        responses: {
+            /** @description Configured reminder rule. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderRule"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    updateReminderRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Reminder-rule UUID. */
+                ruleId: components["parameters"]["ReminderRuleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReminderRule"];
+            };
+        };
+        responses: {
+            /** @description Updated reminder rule. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderRule"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getEventTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active or revoked memberships and event-bound team invitations visible to a team manager. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamOverview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    createTeamInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTeamInvitation"];
+            };
+        };
+        responses: {
+            /** @description Team invitation plus its one-time acceptance credential. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamInvitationCredential"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    resendTeamInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Team-invitation UUID. */
+                invitationId: components["parameters"]["TeamInvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated invitation plus a newly rotated raw acceptance token. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamInvitationCredential"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    revokeTeamInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Team-invitation UUID. */
+                invitationId: components["parameters"]["TeamInvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked team invitation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamInvitation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    updateTeamMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Event-membership UUID. */
+                membershipId: components["parameters"]["MembershipId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTeamMember"];
+            };
+        };
+        responses: {
+            /** @description Updated event membership and resolved effective capabilities. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMember"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    revokeTeamMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Event-membership UUID. */
+                membershipId: components["parameters"]["MembershipId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked event membership. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMember"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    acceptTeamInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptTeamInvitation"];
+            };
+        };
+        responses: {
+            /** @description Active event membership, including an idempotent already-accepted result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptTeamInvitationResult"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listNotifications: {
+        parameters: {
+            query?: {
+                eventId?: string;
+                unreadOnly?: boolean;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paged notifications scoped to active event memberships, with the caller's unread count. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListNotificationsResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    markNotificationRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Operational-notification UUID. */
+                notificationId: components["parameters"]["NotificationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notification with an idempotently assigned read timestamp. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notification"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getWhatsappMessageMedia: {

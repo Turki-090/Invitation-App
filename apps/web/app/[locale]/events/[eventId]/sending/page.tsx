@@ -30,10 +30,13 @@ export default async function EventSendingPage({
       eventsCopy={dictionary.events}
       guestsCopy={dictionary.guests}
       locale={locale}
+      notificationsCopy={dictionary.notifications}
       preparationCopy={dictionary.preparation}
+      remindersCopy={dictionary.reminders}
       sendingCopy={dictionary.sending}
       section="sending"
       shellCopy={dictionary.shell}
+      teamCopy={dictionary.team}
     />
   );
 }

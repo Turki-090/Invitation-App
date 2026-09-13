@@ -62,7 +62,14 @@ export class EventsService {
       },
       orderBy: [{ eventDate: "asc" }, { createdAt: "asc" }],
     });
-    return events.map((event) => this.toSummary(event));
+    return events
+      .filter((event) => {
+        const membership = event.memberships[0];
+        return Boolean(
+          membership && this.access.allows(membership, Permission.EVENT_VIEW),
+        );
+      })
+      .map((event) => this.toSummary(event));
   }
 
   public async create(
@@ -468,10 +475,7 @@ export class EventsService {
       city: event.city,
       status: event.status,
       role: membership.role,
-      canSendInvitations: this.access.allows(
-        membership,
-        Permission.INVITATION_SEND,
-      ),
+      ...this.capabilities(membership),
     };
   }
 
@@ -501,14 +505,32 @@ export class EventsService {
       qrEnabled: event.qrEnabled,
       status: event.status,
       role: membership.role,
-      canSendInvitations: this.access.allows(
-        membership,
-        Permission.INVITATION_SEND,
-      ),
+      ...this.capabilities(membership),
       availableTransitions: [...allowedEventStatusTransitions(event.status)],
       createdAt: event.createdAt.toISOString(),
       updatedAt: event.updatedAt.toISOString(),
       archivedAt: event.archivedAt?.toISOString() ?? null,
+    };
+  }
+
+  private capabilities(membership: EventCapabilityMembership) {
+    const allows = (permission: (typeof Permission)[keyof typeof Permission]) =>
+      this.access.allows(membership, permission);
+    return {
+      effectivePermissions: [...this.access.effectivePermissions(membership)],
+      canViewGuests: allows(Permission.GUEST_VIEW),
+      canManageGuests: [
+        Permission.GUEST_CREATE,
+        Permission.GUEST_EDIT,
+        Permission.GUEST_DELETE,
+        Permission.GUEST_IMPORT,
+      ].some(allows),
+      canPrepareInvitations: allows(Permission.INVITATION_SEND),
+      canSendInvitations: allows(Permission.INVITATION_SEND),
+      canSendReminders: allows(Permission.REMINDER_SEND),
+      canManageTeam: allows(Permission.TEAM_MANAGE),
+      canEditEvent: allows(Permission.EVENT_EDIT),
+      canArchiveEvent: allows(Permission.EVENT_ARCHIVE),
     };
   }
 

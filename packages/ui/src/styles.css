@@ -1741,21 +1741,29 @@ a:hover {
     background: var(--surface-card);
     border-block-start: 1px solid var(--border-default);
     bottom: 0;
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    display: flex;
+    gap: var(--space-1);
     inset-inline: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
     padding: 6px max(8px, env(safe-area-inset-right))
-      max(6px, env(safe-area-inset-bottom));
+      max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
     position: fixed;
+    scroll-snap-type: inline proximity;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
     z-index: 30;
   }
   .dawah-bottom-nav .dawah-host-nav__item {
+    flex: 1 0 72px;
     flex-direction: column;
     font-size: 10px;
     gap: 2px;
     justify-content: center;
     min-height: 54px;
     padding: 4px;
+    scroll-snap-align: start;
     text-align: center;
   }
   .dawah-bottom-nav .dawah-host-nav__badge {

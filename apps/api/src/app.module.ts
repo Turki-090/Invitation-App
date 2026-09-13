@@ -10,9 +10,12 @@ import { HealthModule } from "./health/health.module";
 import { InvitationsModule } from "./invitations/invitations.module";
 import { ImportsModule } from "./imports/imports.module";
 import { MessagingModule } from "./messaging/messaging.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PreparationModule } from "./preparation/preparation.module";
 import { RsvpModule } from "./rsvp/rsvp.module";
+import { RemindersModule } from "./reminders/reminders.module";
+import { TeamModule } from "./team/team.module";
 
 @Module({
   imports: [
@@ -31,8 +34,11 @@ import { RsvpModule } from "./rsvp/rsvp.module";
     InvitationsModule,
     ImportsModule,
     MessagingModule,
+    NotificationsModule,
     PreparationModule,
+    RemindersModule,
     RsvpModule,
+    TeamModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

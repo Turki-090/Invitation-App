@@ -7,8 +7,13 @@ import {
   createWorkerRedis,
   defaultJobOptions,
   queueNames,
+  reminderRunJobs,
+  reminderSweepJobData,
+  reminderSweepSchedulerId,
+  whatsappBatchJobId,
   whatsappMessageJobs,
   whatsappRsvpConfirmationJobs,
+  type ReminderJobData,
   type WhatsappSendJobData,
   type WhatsappWebhookJobData,
 } from "@dawah/queue";
@@ -23,6 +28,11 @@ import {
 } from "./import-processor";
 import { PrismaImportProcessorRepository } from "./prisma-import-repository";
 import { PrismaMessagingRepository } from "./prisma-messaging-repository";
+import {
+  PrismaReminderRepository,
+  REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS,
+} from "./prisma-reminder-repository";
+import { createReminderProcessor } from "./reminder-processor";
 import { createWhatsappSendProcessor } from "./whatsapp-send-processor";
 import { createWhatsappWebhookProcessor } from "./whatsapp-webhook-processor";
 
@@ -32,6 +42,10 @@ const prisma = new PrismaClient({ datasourceUrl: environment.DATABASE_URL });
 const producerRedis = createProducerRedis(
   environment.REDIS_URL,
   "dawah-worker-messaging-producer",
+);
+const reminderProducerRedis = createProducerRedis(
+  environment.REDIS_URL,
+  "dawah-worker-reminder-producer",
 );
 const storage = createS3ObjectStorage({
   endpoint: environment.STORAGE_ENDPOINT,
@@ -130,6 +144,69 @@ const whatsappWebhookWorker = new Worker<WhatsappWebhookJobData>(
     prefix: environment.QUEUE_PREFIX,
   },
 );
+const reminderQueue = new Queue<ReminderJobData>(queueNames.reminders, {
+  connection: reminderProducerRedis,
+  prefix: environment.QUEUE_PREFIX,
+  defaultJobOptions,
+});
+const reminderRepository = new PrismaReminderRepository(prisma);
+const reminderProcessor = createReminderProcessor({
+  repository: reminderRepository,
+  enqueueRuleRuns: async (runs) => {
+    if (runs.length === 0) return;
+    const jobs = await reminderQueue.addBulk(reminderRunJobs(runs));
+    await Promise.all(jobs.map((job) => retryFailedJob(job)));
+  },
+  dispatchBatch: async (batchId) => {
+    const job = await sendQueue.add(
+      "dispatch",
+      { operation: "DISPATCH_BATCH", batchId },
+      { jobId: whatsappBatchJobId(batchId) },
+    );
+    await retryFailedJob(job);
+  },
+});
+const reminderWorker = new Worker<ReminderJobData>(
+  queueNames.reminders,
+  reminderProcessor,
+  {
+    concurrency: 1,
+    connection: redis,
+    prefix: environment.QUEUE_PREFIX,
+  },
+);
+const reminderSchedulerRegistration = reminderQueue
+  .upsertJobScheduler(
+    reminderSweepSchedulerId,
+    { every: REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS },
+    {
+      name: "sweep",
+      data: reminderSweepJobData(),
+      opts: defaultJobOptions,
+    },
+  )
+  .then(async () => {
+    const evaluationSlot = Math.floor(
+      Date.now() / REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS,
+    );
+    const startupSweep = await reminderQueue.add(
+      "sweep",
+      reminderSweepJobData(),
+      {
+        ...defaultJobOptions,
+        jobId: `reminder-startup-sweep-${evaluationSlot}`,
+      },
+    );
+    await retryFailedJob(startupSweep);
+    return true;
+  })
+  .catch((error: unknown) => {
+    console.error(
+      "Reminder scheduler registration failed:",
+      error instanceof Error ? error.message : "unknown error",
+    );
+    return false;
+  });
 
 let confirmationSweepRunning = false;
 const sweepRsvpConfirmations = async (): Promise<void> => {
@@ -202,6 +279,12 @@ whatsappWebhookWorker.on("error", (error) => {
     error.message,
   );
 });
+reminderWorker.on("error", (error) => {
+  console.error("Reminder worker queue connection error:", error.message);
+});
+reminderWorker.on("failed", (job, error) => {
+  console.error(`Reminder job ${job?.id ?? "unknown"} failed:`, error.message);
+});
 
 const server = createServer(async (request, response) => {
   applySecurityHeaders(response);
@@ -224,6 +307,8 @@ const server = createServer(async (request, response) => {
       importWorkerReady,
       whatsappSendWorkerReady,
       whatsappWebhookWorkerReady,
+      reminderWorkerReady,
+      reminderSchedulerReady,
     ] = await Promise.all([
       resolvesWithin(
         redis.ping().then((result) => result === "PONG"),
@@ -253,6 +338,14 @@ const server = createServer(async (request, response) => {
           .then(() => whatsappWebhookWorker.isRunning()),
         environment.WORKER_READY_TIMEOUT_MS,
       ),
+      resolvesWithin(
+        reminderWorker.waitUntilReady().then(() => reminderWorker.isRunning()),
+        environment.WORKER_READY_TIMEOUT_MS,
+      ),
+      resolvesWithin(
+        reminderSchedulerRegistration,
+        environment.WORKER_READY_TIMEOUT_MS,
+      ),
     ]);
     const ready =
       redisReady &&
@@ -260,7 +353,9 @@ const server = createServer(async (request, response) => {
       healthWorkerReady &&
       importWorkerReady &&
       whatsappSendWorkerReady &&
-      whatsappWebhookWorkerReady;
+      whatsappWebhookWorkerReady &&
+      reminderWorkerReady &&
+      reminderSchedulerReady;
     respond(
       response,
       ready ? 200 : 503,
@@ -274,6 +369,8 @@ const server = createServer(async (request, response) => {
               importWorker: "ok",
               whatsappSendWorker: "ok",
               whatsappWebhookWorker: "ok",
+              reminderWorker: "ok",
+              reminderScheduler: "ok",
             },
           }
         : {
@@ -287,6 +384,8 @@ const server = createServer(async (request, response) => {
               whatsappWebhookWorker: whatsappWebhookWorkerReady
                 ? "ok"
                 : "error",
+              reminderWorker: reminderWorkerReady ? "ok" : "error",
+              reminderScheduler: reminderSchedulerReady ? "ok" : "error",
             },
           },
     );
@@ -316,10 +415,13 @@ const shutdown = async (signal: string): Promise<void> => {
     importWorker.close(),
     whatsappSendWorker.close(),
     whatsappWebhookWorker.close(),
+    reminderWorker.close(),
     sendQueue.close(),
+    reminderQueue.close(),
     prisma.$disconnect(),
     redis.quit(),
     producerRedis.quit(),
+    reminderProducerRedis.quit(),
   ]).then(() => true);
   const finished = await resolvesWithin(graceful, 10_000);
   if (!finished) {
@@ -329,11 +431,14 @@ const shutdown = async (signal: string): Promise<void> => {
       importWorker.close(true),
       whatsappSendWorker.close(true),
       whatsappWebhookWorker.close(true),
+      reminderWorker.close(true),
       sendQueue.close(),
+      reminderQueue.close(),
     ]);
     await prisma.$disconnect().catch(() => undefined);
     redis.disconnect(false);
     producerRedis.disconnect(false);
+    reminderProducerRedis.disconnect(false);
   }
 };
 
@@ -347,6 +452,27 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
       process.exitCode = 1;
     });
   });
+}
+
+async function retryFailedJob(job: {
+  getState(): Promise<string>;
+  retry(
+    state?: "failed" | "completed",
+    options?: {
+      resetAttemptsMade?: boolean;
+      resetAttemptsStarted?: boolean;
+    },
+  ): Promise<void>;
+}): Promise<void> {
+  if ((await job.getState()) !== "failed") return;
+  try {
+    await job.retry("failed", {
+      resetAttemptsMade: true,
+      resetAttemptsStarted: true,
+    });
+  } catch (error) {
+    if ((await job.getState()) === "failed") throw error;
+  }
 }
 
 function respond(

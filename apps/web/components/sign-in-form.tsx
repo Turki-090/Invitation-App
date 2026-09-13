@@ -11,14 +11,17 @@ import { developmentAuthBypassEnabled } from "@/lib/api";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { AppLocale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/dictionaries";
+import { safeRelativeRedirect } from "@/lib/redirect";
 
 interface SignInFormProps {
   locale: AppLocale;
   copy: Dictionary["auth"];
+  redirectTo?: string;
 }
 
-export function SignInForm({ locale, copy }: SignInFormProps) {
+export function SignInForm({ locale, copy, redirectTo }: SignInFormProps) {
   const router = useRouter();
+  const destination = safeRelativeRedirect(redirectTo, locale);
   const [phone, setPhone] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const phoneSchema = z.object({
@@ -84,7 +87,7 @@ export function SignInForm({ locale, copy }: SignInFormProps) {
       setServerError(copy.invalidCode);
       return;
     }
-    router.push(`/${locale}/events`);
+    router.push(destination);
   });
 
   if (phone) {
@@ -144,11 +147,7 @@ export function SignInForm({ locale, copy }: SignInFormProps) {
           <strong>{copy.developmentTitle}</strong>
           <span>{copy.developmentNote}</span>
         </div>
-        <Button
-          fullWidth
-          onClick={() => router.push(`/${locale}/events`)}
-          size="lg"
-        >
+        <Button fullWidth onClick={() => router.push(destination)} size="lg">
           {copy.developmentLogin}
         </Button>
       </div>

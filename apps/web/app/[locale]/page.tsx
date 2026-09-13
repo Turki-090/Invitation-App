@@ -6,10 +6,13 @@ import { getDictionary } from "@/i18n/dictionaries";
 
 export default async function SignInPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ next?: string | string[] }>;
 }) {
   const { locale } = await params;
+  const { next } = await searchParams;
   if (!isAppLocale(locale)) notFound();
   const dictionary = await getDictionary(locale);
   const { auth, common } = dictionary;
@@ -38,7 +41,11 @@ export default async function SignInPage({
             <h1 id="sign-in-title">{auth.title}</h1>
             <p>{auth.intro}</p>
           </div>
-          <SignInForm copy={auth} locale={locale} />
+          <SignInForm
+            copy={auth}
+            locale={locale}
+            redirectTo={typeof next === "string" ? next : next?.[0]}
+          />
         </div>
         <p className="auth-privacy">{auth.privacy}</p>
       </section>
