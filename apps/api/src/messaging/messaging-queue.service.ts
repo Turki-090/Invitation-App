@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from "@nestjs/common";
+import { Inject, Injectable, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { ApiEnvironment } from "@dawah/config";
 import {
@@ -20,7 +20,9 @@ export class MessagingQueueService implements OnModuleDestroy {
   private readonly webhookQueue: Queue<WhatsappWebhookJobData>;
   private readonly confirmationMaximumAttempts: number;
 
-  public constructor(config: ConfigService<ApiEnvironment, true>) {
+  public constructor(
+    @Inject(ConfigService) config: ConfigService<ApiEnvironment, true>,
+  ) {
     this.connection = createProducerRedis(
       config.get("REDIS_URL", { infer: true }),
       "dawah-api-messaging",

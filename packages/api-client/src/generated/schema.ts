@@ -1366,6 +1366,10 @@ export type components = {
             /** @description Whether the current membership can send initial invitations. */
             canSendInvitations: boolean;
             canSendReminders: boolean;
+            canViewReports: boolean;
+            canExportGuests: boolean;
+            canCheckIn: boolean;
+            canManageBilling: boolean;
             canManageTeam: boolean;
             canEditEvent: boolean;
             canArchiveEvent: boolean;
@@ -1403,6 +1407,10 @@ export type components = {
             /** @description Whether the current membership can send initial invitations. */
             canSendInvitations: boolean;
             canSendReminders: boolean;
+            canViewReports: boolean;
+            canExportGuests: boolean;
+            canCheckIn: boolean;
+            canManageBilling: boolean;
             canManageTeam: boolean;
             canEditEvent: boolean;
             canArchiveEvent: boolean;

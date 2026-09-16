@@ -31,6 +31,10 @@ const safeProductionApiEnvironment = {
   META_WHATSAPP_MEDIA_PUBLIC_BASE_URL: "https://api.dawah.sa/api/v1",
   META_WHATSAPP_MEDIA_SIGNING_SECRET:
     "prod-meta-media-signing-secret-2e7b8d4f1a6c",
+  EXPORT_DOWNLOAD_SIGNING_SECRET:
+    "prod-export-download-signing-secret-7f3a9c2e8d4f",
+  CHECK_IN_TOKEN_SIGNING_SECRET:
+    "prod-check-in-token-signing-secret-2e7b8d4f1a6c",
   ...safeProductionStorageEnvironment,
 };
 
@@ -63,6 +67,11 @@ describe("environment validation", () => {
       IMPORT_MAX_CELL_CHARACTERS: 1_000,
       ASSET_MAX_FILE_BYTES: 8_388_608,
       ASSET_MAX_IMAGE_PIXELS: 24_000_000,
+      EXPORT_DOWNLOAD_URL_TTL_SECONDS: 300,
+      EXPORT_RETENTION_HOURS: 168,
+      CHECK_IN_ENABLED: false,
+      BILLING_ENABLED: false,
+      PAYMENTS_ENABLED: false,
     });
   });
 
@@ -80,6 +89,7 @@ describe("environment validation", () => {
       IMPORT_MAX_CELL_CHARACTERS: 1_000,
       ASSET_MAX_FILE_BYTES: 8_388_608,
       ASSET_MAX_IMAGE_PIXELS: 24_000_000,
+      EXPORT_RETENTION_HOURS: 168,
     });
   });
 
@@ -138,6 +148,16 @@ describe("environment validation", () => {
         DAWAH_DEV_AUTH_BYPASS: "true",
       }),
     ).toThrow(/development authentication bypass/i);
+  });
+
+  it("requires billing before payment activation", () => {
+    expect(() =>
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        BILLING_ENABLED: "false",
+        PAYMENTS_ENABLED: "true",
+      }),
+    ).toThrow(/PAYMENTS_ENABLED/);
   });
 
   it("rejects insecure worker infrastructure when deployed", () => {

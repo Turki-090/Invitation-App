@@ -61,6 +61,13 @@ export interface ApiEnvironment
   META_WHATSAPP_APP_SECRET: string;
   META_WHATSAPP_WEBHOOK_VERIFY_TOKEN: string;
   META_WHATSAPP_PHONE_NUMBER_ID: string;
+  EXPORT_DOWNLOAD_SIGNING_SECRET: string;
+  EXPORT_DOWNLOAD_URL_TTL_SECONDS: number;
+  EXPORT_RETENTION_HOURS: number;
+  CHECK_IN_ENABLED: boolean;
+  CHECK_IN_TOKEN_SIGNING_SECRET: string;
+  BILLING_ENABLED: boolean;
+  PAYMENTS_ENABLED: boolean;
 }
 
 export interface WorkerEnvironment
@@ -82,6 +89,7 @@ export interface WorkerEnvironment
   META_WHATSAPP_REQUEST_TIMEOUT_MS: number;
   META_WHATSAPP_SEND_CONCURRENCY: number;
   META_WHATSAPP_MAX_SENDS_PER_SECOND: number;
+  EXPORT_RETENTION_HOURS: number;
 }
 
 export interface WebEnvironment {
@@ -173,6 +181,29 @@ const whatsappRsvpConfirmationShape = {
   META_WHATSAPP_MAX_ATTEMPTS: positiveInteger.max(10).default(5),
 } as const;
 
+const exportRetentionShape = {
+  EXPORT_RETENTION_HOURS: positiveInteger.max(24 * 30).default(24 * 7),
+} as const;
+
+const stage9ApiShape = {
+  ...exportRetentionShape,
+  EXPORT_DOWNLOAD_SIGNING_SECRET: z
+    .string()
+    .min(32)
+    .default("dawah-local-export-download-signing-secret"),
+  EXPORT_DOWNLOAD_URL_TTL_SECONDS: positiveInteger
+    .min(60)
+    .max(60 * 60)
+    .default(5 * 60),
+  CHECK_IN_ENABLED: environmentBoolean,
+  CHECK_IN_TOKEN_SIGNING_SECRET: z
+    .string()
+    .min(32)
+    .default("dawah-local-check-in-token-signing-secret"),
+  BILLING_ENABLED: environmentBoolean,
+  PAYMENTS_ENABLED: environmentBoolean,
+} as const;
+
 const runtimeShape = {
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -187,6 +218,7 @@ const apiEnvironmentSchema = z
     ...importAndAssetLimitsShape,
     ...whatsappMediaShape,
     ...whatsappRsvpConfirmationShape,
+    ...stage9ApiShape,
     DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }),
     QUEUE_PREFIX: optionalText,
@@ -231,6 +263,14 @@ const apiEnvironmentSchema = z
       context,
     );
 
+    if (environment.PAYMENTS_ENABLED && !environment.BILLING_ENABLED) {
+      addIssue(
+        context,
+        "PAYMENTS_ENABLED",
+        "Payment activation requires billing to be enabled.",
+      );
+    }
+
     if (!isDeployedEnvironment(environment.DAWAH_ENV)) return;
 
     validateRemotePostgres(environment.DATABASE_URL, context);
@@ -259,6 +299,16 @@ const apiEnvironmentSchema = z
     validateNonPlaceholderSecret(
       environment.META_WHATSAPP_MEDIA_SIGNING_SECRET,
       "META_WHATSAPP_MEDIA_SIGNING_SECRET",
+      context,
+    );
+    validateNonPlaceholderSecret(
+      environment.EXPORT_DOWNLOAD_SIGNING_SECRET,
+      "EXPORT_DOWNLOAD_SIGNING_SECRET",
+      context,
+    );
+    validateNonPlaceholderSecret(
+      environment.CHECK_IN_TOKEN_SIGNING_SECRET,
+      "CHECK_IN_TOKEN_SIGNING_SECRET",
       context,
     );
     if (/^0+$/.test(environment.META_WHATSAPP_PHONE_NUMBER_ID)) {
@@ -292,6 +342,7 @@ const workerEnvironmentSchema = z
     ...importAndAssetLimitsShape,
     ...whatsappMediaShape,
     ...whatsappRsvpConfirmationShape,
+    ...exportRetentionShape,
     DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }),
     QUEUE_PREFIX: optionalText,

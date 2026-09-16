@@ -5,12 +5,18 @@ import {
   type BulkCancelInvitationsResult,
   type ConfirmImportInput,
   type ConfirmImportResult,
+  type CheckInDashboard,
+  type CheckInResult,
+  type CreateCheckInInput,
+  type CreateExportInput,
   type CreateReminderRuleInput,
   type CreateInvitationTemplateInput,
   type CreatePreparationSnapshotsInput,
   type CreatePreparationSnapshotsResult,
   type CreateInvitationInput,
   type CreateTeamInvitationInput,
+  type EventReport,
+  type ExportJob,
   type GetImportJobQuery,
   type ImportJobDetailResponse,
   type ImportJobSummary,
@@ -25,18 +31,23 @@ import {
   type ListInvitationsQuery,
   type ListNotificationsQuery,
   type ListNotificationsResponse,
+  type ListExportJobsQuery,
+  type ListExportJobsResponse,
   type ListReminderRunsResponse,
   type ReadinessResponse,
   type CreateSendBatchInput,
   type ListSendBatchesResponse,
   type MessageListQuery,
   type PublicInvitation,
+  type PublicEntryPass,
   type PublicInvitationLocaleQuery,
   type ReminderReadinessRequest,
   type ReminderReadinessResponse,
   type ReminderRule,
   type ReminderRun,
   type ReminderRunDetail,
+  type ResolveEntryPassInput,
+  type ResolvedEntryPass,
   type ResendMessageInput,
   type ResendReadinessResponse,
   type SendBatch,
@@ -45,6 +56,8 @@ import {
   type SendReadinessResponse,
   type SendRemindersInput,
   type StoredAsset,
+  type SearchCheckInPartiesQuery,
+  type SearchCheckInPartiesResponse,
   type SubmitRsvpInput,
   type TeamInvitation,
   type TeamInvitationCredential,
@@ -57,6 +70,7 @@ import {
   type UpdateReminderRuleInput,
   type UpdateTeamMemberInput,
   publicInvitationSchema,
+  publicEntryPassSchema,
   rsvpResultSchema,
   type RsvpResult,
 } from "@dawah/api-contract";
@@ -140,6 +154,29 @@ export async function submitPublicRsvp(
   return parsed.data;
 }
 
+export async function issuePublicEntryPass(
+  token: string,
+): Promise<PublicEntryPass> {
+  const response = await fetch(publicEntryPassUrl(token), {
+    cache: "no-store",
+    credentials: "omit",
+    headers: { Accept: "application/json" },
+    method: "POST",
+    referrerPolicy: "no-referrer",
+  });
+  const payload = await response.json().catch(() => undefined);
+  if (!response.ok) throwApiError(payload, response.status);
+  const parsed = publicEntryPassSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new ApiClientError(
+      "INVALID_ENTRY_PASS_RESPONSE",
+      "The entry pass response could not be verified.",
+      502,
+    );
+  }
+  return parsed.data;
+}
+
 function publicInvitationUrl(
   token: string,
   locale: PublicInvitationLocaleQuery["locale"],
@@ -152,6 +189,10 @@ function publicRsvpUrl(
   locale: PublicInvitationLocaleQuery["locale"],
 ): string {
   return publicCapabilityUrl(token, locale, "/rsvp");
+}
+
+function publicEntryPassUrl(token: string): string {
+  return `${apiBaseUrl}/public/invitations/${encodeURIComponent(token)}/entry-pass`;
 }
 
 function publicCapabilityUrl(
@@ -214,6 +255,110 @@ export async function getEventDashboard(
   );
   if (!data) throwApiError(error, response.status);
   return data;
+}
+
+export async function getEventReport(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<EventReport> {
+  return requestAuthenticatedJson(supabase, `/events/${eventId}/reports`);
+}
+
+export async function createExportJob(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: CreateExportInput,
+): Promise<ExportJob> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/exports`,
+    jsonRequest("POST", input),
+  );
+}
+
+export async function listExportJobs(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  query: ListExportJobsQuery = { page: 1, pageSize: 20 },
+): Promise<ListExportJobsResponse> {
+  const search = new URLSearchParams({
+    page: String(query.page),
+    pageSize: String(query.pageSize),
+  });
+  if (query.status) search.set("status", query.status);
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/exports?${search.toString()}`,
+  );
+}
+
+export async function downloadExportJob(
+  supabase: SupabaseClient | null,
+  downloadUrl: string,
+): Promise<Blob> {
+  const parsed = new URL(downloadUrl, apiBaseUrl);
+  const apiOrigin = new URL(apiBaseUrl).origin;
+  if (parsed.origin !== apiOrigin || !parsed.pathname.startsWith("/api/v1/")) {
+    throw new ApiClientError(
+      "INVALID_EXPORT_DOWNLOAD_URL",
+      "The export download URL could not be verified.",
+      502,
+    );
+  }
+  return requestAuthenticatedBlob(
+    supabase,
+    `${parsed.pathname.replace(/^\/api\/v1/, "")}${parsed.search}`,
+  );
+}
+
+export async function resolveEntryPass(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: ResolveEntryPassInput,
+): Promise<ResolvedEntryPass> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/check-ins/resolve`,
+    jsonRequest("POST", input),
+  );
+}
+
+export async function searchCheckInParties(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  query: SearchCheckInPartiesQuery,
+): Promise<SearchCheckInPartiesResponse> {
+  const search = new URLSearchParams({
+    query: query.query,
+    limit: String(query.limit),
+  });
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/check-ins/search?${search.toString()}`,
+  );
+}
+
+export async function getCheckInDashboard(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<CheckInDashboard> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/check-ins/dashboard`,
+  );
+}
+
+export async function createCheckIn(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  input: CreateCheckInInput,
+  idempotencyKey: string,
+): Promise<CheckInResult> {
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/check-ins`,
+    jsonRequest("POST", input, { "Idempotency-Key": idempotencyKey }),
+  );
 }
 
 export async function listInvitations(
@@ -887,6 +1032,34 @@ async function requestAuthenticatedJson<T>(
   const payload = await response.json().catch(() => undefined);
   if (!response.ok) throwApiError(payload, response.status);
   return payload as T;
+}
+
+async function requestAuthenticatedBlob(
+  supabase: SupabaseClient | null,
+  path: string,
+): Promise<Blob> {
+  const accessToken = developmentAuthBypassEnabled
+    ? DEVELOPMENT_ACCESS_TOKEN
+    : (await supabase?.auth.getSession())?.data.session?.access_token;
+  if (!accessToken) {
+    throw new ApiClientError(
+      "AUTH_REQUIRED",
+      "يلزم تسجيل الدخول للمتابعة.",
+      401,
+    );
+  }
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/octet-stream",
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => undefined);
+    throwApiError(payload, response.status);
+  }
+  return response.blob();
 }
 
 async function authenticatedClient(supabase: SupabaseClient | null) {
