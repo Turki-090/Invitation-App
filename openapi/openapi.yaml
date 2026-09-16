@@ -2050,6 +2050,10 @@ components:
           canPrepareInvitations,
           canSendInvitations,
           canSendReminders,
+          canViewReports,
+          canExportGuests,
+          canCheckIn,
+          canManageBilling,
           canManageTeam,
           canEditEvent,
           canArchiveEvent,
@@ -2077,6 +2081,10 @@ components:
           type: boolean
           description: Whether the current membership can send initial invitations.
         canSendReminders: { type: boolean }
+        canViewReports: { type: boolean }
+        canExportGuests: { type: boolean }
+        canCheckIn: { type: boolean }
+        canManageBilling: { type: boolean }
         canManageTeam: { type: boolean }
         canEditEvent: { type: boolean }
         canArchiveEvent: { type: boolean }
@@ -2110,6 +2118,10 @@ components:
           canPrepareInvitations,
           canSendInvitations,
           canSendReminders,
+          canViewReports,
+          canExportGuests,
+          canCheckIn,
+          canManageBilling,
           canManageTeam,
           canEditEvent,
           canArchiveEvent,
@@ -2153,6 +2165,10 @@ components:
           type: boolean
           description: Whether the current membership can send initial invitations.
         canSendReminders: { type: boolean }
+        canViewReports: { type: boolean }
+        canExportGuests: { type: boolean }
+        canCheckIn: { type: boolean }
+        canManageBilling: { type: boolean }
         canManageTeam: { type: boolean }
         canEditEvent: { type: boolean }
         canArchiveEvent: { type: boolean }

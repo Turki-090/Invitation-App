@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultJobOptions,
+  exportJobId,
   reminderRunJobId,
   reminderRunJobs,
   reminderSweepJobData,
@@ -12,6 +13,12 @@ import {
   whatsappRsvpConfirmationJobs,
   whatsappWebhookJobId,
 } from "./index";
+
+describe("export queue identifiers", () => {
+  it("creates a deterministic PII-free export job identifier", () => {
+    expect(exportJobId("job-id")).toBe("export-job-id");
+  });
+});
 
 describe("reminder queue identifiers", () => {
   it("creates stable PII-free sweep and rule-run definitions", () => {

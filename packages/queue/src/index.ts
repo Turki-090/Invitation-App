@@ -31,6 +31,15 @@ export interface WhatsappWebhookJobData {
   readonly webhookEventId: string;
 }
 
+export interface ExportJobData {
+  readonly eventId: string;
+  readonly exportJobId: string;
+}
+
+export function exportJobId(exportJobId: string): string {
+  return `export-${exportJobId}`;
+}
+
 export type ReminderJobData =
   | { readonly operation: "SWEEP" }
   | {
