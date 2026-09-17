@@ -24,6 +24,7 @@ export const REMINDER_EXCLUSION_REASON_CODES = [
   "AUDIENCE_MISMATCH",
   "RULE_NOT_DUE",
   "RULE_LIMIT_REACHED",
+  "INSUFFICIENT_CREDITS",
 ] as const;
 
 export const reminderAudienceSchema = z.enum(REMINDER_AUDIENCES);

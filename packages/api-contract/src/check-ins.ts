@@ -13,7 +13,10 @@ export const CHECK_IN_OUTCOMES = [
 ] as const;
 
 const timestampSchema = z.iso.datetime({ offset: true });
+/** One party's attendance, bounded by the largest invitation a host can create. */
 const attendanceSchema = z.number().int().min(0).max(200);
+/** Event-wide attendance totals, which are the sum of every party. */
+const eventAttendanceSchema = z.number().int().min(0);
 const positiveAttendanceSchema = z.number().int().min(1).max(200);
 const canonicalUuidSchema = z.uuid().transform((value) => value.toLowerCase());
 const optionalDeviceIdSchema = z
@@ -71,8 +74,8 @@ export const checkInPartySchema = z
   .strict()
   .superRefine((value, context) => {
     if (
-      value.checkedInAttendance + value.remainingAttendance !==
-      value.confirmedAttendance
+      value.remainingAttendance !==
+      Math.max(value.confirmedAttendance - value.checkedInAttendance, 0)
     ) {
       context.addIssue({
         code: "custom",
@@ -83,7 +86,7 @@ export const checkInPartySchema = z
     const expectedStatus =
       value.checkedInAttendance === 0
         ? "NOT_ARRIVED"
-        : value.checkedInAttendance === value.confirmedAttendance
+        : value.checkedInAttendance >= value.confirmedAttendance
           ? "CHECKED_IN"
           : "PARTIALLY_CHECKED_IN";
     if (value.status !== expectedStatus) {
@@ -149,8 +152,8 @@ export const checkInResultSchema = z
   .strict()
   .superRefine((value, context) => {
     if (
-      value.checkedInAttendance + value.remainingAttendance !==
-      value.confirmedAttendance
+      value.remainingAttendance !==
+      Math.max(value.confirmedAttendance - value.checkedInAttendance, 0)
     ) {
       context.addIssue({
         code: "custom",
@@ -190,9 +193,9 @@ export type RecentCheckIn = z.infer<typeof recentCheckInSchema>;
 export const checkInDashboardSchema = z
   .object({
     eventId: canonicalUuidSchema,
-    expectedAttendance: attendanceSchema,
-    checkedInAttendance: attendanceSchema,
-    remainingAttendance: attendanceSchema,
+    expectedAttendance: eventAttendanceSchema,
+    checkedInAttendance: eventAttendanceSchema,
+    remainingAttendance: eventAttendanceSchema,
     checkInPercentage: z.number().int().min(0).max(100),
     invitationGroups: z.number().int().nonnegative(),
     fullyCheckedInGroups: z.number().int().nonnegative(),
@@ -205,8 +208,8 @@ export const checkInDashboardSchema = z
   .strict()
   .superRefine((value, context) => {
     if (
-      value.checkedInAttendance + value.remainingAttendance !==
-      value.expectedAttendance
+      value.remainingAttendance !==
+      Math.max(value.expectedAttendance - value.checkedInAttendance, 0)
     ) {
       context.addIssue({
         code: "custom",

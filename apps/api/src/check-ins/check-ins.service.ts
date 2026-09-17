@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -43,7 +42,9 @@ import { PrismaService } from "../prisma/prisma.service";
 const CHECK_IN_OPERATION = "EVENT_CHECK_IN";
 const IDEMPOTENCY_TTL_MILLISECONDS = 7 * 24 * 60 * 60_000;
 const ENTRY_PASS_TTL_MILLISECONDS = 2 * 24 * 60 * 60_000;
-const MAX_TRANSACTION_ATTEMPTS = 3;
+const MAX_TRANSACTION_ATTEMPTS = 6;
+const RETRY_BASE_DELAY_MILLISECONDS = 20;
+const RETRY_MAXIMUM_DELAY_MILLISECONDS = 250;
 
 const partySelect = Prisma.validator<Prisma.InvitationGroupSelect>()({
   id: true,
@@ -95,8 +96,8 @@ export class CheckInsService {
       if (!initial) this.publicInvitationNotFound();
 
       await this.lockInvitation(transaction, initial.invitationGroupId);
-      const capability = await transaction.publicInvitationCapability.findUnique(
-        {
+      const capability =
+        await transaction.publicInvitationCapability.findUnique({
           where: { tokenHash },
           include: {
             invitationGroup: {
@@ -110,8 +111,7 @@ export class CheckInsService {
               },
             },
           },
-        },
-      );
+        });
       const now = new Date();
       if (
         !capability ||
@@ -342,10 +342,12 @@ export class CheckInsService {
       checkInPercentage:
         aggregate.expectedAttendance === 0
           ? 0
-          : Math.round(
-              (aggregate.checkedInAttendance /
-                aggregate.expectedAttendance) *
-                100,
+          : Math.min(
+              Math.round(
+                (aggregate.checkedInAttendance / aggregate.expectedAttendance) *
+                  100,
+              ),
+              100,
             ),
       invitationGroups: aggregate.invitationGroups,
       fullyCheckedInGroups: aggregate.fullyCheckedInGroups,
@@ -443,7 +445,8 @@ export class CheckInsService {
       if (!this.isInvitationEligible(invitation)) {
         throw new ConflictException({
           code: "CHECK_IN_NOT_ELIGIBLE",
-          message: "Only an active invitation with confirmed attendance can be checked in.",
+          message:
+            "Only an active invitation with confirmed attendance can be checked in.",
         });
       }
 
@@ -494,7 +497,12 @@ export class CheckInsService {
             },
           },
         });
-        await this.completeIdempotency(transaction, idempotency.id, result, now);
+        await this.completeIdempotency(
+          transaction,
+          idempotency.id,
+          result,
+          now,
+        );
         return result;
       }
 
@@ -543,9 +551,7 @@ export class CheckInsService {
         },
       });
       const result = checkInResultSchema.parse({
-        outcome: increment.complete
-          ? "CHECKED_IN"
-          : "PARTIALLY_CHECKED_IN",
+        outcome: increment.complete ? "CHECKED_IN" : "PARTIALLY_CHECKED_IN",
         invitationGroupId: invitation.id,
         displayName: invitation.displayName,
         confirmedAttendance: invitation.expectedAttendees,
@@ -701,7 +707,8 @@ export class CheckInsService {
     if (!event.qrEnabled) {
       throw new ConflictException({
         code: "CHECK_IN_DISABLED",
-        message: "Enable QR check-in for this event before using check-in tools.",
+        message:
+          "Enable QR check-in for this event before using check-in tools.",
       });
     }
     if (
@@ -722,7 +729,10 @@ export class CheckInsService {
   }
 
   private actorLabel(
-    actor: { readonly displayName: string | null; readonly email: string | null } | null,
+    actor: {
+      readonly displayName: string | null;
+      readonly email: string | null;
+    } | null,
   ): string | null {
     const label = actor?.displayName?.trim() || actor?.email?.trim() || null;
     return label?.slice(0, 160) ?? null;
@@ -748,6 +758,14 @@ export class CheckInsService {
     if (rows.length === 0) this.invitationNotFound();
   }
 
+  /**
+   * Several scanners working one queue serialize on the same invitation rows,
+   * so a write conflict is an expected event-day condition rather than a
+   * fault. Retries back off with jitter so a contended party does not collide
+   * again on the same tick, and an exhausted attempt answers with a retryable
+   * conflict code instead of an unhandled failure: the caller can safely send
+   * the same idempotency key again.
+   */
   private async withSerializableRetry<T>(
     operation: (transaction: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
@@ -759,14 +777,15 @@ export class CheckInsService {
           timeout: 30_000,
         });
       } catch (error) {
-        if (
-          attempt < MAX_TRANSACTION_ATTEMPTS &&
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          (error.code === "P2002" || error.code === "P2034")
-        ) {
-          continue;
+        if (!isTransactionConflict(error)) throw error;
+        if (attempt >= MAX_TRANSACTION_ATTEMPTS) {
+          throw new ConflictException({
+            code: "CHECK_IN_CONTENDED",
+            message:
+              "Another device is checking in this party. Retry with the same Idempotency-Key.",
+          });
         }
-        throw error;
+        await delay(retryDelayMilliseconds(attempt));
       }
     }
     throw new Error("The serializable transaction retry loop was exhausted.");
@@ -807,4 +826,34 @@ export class CheckInsService {
       message: "The invitation does not exist or is not accessible.",
     });
   }
+}
+
+/** PostgreSQL serialization failure and deadlock SQLSTATEs. */
+const RETRYABLE_SQL_STATES = new Set(["40001", "40P01"]);
+
+/**
+ * Prisma reports a conflicting managed query as P2034, but a raw
+ * `SELECT ... FOR UPDATE` comes back as P2010 with the SQLSTATE in its
+ * metadata. Both are the same event-day contention and both are safe to retry.
+ */
+function isTransactionConflict(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (error.code === "P2002" || error.code === "P2034") return true;
+  if (error.code !== "P2010") return false;
+  const sqlState = (error.meta as { readonly code?: unknown } | undefined)
+    ?.code;
+  return typeof sqlState === "string" && RETRYABLE_SQL_STATES.has(sqlState);
+}
+
+function retryDelayMilliseconds(attempt: number): number {
+  const ceiling = Math.min(
+    RETRY_BASE_DELAY_MILLISECONDS * 2 ** (attempt - 1),
+    RETRY_MAXIMUM_DELAY_MILLISECONDS,
+  );
+  // Full jitter: without it every contending request retries on the same tick.
+  return Math.floor(Math.random() * ceiling);
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }

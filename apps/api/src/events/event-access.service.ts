@@ -26,10 +26,22 @@ export class EventAccessService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
   ) {}
 
-  public ensureUser(
+  /**
+   * Resolves the calling user, writing only when the row is missing or its
+   * contact details actually changed. Every authenticated request passes
+   * through here, and an unconditional write made concurrent requests from one
+   * principal collide inside the repeatable-read and serializable transactions
+   * that reports and check-in run in.
+   */
+  public async ensureUser(
     principal: AuthPrincipal,
     client: EventAccessClient = this.prisma,
   ): Promise<User> {
+    const existing = await client.user.findUnique({
+      where: { authProviderId: principal.subject },
+    });
+    if (existing && !this.contactChanged(existing, principal)) return existing;
+
     return client.user.upsert({
       where: { authProviderId: principal.subject },
       create: {
@@ -42,6 +54,13 @@ export class EventAccessService {
         ...(principal.phone ? { phoneE164: principal.phone } : {}),
       },
     });
+  }
+
+  private contactChanged(user: User, principal: AuthPrincipal): boolean {
+    return (
+      (principal.email !== undefined && principal.email !== user.email) ||
+      (principal.phone !== undefined && principal.phone !== user.phoneE164)
+    );
   }
 
   public resolve(

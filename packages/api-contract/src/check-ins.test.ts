@@ -74,7 +74,8 @@ describe("check-in contracts", () => {
     };
     expect(checkInPartySchema.safeParse(party).success).toBe(true);
     expect(
-      checkInPartySchema.safeParse({ ...party, remainingAttendance: 1 }).success,
+      checkInPartySchema.safeParse({ ...party, remainingAttendance: 1 })
+        .success,
     ).toBe(false);
 
     const result = {
@@ -123,5 +124,43 @@ describe("check-in contracts", () => {
         notArrivedGroups: 2,
       }).success,
     ).toBe(false);
+  });
+
+  it("accepts event-wide totals larger than one invitation's ceiling", () => {
+    expect(
+      checkInDashboardSchema.safeParse({
+        eventId: invitationGroupId,
+        expectedAttendance: 4_000,
+        checkedInAttendance: 1_500,
+        remainingAttendance: 2_500,
+        checkInPercentage: 38,
+        invitationGroups: 900,
+        fullyCheckedInGroups: 300,
+        partiallyCheckedInGroups: 100,
+        notArrivedGroups: 500,
+        duplicateAttempts: 12,
+        recentArrivals: [],
+        calculatedAt: "2026-09-13T12:00:00.000Z",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("keeps a party consistent after its confirmed attendance is lowered", () => {
+    expect(
+      checkInPartySchema.safeParse({
+        invitationGroupId,
+        displayName: "أسرة الشمري",
+        phoneDisplay: "+966••••••11",
+        phoneMasked: true,
+        confirmedAttendance: 2,
+        checkedInAttendance: 3,
+        remainingAttendance: 0,
+        status: "CHECKED_IN",
+        firstCheckedInAt: "2026-09-13T12:00:00.000Z",
+        lastCheckedInAt: "2026-09-13T12:05:00.000Z",
+        lastCheckedInBy: "Fahad",
+        lastDeviceId: null,
+      }).success,
+    ).toBe(true);
   });
 });

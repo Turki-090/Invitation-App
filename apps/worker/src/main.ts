@@ -21,11 +21,17 @@ import { createS3ObjectStorage } from "@dawah/storage";
 import { PrismaClient } from "@prisma/client";
 import { Queue, Worker } from "bullmq";
 import {
+  createExportProcessor,
+  type ExportProcessorResult,
+  type ExportQueueJobData,
+} from "./export-processor";
+import {
   createImportProcessor,
   type ImportProcessorResult,
   type ImportQueueJobData,
   type ImportQueueJobName,
 } from "./import-processor";
+import { PrismaExportRepository } from "./prisma-export-repository";
 import { PrismaImportProcessorRepository } from "./prisma-import-repository";
 import { PrismaMessagingRepository } from "./prisma-messaging-repository";
 import {
@@ -81,6 +87,21 @@ const importWorker = new Worker<
   ImportProcessorResult,
   ImportQueueJobName
 >(queueNames.imports, importProcessor, {
+  concurrency: 1,
+  connection: redis,
+  prefix: environment.QUEUE_PREFIX,
+});
+const exportProcessor = createExportProcessor({
+  privateBucket: environment.STORAGE_PRIVATE_BUCKET,
+  repository: new PrismaExportRepository(prisma),
+  retentionHours: environment.EXPORT_RETENTION_HOURS,
+  storage,
+});
+const exportWorker = new Worker<
+  ExportQueueJobData,
+  ExportProcessorResult,
+  "generate"
+>(queueNames.exports, exportProcessor, {
   concurrency: 1,
   connection: redis,
   prefix: environment.QUEUE_PREFIX,
@@ -256,6 +277,12 @@ healthWorker.on("error", (error) => {
 importWorker.on("error", (error) => {
   console.error("Import worker queue connection error:", error.message);
 });
+exportWorker.on("error", (error) => {
+  console.error("Export worker queue connection error:", error.message);
+});
+exportWorker.on("failed", (job, error) => {
+  console.error(`Export job ${job?.id ?? "unknown"} failed:`, error.message);
+});
 whatsappSendWorker.on("error", (error) => {
   console.error("WhatsApp send worker queue connection error:", error.message);
 });
@@ -305,6 +332,7 @@ const server = createServer(async (request, response) => {
       databaseReady,
       healthWorkerReady,
       importWorkerReady,
+      exportWorkerReady,
       whatsappSendWorkerReady,
       whatsappWebhookWorkerReady,
       reminderWorkerReady,
@@ -324,6 +352,10 @@ const server = createServer(async (request, response) => {
       ),
       resolvesWithin(
         importWorker.waitUntilReady().then(() => importWorker.isRunning()),
+        environment.WORKER_READY_TIMEOUT_MS,
+      ),
+      resolvesWithin(
+        exportWorker.waitUntilReady().then(() => exportWorker.isRunning()),
         environment.WORKER_READY_TIMEOUT_MS,
       ),
       resolvesWithin(
@@ -352,6 +384,7 @@ const server = createServer(async (request, response) => {
       databaseReady &&
       healthWorkerReady &&
       importWorkerReady &&
+      exportWorkerReady &&
       whatsappSendWorkerReady &&
       whatsappWebhookWorkerReady &&
       reminderWorkerReady &&
@@ -367,6 +400,7 @@ const server = createServer(async (request, response) => {
               database: "ok",
               healthWorker: "ok",
               importWorker: "ok",
+              exportWorker: "ok",
               whatsappSendWorker: "ok",
               whatsappWebhookWorker: "ok",
               reminderWorker: "ok",
@@ -380,6 +414,7 @@ const server = createServer(async (request, response) => {
               database: databaseReady ? "ok" : "error",
               healthWorker: healthWorkerReady ? "ok" : "error",
               importWorker: importWorkerReady ? "ok" : "error",
+              exportWorker: exportWorkerReady ? "ok" : "error",
               whatsappSendWorker: whatsappSendWorkerReady ? "ok" : "error",
               whatsappWebhookWorker: whatsappWebhookWorkerReady
                 ? "ok"
@@ -413,6 +448,7 @@ const shutdown = async (signal: string): Promise<void> => {
     new Promise<void>((resolve) => server.close(() => resolve())),
     healthWorker.close(),
     importWorker.close(),
+    exportWorker.close(),
     whatsappSendWorker.close(),
     whatsappWebhookWorker.close(),
     reminderWorker.close(),
@@ -429,6 +465,7 @@ const shutdown = async (signal: string): Promise<void> => {
     await Promise.allSettled([
       healthWorker.close(true),
       importWorker.close(true),
+      exportWorker.close(true),
       whatsappSendWorker.close(true),
       whatsappWebhookWorker.close(true),
       reminderWorker.close(true),

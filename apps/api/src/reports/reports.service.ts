@@ -1,15 +1,25 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { EventReport } from "@dawah/api-contract";
 import { Permission } from "@dawah/domain";
-import { Prisma, type EventStatus, type PrismaClient } from "@prisma/client";
+import {
+  Prisma,
+  type EventStatus,
+  type MessageStatus,
+  type PrismaClient,
+} from "@prisma/client";
 import type { AuthPrincipal } from "../auth/auth.types";
 import { EventAccessService } from "../events/event-access.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 type ReportClient = Pick<
   PrismaClient,
-  "invitationGroup" | "guestMember" | "message" | "checkInState"
+  "invitationGroup" | "guestMember" | "message" | "checkInState" | "$queryRaw"
 >;
+
+interface LatestDeliveryRow {
+  readonly status: MessageStatus;
+  readonly count: number;
+}
 
 const RSVP_STATUSES = [
   "ACCEPTED",
@@ -40,20 +50,23 @@ export class ReportsService {
     @Inject(EventAccessService) private readonly access: EventAccessService,
   ) {}
 
-  public get(
+  /**
+   * Authorization resolves before the snapshot opens. It upserts the calling
+   * user, and a write inside a `RepeatableRead` transaction turns concurrent
+   * reports for the same caller into serialization failures; the report itself
+   * only needs every aggregate to come from one snapshot.
+   */
+  public async get(
     principal: AuthPrincipal,
     eventId: string,
   ): Promise<EventReport> {
+    const { event } = await this.access.resolve(
+      principal,
+      eventId,
+      Permission.REPORTS_VIEW,
+    );
     return this.prisma.$transaction(
-      async (transaction) => {
-        const { event } = await this.access.resolve(
-          principal,
-          eventId,
-          Permission.REPORTS_VIEW,
-          transaction,
-        );
-        return this.aggregate(transaction, eventId, event.status);
-      },
+      (transaction) => this.aggregate(transaction, eventId, event.status),
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
   }
@@ -108,16 +121,27 @@ export class ReportsService {
           predecessorMessageId: null,
         },
       }),
-      client.message.findMany({
-        where: { ...activeMessageWhere, messageType: "INVITATION" },
-        distinct: ["invitationGroupId"],
-        orderBy: [
-          { invitationGroupId: "asc" },
-          { createdAt: "desc" },
-          { id: "desc" },
-        ],
-        select: { status: true },
-      }),
+      // One row per delivery status rather than one row per guest: the report
+      // must stay bounded for an event with twenty thousand invitations.
+      client.$queryRaw<LatestDeliveryRow[]>`
+        SELECT "latest"."status" AS "status", COUNT(*)::int AS "count"
+        FROM (
+          SELECT DISTINCT ON ("message"."invitation_group_id")
+            "message"."status" AS "status"
+          FROM "messages" AS "message"
+          JOIN "invitation_groups" AS "invitation"
+            ON "invitation"."id" = "message"."invitation_group_id"
+           AND "invitation"."event_id" = "message"."event_id"
+          WHERE "message"."event_id" = ${eventId}::uuid
+            AND "message"."message_type" = 'INVITATION'
+            AND "invitation"."cancelled_at" IS NULL
+          ORDER BY
+            "message"."invitation_group_id",
+            "message"."created_at" DESC,
+            "message"."id" DESC
+        ) AS "latest"
+        GROUP BY "latest"."status"
+      `,
       client.checkInState.aggregate({
         where: {
           eventId,
@@ -137,18 +161,16 @@ export class ReportsService {
       0,
     );
     const rsvpCount = countBy(rsvpGroups, "rsvpStatus");
-    const invitationTypeCount = countBy(
-      invitationTypeGroups,
-      "invitationType",
+    const invitationTypeCount = countBy(invitationTypeGroups, "invitationType");
+    const latestMessageCounts = new Map<string, number>(
+      latestInvitationMessages.map((row) => [row.status, row.count]),
     );
-    const latestMessageCounts = new Map<string, number>();
-    for (const message of latestInvitationMessages) {
-      latestMessageCounts.set(
-        message.status,
-        (latestMessageCounts.get(message.status) ?? 0) + 1,
-      );
-    }
-    const messageCount = (status: string) => latestMessageCounts.get(status) ?? 0;
+    const latestMessageTotal = latestInvitationMessages.reduce(
+      (total, row) => total + row.count,
+      0,
+    );
+    const messageCount = (status: string) =>
+      latestMessageCounts.get(status) ?? 0;
 
     return {
       eventId,
@@ -176,11 +198,8 @@ export class ReportsService {
         primaryWithCompanionsGroups: invitationTypeCount(INVITATION_TYPES[2]),
       },
       delivery: {
-        latestInvitationMessages: latestInvitationMessages.length,
-        notSentGroups: Math.max(
-          activeGroupCount - latestInvitationMessages.length,
-          0,
-        ),
+        latestInvitationMessages: latestMessageTotal,
+        notSentGroups: Math.max(activeGroupCount - latestMessageTotal, 0),
         byStatus: {
           queued: messageCount(MESSAGE_STATUSES[0]),
           sending: messageCount(MESSAGE_STATUSES[1]),

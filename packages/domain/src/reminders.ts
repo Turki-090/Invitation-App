@@ -17,6 +17,7 @@ export const ReminderEligibilityReason = {
   AUDIENCE_MISMATCH: "AUDIENCE_MISMATCH",
   RULE_NOT_DUE: "RULE_NOT_DUE",
   RULE_LIMIT_REACHED: "RULE_LIMIT_REACHED",
+  INSUFFICIENT_CREDITS: "INSUFFICIENT_CREDITS",
 } as const;
 
 export type ReminderEligibilityReason =
@@ -35,6 +36,7 @@ export const REMINDER_EXCLUSION_REASON_CODES = [
   ReminderEligibilityReason.AUDIENCE_MISMATCH,
   ReminderEligibilityReason.RULE_NOT_DUE,
   ReminderEligibilityReason.RULE_LIMIT_REACHED,
+  ReminderEligibilityReason.INSUFFICIENT_CREDITS,
 ] as const satisfies readonly ReminderEligibilityReason[];
 
 export const REMINDER_ELIGIBILITY_REASON_CATALOG =

@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { createStorageKeyFactory, type PrivateObjectStorage } from "@dawah/storage";
+import {
+  createStorageKeyFactory,
+  type PrivateObjectStorage,
+} from "@dawah/storage";
 import { UnrecoverableError, type Job } from "bullmq";
 import ExcelJS from "exceljs-hardened";
 
@@ -191,7 +194,7 @@ export function createExportProcessor(
       body,
       contentType,
       metadata: {
-        export_job_id: claimed.job.exportJobId,
+        "export-job-id": claimed.job.exportJobId,
         sha256,
       },
     });
@@ -202,11 +205,18 @@ export function createExportProcessor(
     if (
       !stored ||
       stored.size !== body.byteLength ||
-      (stored.contentType !== undefined && stored.contentType !== contentType) ||
+      (stored.contentType !== undefined &&
+        stored.contentType !== contentType) ||
       stored.metadata.sha256 !== sha256
     ) {
-      await safelyDelete(dependencies.storage, dependencies.privateBucket, objectKey);
-      throw new Error("The generated export failed its private-storage integrity check.");
+      await safelyDelete(
+        dependencies.storage,
+        dependencies.privateBucket,
+        objectKey,
+      );
+      throw new Error(
+        "The generated export failed its private-storage integrity check.",
+      );
     }
 
     let completed: CompleteExportResult;
@@ -226,7 +236,11 @@ export function createExportProcessor(
         now(),
       );
     } catch (error) {
-      await safelyDelete(dependencies.storage, dependencies.privateBucket, objectKey);
+      await safelyDelete(
+        dependencies.storage,
+        dependencies.privateBucket,
+        objectKey,
+      );
       throw error;
     }
 
@@ -234,7 +248,11 @@ export function createExportProcessor(
       completed.outcome !== "COMPLETED" &&
       completed.retainedObjectKey !== objectKey
     ) {
-      await safelyDelete(dependencies.storage, dependencies.privateBucket, objectKey);
+      await safelyDelete(
+        dependencies.storage,
+        dependencies.privateBucket,
+        objectKey,
+      );
     }
     if (completed.outcome !== "COMPLETED") {
       return {
@@ -263,20 +281,82 @@ interface ExportColumn {
 
 function exportColumns(includePhone: boolean): readonly ExportColumn[] {
   return [
-    { header: "معرّف الدعوة", key: "invitation_id", width: 38, value: (row) => row.invitationId },
-    { header: "اسم المجموعة", key: "display_name", width: 30, value: (row) => safeSpreadsheetText(row.displayName) },
-    { header: "اسم جهة الاتصال", key: "contact_name", width: 30, value: (row) => safeSpreadsheetText(row.contactName) },
+    {
+      header: "معرّف الدعوة",
+      key: "invitation_id",
+      width: 38,
+      value: (row) => row.invitationId,
+    },
+    {
+      header: "اسم المجموعة",
+      key: "display_name",
+      width: 30,
+      value: (row) => safeSpreadsheetText(row.displayName),
+    },
+    {
+      header: "اسم جهة الاتصال",
+      key: "contact_name",
+      width: 30,
+      value: (row) => safeSpreadsheetText(row.contactName),
+    },
     ...(includePhone
-      ? [{ header: "رقم الهاتف", key: "phone", width: 20, value: (row: ExportRow) => safeSpreadsheetText(row.phoneE164 ?? "") }]
+      ? [
+          {
+            header: "رقم الهاتف",
+            key: "phone",
+            width: 20,
+            value: (row: ExportRow) => safeSpreadsheetText(row.phoneE164 ?? ""),
+          },
+        ]
       : []),
-    { header: "نوع الدعوة", key: "invitation_type", width: 24, value: (row) => row.invitationType },
-    { header: "عدد المرافقين", key: "max_companions", width: 16, value: (row) => row.maxCompanions },
-    { header: "أسماء الضيوف", key: "guest_names", width: 45, value: (row) => safeSpreadsheetText(row.guestNames.join("؛ ")) },
-    { header: "حالة الرد", key: "rsvp_status", width: 22, value: (row) => row.rsvpStatus },
-    { header: "الحضور المتوقع", key: "expected_attendees", width: 18, value: (row) => row.expectedAttendees },
-    { header: "تم تسجيل دخولهم", key: "checked_in", width: 18, value: (row) => row.checkedInCount },
-    { header: "المتبقي", key: "remaining", width: 14, value: (row) => Math.max(0, row.expectedAttendees - row.checkedInCount) },
-    { header: "آخر حالة توصيل", key: "latest_delivery_status", width: 22, value: (row) => row.latestDeliveryStatus ?? "" },
+    {
+      header: "نوع الدعوة",
+      key: "invitation_type",
+      width: 24,
+      value: (row) => row.invitationType,
+    },
+    {
+      header: "عدد المرافقين",
+      key: "max_companions",
+      width: 16,
+      value: (row) => row.maxCompanions,
+    },
+    {
+      header: "أسماء الضيوف",
+      key: "guest_names",
+      width: 45,
+      value: (row) => safeSpreadsheetText(row.guestNames.join("؛ ")),
+    },
+    {
+      header: "حالة الرد",
+      key: "rsvp_status",
+      width: 22,
+      value: (row) => row.rsvpStatus,
+    },
+    {
+      header: "الحضور المتوقع",
+      key: "expected_attendees",
+      width: 18,
+      value: (row) => row.expectedAttendees,
+    },
+    {
+      header: "تم تسجيل دخولهم",
+      key: "checked_in",
+      width: 18,
+      value: (row) => row.checkedInCount,
+    },
+    {
+      header: "المتبقي",
+      key: "remaining",
+      width: 14,
+      value: (row) => Math.max(0, row.expectedAttendees - row.checkedInCount),
+    },
+    {
+      header: "آخر حالة توصيل",
+      key: "latest_delivery_status",
+      width: 22,
+      value: (row) => row.latestDeliveryStatus ?? "",
+    },
   ];
 }
 
@@ -338,7 +418,8 @@ function createArtifactWriter(
 }
 
 function csvCell(value: string | number): string {
-  const text = typeof value === "number" ? String(value) : safeSpreadsheetText(value);
+  const text =
+    typeof value === "number" ? String(value) : safeSpreadsheetText(value);
   return `"${text.replaceAll('"', '""')}"`;
 }
 
@@ -374,7 +455,9 @@ function assertForwardProgress(
         (row.cursor.createdAt.getTime() === cursor.createdAt.getTime() &&
           row.cursor.id <= cursor.id))
     ) {
-      throw new Error("The export repository did not advance its keyset cursor.");
+      throw new Error(
+        "The export repository did not advance its keyset cursor.",
+      );
     }
     cursor = row.cursor;
   }
@@ -387,7 +470,9 @@ function assertDependencies(dependencies: ExportProcessorDependencies): void {
     (dependencies.pageSize !== undefined &&
       (!Number.isInteger(dependencies.pageSize) || dependencies.pageSize <= 0))
   ) {
-    throw new RangeError("Export retention and page size must be positive integers.");
+    throw new RangeError(
+      "Export retention and page size must be positive integers.",
+    );
   }
 }
 

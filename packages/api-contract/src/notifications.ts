@@ -5,7 +5,10 @@ export const notificationKindSchema = z.enum([
   "MESSAGE_BATCH_FAILED",
   "REMINDER_BATCH_COMPLETED",
   "TEAM_MEMBER_JOINED",
+  "EXPORT_READY",
+  "EXPORT_FAILED",
 ]);
+export type NotificationKind = z.infer<typeof notificationKindSchema>;
 
 export const notificationSchema = z.object({
   id: z.uuid(),

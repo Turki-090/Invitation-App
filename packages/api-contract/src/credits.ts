@@ -29,9 +29,7 @@ export const creditReconciliationSchema = z.object({
   excessChargeUnits: z.number().int().nonnegative(),
   reconciled: z.boolean(),
 });
-export type CreditReconciliation = z.infer<
-  typeof creditReconciliationSchema
->;
+export type CreditReconciliation = z.infer<typeof creditReconciliationSchema>;
 
 export const creditOverviewSchema = z.object({
   eventId: z.uuid(),
@@ -67,9 +65,7 @@ export const listCreditLedgerQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   entryType: creditLedgerEntryTypeSchema.optional(),
 });
-export type ListCreditLedgerQuery = z.infer<
-  typeof listCreditLedgerQuerySchema
->;
+export type ListCreditLedgerQuery = z.infer<typeof listCreditLedgerQuerySchema>;
 
 export const listCreditLedgerResponseSchema = z.object({
   items: z.array(creditLedgerEntrySchema),

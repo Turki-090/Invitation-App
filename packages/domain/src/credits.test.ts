@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertCreditLedgerUnits,
   calculateCreditPosition,
+  chargeReservation,
   CreditLedgerEntryType,
   CreditReservationStatus,
   reconcileCreditUsage,
@@ -72,6 +73,36 @@ describe("credit accounting rules", () => {
     expect(() =>
       assertCreditLedgerUnits(CreditLedgerEntryType.MANUAL_ADJUSTMENT, 0),
     ).toThrow("cannot be zero");
+  });
+
+  it("releases held units one logical send at a time", () => {
+    expect(
+      chargeReservation({
+        status: CreditReservationStatus.ACTIVE,
+        units: 3,
+      }),
+    ).toEqual({ heldUnits: 2, status: CreditReservationStatus.ACTIVE });
+    expect(
+      chargeReservation({
+        status: CreditReservationStatus.ACTIVE,
+        units: 1,
+      }),
+    ).toEqual({ heldUnits: 1, status: CreditReservationStatus.CONSUMED });
+  });
+
+  it("refuses to charge a terminal reservation or exceed its held units", () => {
+    expect(() =>
+      chargeReservation({
+        status: CreditReservationStatus.CONSUMED,
+        units: 2,
+      }),
+    ).toThrow("active reservation");
+    expect(() =>
+      chargeReservation(
+        { status: CreditReservationStatus.ACTIVE, units: 2 },
+        3,
+      ),
+    ).toThrow("beyond the units it holds");
   });
 
   it("permits only terminal transitions from an active reservation", () => {

@@ -31,7 +31,9 @@ export class ExportsQueueService implements OnModuleDestroy {
   }
 
   public enqueue(data: ExportJobData): Promise<unknown> {
-    return this.queue.add("generate", data, { jobId: exportJobId(data.exportJobId) });
+    return this.queue.add("generate", data, {
+      jobId: exportJobId(data.exportJobId),
+    });
   }
 
   public async onModuleDestroy(): Promise<void> {
@@ -39,4 +41,3 @@ export class ExportsQueueService implements OnModuleDestroy {
     this.connection.disconnect(false);
   }
 }
-

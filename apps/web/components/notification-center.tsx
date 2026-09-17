@@ -144,6 +144,8 @@ function notificationLabel(
     MESSAGE_BATCH_FAILED: copy.batchFailed,
     REMINDER_BATCH_COMPLETED: copy.reminderCompleted,
     TEAM_MEMBER_JOINED: copy.memberJoined,
+    EXPORT_READY: copy.exportReady,
+    EXPORT_FAILED: copy.exportFailed,
   }[notification.kind];
 }
 

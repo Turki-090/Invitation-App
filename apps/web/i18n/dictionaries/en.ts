@@ -830,6 +830,7 @@ const en = {
     reasonAudienceMismatch: "Invitation is outside the selected segment",
     reasonRuleNotDue: "The automatic rule is not due",
     reasonRuleLimitReached: "Maximum reminders reached for this invitation",
+    reasonInsufficientCredits: "Not enough credits for this reminder run",
   },
   reports: {
     metadataTitle: "Event reports",
@@ -913,6 +914,8 @@ const en = {
     loadError: "The check-in state could not be loaded.",
     refresh: "Refresh",
     expected: "Expected",
+    peopleUnit: "people",
+    groupsUnit: "groups",
     arrived: "Arrived",
     remaining: "Remaining",
     completeGroups: "Complete groups",
@@ -970,9 +973,11 @@ const en = {
     noEntriesTitle: "No credit entries",
     noEntriesDescription: "Purchases, usage, and refunds will appear here.",
     billingDisabled: "Commercial billing is not enabled in this environment.",
-    paymentsDisabled: "Online payments are disabled; purchases cannot be started.",
+    paymentsDisabled:
+      "Online payments are disabled; purchases cannot be started.",
     permissionDeniedTitle: "Billing is unavailable for this role",
-    permissionDeniedDescription: "Billing management is restricted to the event owner.",
+    permissionDeniedDescription:
+      "Billing management is restricted to the event owner.",
     entryPurchase: "Purchase",
     entryBonus: "Bonus",
     entrySendUsage: "Send usage",
@@ -1105,6 +1110,8 @@ const en = {
     batchFailed: "A message batch has failed messages",
     reminderCompleted: "A reminder batch completed",
     memberJoined: "A new member joined the event team",
+    exportReady: "An export file is ready to download",
+    exportFailed: "An export file could not be built",
   },
   publicInvitation: {
     metadataTitle: "Private invitation",

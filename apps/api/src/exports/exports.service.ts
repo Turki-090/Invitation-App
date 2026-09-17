@@ -36,7 +36,6 @@ export interface ExportDownload {
   readonly filename: string;
 }
 
-const DOWNLOAD_TTL_SECONDS = 15 * 60;
 const supportedContentTypes = new Set([
   "text/csv; charset=utf-8",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -192,7 +191,8 @@ export class ExportsService {
     if (
       !object ||
       object.body.byteLength !== asset.byteSize ||
-      (object.contentType !== undefined && object.contentType !== asset.contentType) ||
+      (object.contentType !== undefined &&
+        object.contentType !== asset.contentType) ||
       createHash("sha256").update(object.body).digest("hex") !== asset.sha256
     ) {
       throw this.unavailable();
@@ -221,7 +221,8 @@ export class ExportsService {
     const now = new Date();
     const expired =
       job.expiresAt !== null && job.expiresAt.getTime() <= now.getTime();
-    const status = expired && job.status === "COMPLETED" ? "EXPIRED" : job.status;
+    const status =
+      expired && job.status === "COMPLETED" ? "EXPIRED" : job.status;
     const asset = status === "COMPLETED" ? job.outputAsset : null;
     return {
       id: job.id,
@@ -255,7 +256,8 @@ export class ExportsService {
     asset: StoredAsset,
     now: Date,
   ): string {
-    const maximumExpiry = Math.floor(now.getTime() / 1_000) + DOWNLOAD_TTL_SECONDS;
+    const maximumExpiry =
+      Math.floor(now.getTime() / 1_000) + this.downloadTtlSeconds();
     const jobExpiry = Math.floor((job.expiresAt?.getTime() ?? 0) / 1_000);
     const expires = Math.min(maximumExpiry, jobExpiry);
     const signature = this.downloadSignature(job, asset, expires);
@@ -270,7 +272,7 @@ export class ExportsService {
     const nowSeconds = Math.floor(Date.now() / 1_000);
     if (
       query.expires <= nowSeconds ||
-      query.expires > nowSeconds + DOWNLOAD_TTL_SECONDS ||
+      query.expires > nowSeconds + this.downloadTtlSeconds() ||
       query.expires > Math.floor((job.expiresAt?.getTime() ?? 0) / 1_000)
     ) {
       return false;
@@ -297,11 +299,11 @@ export class ExportsService {
   }
 
   private signingSecret(): string {
-    // This is the repository's existing private-capability signing secret. The
-    // signature namespace above prevents cross-use with messaging media URLs.
-    return this.config.get("META_WHATSAPP_MEDIA_SIGNING_SECRET", {
-      infer: true,
-    });
+    return this.config.get("EXPORT_DOWNLOAD_SIGNING_SECRET", { infer: true });
+  }
+
+  private downloadTtlSeconds(): number {
+    return this.config.get("EXPORT_DOWNLOAD_URL_TTL_SECONDS", { infer: true });
   }
 
   private async markQueueFailure(
@@ -348,4 +350,3 @@ export class ExportsService {
     });
   }
 }
-

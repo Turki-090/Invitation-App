@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   evaluateReminderEligibility,
-  type ReminderEligibilityReason,
+  ReminderEligibilityReason,
 } from "@dawah/domain";
 import type { ReminderJobData, ReminderRunJob } from "@dawah/queue";
 import {
@@ -10,6 +10,7 @@ import {
   type MessageStatus,
   type ReminderTriggerKind,
 } from "@prisma/client";
+import { hasAvailableCredits, reserveSendBatch } from "./credit-ledger";
 import type {
   ReminderProcessorRepository,
   ReminderRuleRunResult,
@@ -293,7 +294,7 @@ export class PrismaReminderRepository implements ReminderProcessorRepository {
           rule.template.provider === "META_WHATSAPP" &&
           Boolean(rule.template.providerTemplateName?.trim());
         const cooldownMilliseconds = rule.cooldownMinutes * MINUTE_MILLISECONDS;
-        const evaluations = invitations.map((invitation) => {
+        const rawEvaluations = invitations.map((invitation) => {
           const initialMessage = initialByInvitation.get(invitation.id) ?? null;
           const sourceHash = invitationSourceHash(
             rule.event,
@@ -345,6 +346,25 @@ export class PrismaReminderRepository implements ReminderProcessorRepository {
             reasonCodes: result.reasonCodes,
           };
         });
+        // A run that cannot hold the credits it would spend is excluded as a
+        // whole, so the decision stays visible in run history instead of
+        // failing the job or sending messages the event cannot pay for.
+        const affordable = await hasAvailableCredits(
+          transaction,
+          data.eventId,
+          rawEvaluations.filter((evaluation) => evaluation.eligible).length,
+          now,
+        );
+        const evaluations = affordable
+          ? rawEvaluations
+          : rawEvaluations.map((evaluation) => ({
+              ...evaluation,
+              eligible: false,
+              reasonCodes: [
+                ...evaluation.reasonCodes,
+                ReminderEligibilityReason.INSUFFICIENT_CREDITS,
+              ],
+            }));
         const eligible = evaluations.filter(
           (evaluation) => evaluation.eligible,
         );
@@ -391,6 +411,12 @@ export class PrismaReminderRepository implements ReminderProcessorRepository {
               estimatedCreditUnits: eligible.length,
               queuedAt: evaluatedAt,
             },
+          });
+          await reserveSendBatch(transaction, {
+            createdByUserId: rule.createdBy,
+            eventId: data.eventId,
+            sendBatchId: batchId,
+            units: eligible.length,
           });
           await transaction.message.createMany({
             data: eligible.map((evaluation) => {

@@ -31,6 +31,7 @@ import {
   type StoredAsset,
 } from "@prisma/client";
 import type { AuthPrincipal } from "../auth/auth.types";
+import { CreditLedgerService } from "../credits/credit-ledger.service";
 import { EventAccessService } from "../events/event-access.service";
 import {
   invitationSourceHash,
@@ -71,6 +72,8 @@ export class MessagingService {
     @Inject(EventAccessService) private readonly access: EventAccessService,
     @Inject(MessagingQueueService)
     private readonly queue: MessagingQueueService,
+    @Inject(CreditLedgerService)
+    private readonly credits: CreditLedgerService,
   ) {}
 
   public async readiness(
@@ -179,6 +182,16 @@ export class MessagingService {
             queuedAt: now,
           },
         });
+        await this.credits.reserveForSendBatch(
+          transaction,
+          {
+            eventId,
+            sendBatchId: batchId,
+            units: state.ready.length,
+            createdByUserId: user.id,
+          },
+          now,
+        );
         await transaction.message.createMany({
           data: state.ready.map(({ invitation, snapshot }) => ({
             id: randomUUID(),
@@ -454,6 +467,16 @@ export class MessagingService {
             queuedAt: now,
           },
         });
+        await this.credits.reserveForSendBatch(
+          transaction,
+          {
+            eventId,
+            sendBatchId: nextBatchId,
+            units: 1,
+            createdByUserId: user.id,
+          },
+          now,
+        );
         await transaction.message.create({
           data: {
             id: randomUUID(),

@@ -34,6 +34,16 @@ tags:
     description: Event-scoped operational notifications for authenticated team members.
   - name: rsvp
     description: Private accountless invitation access and atomic guest or host RSVP changes.
+  - name: reports
+    description: Reconciled event reporting aggregated from source records.
+  - name: exports
+    description: Background guest exports delivered as expiring private downloads.
+  - name: check-in
+    description: Opaque entry passes and event-day arrival recording.
+  - name: billing
+    description: Append-only credit accounting for message sending.
+  - name: platform
+    description: API version metadata and feature availability for web and native clients.
   - name: webhooks
     description: Authenticated provider callbacks processed asynchronously.
 paths:
@@ -68,6 +78,19 @@ paths:
               schema: { $ref: "#/components/schemas/Readiness" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /platform:
+    get:
+      summary: Read API version metadata and feature availability
+      tags: [platform]
+      operationId: getPlatformMetadata
+      security: []
+      responses:
+        "200":
+          description: Supported API versions, enabled features, and native client version floors.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlatformMetadata" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /events:
     get:
       summary: List accessible events
@@ -300,6 +323,31 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/RsvpResult" }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/PublicInvitationNotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /public/invitations/{token}/entry-pass:
+    parameters:
+      - $ref: "#/components/parameters/PublicInvitationToken"
+    post:
+      summary: Issue the opaque entry pass for a confirmed private invitation
+      description: Returns the same opaque pass while the invitation keeps a confirmed RSVP and the event still accepts entry passes. Unavailable passes intentionally share the private-invitation not-found response.
+      tags: [check-in]
+      operationId: issuePublicEntryPass
+      security: []
+      responses:
+        "200":
+          description: Opaque entry-pass token that doubles as the QR payload.
+          headers:
+            Cache-Control:
+              schema:
+                {
+                  type: string,
+                  const: "private, no-store, max-age=0, must-revalidate",
+                }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicEntryPass" }
         "404": { $ref: "#/components/responses/PublicInvitationNotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
@@ -1433,6 +1481,282 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/reports:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: Read the reconciled event report
+      description: Aggregates invitation groups, named guests, expected attendance, RSVP, latest delivery status, invitation types, and check-in from source records inside one repeatable-read snapshot.
+      tags: [reports]
+      operationId: getEventReport
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Reconciled report totals for the event.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventReport" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/exports:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Request a background guest export
+      description: Queues a private CSV or XLSX build. The file is generated asynchronously and stays visible only to the requester.
+      tags: [exports]
+      operationId: createExportJob
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateExport" }
+      responses:
+        "202":
+          description: The export was accepted and queued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExportJob" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+    get:
+      summary: List the caller's export requests
+      tags: [exports]
+      operationId: listExportJobs
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/ExportJobStatus" }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Paged export requests created by the calling member.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListExportJobsResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/exports/{exportJobId}:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/ExportJobId"
+    get:
+      summary: Read one export request
+      tags: [exports]
+      operationId: getExportJob
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Export request state with a freshly signed download URL when the file is ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExportJob" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/exports/{exportJobId}/download:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+      - $ref: "#/components/parameters/ExportJobId"
+    get:
+      summary: Download a completed export with an expiring signature
+      description: Serves checksum-verified private bytes to the requesting member only while the expiry-bounded signature and the retention window are both valid.
+      tags: [exports]
+      operationId: downloadExportJob
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: expires
+          in: query
+          required: true
+          schema: { type: integer, format: int64, minimum: 1000000000 }
+        - name: signature
+          in: query
+          required: true
+          schema: { type: string, pattern: "^[a-f0-9]{64}$" }
+      responses:
+        "200":
+          description: Export file bytes.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: "private, no-store" }
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /events/{eventId}/check-ins:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Record an arrival for an invitation group
+      description: Adds arriving attendees without ever exceeding the confirmed attendance. A repeated idempotency key replays the stored result, and a scan for an already complete party reports a duplicate instead of adding attendance.
+      tags: [check-in]
+      operationId: createCheckIn
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCheckIn" }
+      responses:
+        "200":
+          description: The resulting attendance for the party.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CheckInResult" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/check-ins/resolve:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Resolve a scanned entry pass to its party
+      tags: [check-in]
+      operationId: resolveEntryPass
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResolveEntryPass" }
+      responses:
+        "200":
+          description: The party the scanned pass belongs to.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResolvedEntryPass" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/check-ins/search:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: Search parties manually by name or phone number
+      description: Phone numbers are masked unless the membership may view full guest phone numbers.
+      tags: [check-in]
+      operationId: searchCheckInParties
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 120 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Matching parties with their current attendance.
+          content:
+            application/json:
+              schema:
+                { $ref: "#/components/schemas/SearchCheckInPartiesResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/check-ins/dashboard:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: Read the event-day check-in dashboard
+      tags: [check-in]
+      operationId: getCheckInDashboard
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Reconciled arrival totals and the most recent arrivals.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CheckInDashboard" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/credits:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: Read the credit position for an event
+      description: Reports balance, reservations, and the reconciliation between logical sends and ledger charges. Commercial pricing is not part of this contract.
+      tags: [billing]
+      operationId: getCreditOverview
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Credit position and reconciliation for the event.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreditOverview" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /events/{eventId}/credits/ledger:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      summary: List append-only credit ledger entries
+      tags: [billing]
+      operationId: listCreditLedgerEntries
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: entryType
+          in: query
+          schema: { $ref: "#/components/schemas/CreditLedgerEntryType" }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Paged ledger entries, newest first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListCreditLedgerResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /events/{eventId}/team:
     parameters:
       - $ref: "#/components/parameters/EventId"
@@ -1832,6 +2156,12 @@ components:
       in: path
       required: true
       description: Operational-notification UUID.
+      schema: { type: string, format: uuid }
+    ExportJobId:
+      name: exportJobId
+      in: path
+      required: true
+      description: Export-request UUID.
       schema: { type: string, format: uuid }
     IdempotencyKey:
       name: Idempotency-Key
@@ -3668,6 +3998,7 @@ components:
           AUDIENCE_MISMATCH,
           RULE_NOT_DUE,
           RULE_LIMIT_REACHED,
+          INSUFFICIENT_CREDITS,
         ]
     ReminderRunSource:
       type: string
@@ -4166,6 +4497,8 @@ components:
           MESSAGE_BATCH_FAILED,
           REMINDER_BATCH_COMPLETED,
           TEAM_MEMBER_JOINED,
+          EXPORT_READY,
+          EXPORT_FAILED,
         ]
     Notification:
       type: object
@@ -4197,5 +4530,504 @@ components:
           properties:
             page: { type: integer, minimum: 1 }
             pageSize: { type: integer, minimum: 1 }
+            totalItems: { type: integer, minimum: 0 }
+            totalPages: { type: integer, minimum: 0 }
+    PlatformMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        [apiVersion, minimumSupportedApiVersion, features, nativeClients]
+      properties:
+        apiVersion: { type: string, const: v1 }
+        minimumSupportedApiVersion: { type: string, const: v1 }
+        features:
+          type: object
+          additionalProperties: false
+          required:
+            [
+              reportsEnabled,
+              exportsEnabled,
+              checkInEnabled,
+              billingEnabled,
+              paymentsEnabled,
+            ]
+          properties:
+            reportsEnabled: { type: boolean }
+            exportsEnabled: { type: boolean }
+            checkInEnabled: { type: boolean }
+            billingEnabled: { type: boolean }
+            paymentsEnabled: { type: boolean }
+        nativeClients:
+          type: object
+          additionalProperties: false
+          required: [ios, android]
+          properties:
+            ios: { $ref: "#/components/schemas/NativeClientVersions" }
+            android: { $ref: "#/components/schemas/NativeClientVersions" }
+    NativeClientVersions:
+      type: object
+      additionalProperties: false
+      required: [minimumSupportedVersion, latestVersion]
+      properties:
+        minimumSupportedVersion:
+          type: [string, "null"]
+          pattern: "^\\d+\\.\\d+\\.\\d+$"
+        latestVersion:
+          type: [string, "null"]
+          pattern: "^\\d+\\.\\d+\\.\\d+$"
+    ReportMessageStatusCounts:
+      type: object
+      additionalProperties: false
+      required:
+        [queued, sending, sent, delivered, read, responded, failed, cancelled]
+      properties:
+        queued: { type: integer, minimum: 0 }
+        sending: { type: integer, minimum: 0 }
+        sent: { type: integer, minimum: 0 }
+        delivered: { type: integer, minimum: 0 }
+        read: { type: integer, minimum: 0 }
+        responded: { type: integer, minimum: 0 }
+        failed: { type: integer, minimum: 0 }
+        cancelled: { type: integer, minimum: 0 }
+    EventReport:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          eventId,
+          generatedAt,
+          invitationGroups,
+          namedGuests,
+          expectedAttendance,
+          rsvp,
+          invitationTypes,
+          delivery,
+          checkIn,
+        ]
+      properties:
+        eventId: { type: string, format: uuid }
+        generatedAt: { type: string, format: date-time }
+        invitationGroups:
+          type: object
+          additionalProperties: false
+          required:
+            [active, cancelled, withInitialInvitation, withoutInitialInvitation]
+          properties:
+            active: { type: integer, minimum: 0 }
+            cancelled: { type: integer, minimum: 0 }
+            withInitialInvitation: { type: integer, minimum: 0 }
+            withoutInitialInvitation: { type: integer, minimum: 0 }
+        namedGuests: { type: integer, minimum: 0 }
+        expectedAttendance: { type: integer, minimum: 0 }
+        rsvp:
+          type: object
+          additionalProperties: false
+          required:
+            [
+              acceptedGroups,
+              partiallyAcceptedGroups,
+              declinedGroups,
+              pendingGroups,
+            ]
+          properties:
+            acceptedGroups: { type: integer, minimum: 0 }
+            partiallyAcceptedGroups: { type: integer, minimum: 0 }
+            declinedGroups: { type: integer, minimum: 0 }
+            pendingGroups: { type: integer, minimum: 0 }
+        invitationTypes:
+          type: object
+          additionalProperties: false
+          required:
+            [singleGroups, namedGroupGroups, primaryWithCompanionsGroups]
+          properties:
+            singleGroups: { type: integer, minimum: 0 }
+            namedGroupGroups: { type: integer, minimum: 0 }
+            primaryWithCompanionsGroups: { type: integer, minimum: 0 }
+        delivery:
+          type: object
+          additionalProperties: false
+          required: [latestInvitationMessages, notSentGroups, byStatus]
+          properties:
+            latestInvitationMessages: { type: integer, minimum: 0 }
+            notSentGroups: { type: integer, minimum: 0 }
+            byStatus: { $ref: "#/components/schemas/ReportMessageStatusCounts" }
+        checkIn:
+          type: object
+          additionalProperties: false
+          required:
+            [
+              checkedInGroups,
+              checkedInAttendees,
+              notArrivedAttendees,
+              noShowAttendees,
+            ]
+          properties:
+            checkedInGroups: { type: integer, minimum: 0 }
+            checkedInAttendees: { type: integer, minimum: 0 }
+            notArrivedAttendees: { type: integer, minimum: 0 }
+            noShowAttendees: { type: [integer, "null"], minimum: 0 }
+    ExportFormat:
+      type: string
+      enum: [CSV, XLSX]
+    ExportPreset:
+      type: string
+      enum:
+        [
+          FULL_GUEST_LIST,
+          CONFIRMED_ATTENDANCE,
+          PENDING_RSVP,
+          CHECK_IN_LIST,
+          FINAL_ATTENDANCE,
+        ]
+    ExportJobStatus:
+      type: string
+      enum: [QUEUED, PROCESSING, COMPLETED, FAILED, EXPIRED]
+    CreateExport:
+      type: object
+      additionalProperties: false
+      required: [format, preset]
+      properties:
+        format: { $ref: "#/components/schemas/ExportFormat" }
+        preset: { $ref: "#/components/schemas/ExportPreset" }
+    ExportOutput:
+      type: object
+      additionalProperties: false
+      required: [filename, contentType, byteSize, sha256, downloadUrl]
+      properties:
+        filename: { type: string, minLength: 1, maxLength: 255 }
+        contentType: { type: string, minLength: 1, maxLength: 255 }
+        byteSize: { type: integer, minimum: 1 }
+        sha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+        downloadUrl: { type: string, minLength: 1 }
+    ExportJob:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          eventId,
+          format,
+          preset,
+          status,
+          rowCount,
+          output,
+          failureCode,
+          failureMessage,
+          requestedAt,
+          processingAt,
+          completedAt,
+          failedAt,
+          expiresAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        format: { $ref: "#/components/schemas/ExportFormat" }
+        preset: { $ref: "#/components/schemas/ExportPreset" }
+        status: { $ref: "#/components/schemas/ExportJobStatus" }
+        rowCount: { type: [integer, "null"], minimum: 0 }
+        output:
+          oneOf:
+            - $ref: "#/components/schemas/ExportOutput"
+            - type: "null"
+        failureCode: { type: [string, "null"], maxLength: 100 }
+        failureMessage: { type: [string, "null"], maxLength: 1000 }
+        requestedAt: { type: string, format: date-time }
+        processingAt: { type: [string, "null"], format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+        failedAt: { type: [string, "null"], format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
+    ListExportJobsResponse:
+      type: object
+      additionalProperties: false
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ExportJob" }
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, pageSize, totalItems, totalPages]
+          properties:
+            page: { type: integer, minimum: 1 }
+            pageSize: { type: integer, minimum: 1, maximum: 50 }
+            totalItems: { type: integer, minimum: 0 }
+            totalPages: { type: integer, minimum: 0 }
+    EntryPassToken:
+      type: string
+      pattern: "^ep1\\.[A-Za-z0-9_-]{22}\\.[A-Za-z0-9_-]{43}$"
+    PublicEntryPass:
+      type: object
+      additionalProperties: false
+      required: [token, qrPayload, issuedAt, expiresAt]
+      properties:
+        token: { $ref: "#/components/schemas/EntryPassToken" }
+        qrPayload: { $ref: "#/components/schemas/EntryPassToken" }
+        issuedAt: { type: string, format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
+    ResolveEntryPass:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token: { $ref: "#/components/schemas/EntryPassToken" }
+    CheckInSource:
+      type: string
+      enum: [QR, MANUAL]
+    CheckInPartyStatus:
+      type: string
+      enum: [NOT_ARRIVED, PARTIALLY_CHECKED_IN, CHECKED_IN]
+    CheckInOutcome:
+      type: string
+      enum: [PARTIALLY_CHECKED_IN, CHECKED_IN, ALREADY_CHECKED_IN]
+    CheckInParty:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          invitationGroupId,
+          displayName,
+          phoneDisplay,
+          phoneMasked,
+          confirmedAttendance,
+          checkedInAttendance,
+          remainingAttendance,
+          status,
+          firstCheckedInAt,
+          lastCheckedInAt,
+          lastCheckedInBy,
+          lastDeviceId,
+        ]
+      properties:
+        invitationGroupId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 160 }
+        phoneDisplay: { type: [string, "null"], minLength: 1, maxLength: 40 }
+        phoneMasked: { type: boolean }
+        confirmedAttendance: { type: integer, minimum: 1, maximum: 200 }
+        checkedInAttendance: { type: integer, minimum: 0, maximum: 200 }
+        remainingAttendance: { type: integer, minimum: 0, maximum: 200 }
+        status: { $ref: "#/components/schemas/CheckInPartyStatus" }
+        firstCheckedInAt: { type: [string, "null"], format: date-time }
+        lastCheckedInAt: { type: [string, "null"], format: date-time }
+        lastCheckedInBy:
+          { type: [string, "null"], minLength: 1, maxLength: 160 }
+        lastDeviceId: { type: [string, "null"], minLength: 1, maxLength: 128 }
+    ResolvedEntryPass:
+      allOf:
+        - $ref: "#/components/schemas/CheckInParty"
+        - type: object
+          required: [resolvedAt]
+          properties:
+            resolvedAt: { type: string, format: date-time }
+    SearchCheckInPartiesResponse:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: "#/components/schemas/CheckInParty" }
+    CreateCheckIn:
+      type: object
+      additionalProperties: false
+      required: [invitationGroupId, attendeeCount, source]
+      properties:
+        invitationGroupId: { type: string, format: uuid }
+        attendeeCount: { type: integer, minimum: 1, maximum: 200 }
+        source: { $ref: "#/components/schemas/CheckInSource" }
+        deviceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: "^[\\x20-\\x7E]+$"
+    CheckInResult:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          outcome,
+          invitationGroupId,
+          displayName,
+          confirmedAttendance,
+          previousCheckedInAttendance,
+          checkedInAttendance,
+          remainingAttendance,
+          incrementedBy,
+          checkedInAt,
+          checkedInBy,
+          deviceId,
+          recordId,
+          idempotentReplay,
+        ]
+      properties:
+        outcome: { $ref: "#/components/schemas/CheckInOutcome" }
+        invitationGroupId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 160 }
+        confirmedAttendance: { type: integer, minimum: 1, maximum: 200 }
+        previousCheckedInAttendance: { type: integer, minimum: 0, maximum: 200 }
+        checkedInAttendance: { type: integer, minimum: 0, maximum: 200 }
+        remainingAttendance: { type: integer, minimum: 0, maximum: 200 }
+        incrementedBy: { type: integer, minimum: 0, maximum: 200 }
+        checkedInAt: { type: [string, "null"], format: date-time }
+        checkedInBy: { type: [string, "null"], minLength: 1, maxLength: 160 }
+        deviceId: { type: [string, "null"], minLength: 1, maxLength: 128 }
+        recordId: { type: [string, "null"], format: uuid }
+        idempotentReplay: { type: boolean }
+    RecentCheckIn:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          recordId,
+          invitationGroupId,
+          displayName,
+          attendeeCount,
+          checkedInAttendance,
+          confirmedAttendance,
+          source,
+          checkedInAt,
+          checkedInBy,
+          deviceId,
+        ]
+      properties:
+        recordId: { type: string, format: uuid }
+        invitationGroupId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 160 }
+        attendeeCount: { type: integer, minimum: 1, maximum: 200 }
+        checkedInAttendance: { type: integer, minimum: 1, maximum: 200 }
+        confirmedAttendance: { type: integer, minimum: 1, maximum: 200 }
+        source: { $ref: "#/components/schemas/CheckInSource" }
+        checkedInAt: { type: string, format: date-time }
+        checkedInBy: { type: [string, "null"], minLength: 1, maxLength: 160 }
+        deviceId: { type: [string, "null"], minLength: 1, maxLength: 128 }
+    CheckInDashboard:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          eventId,
+          expectedAttendance,
+          checkedInAttendance,
+          remainingAttendance,
+          checkInPercentage,
+          invitationGroups,
+          fullyCheckedInGroups,
+          partiallyCheckedInGroups,
+          notArrivedGroups,
+          duplicateAttempts,
+          recentArrivals,
+          calculatedAt,
+        ]
+      properties:
+        eventId: { type: string, format: uuid }
+        expectedAttendance: { type: integer, minimum: 0 }
+        checkedInAttendance: { type: integer, minimum: 0 }
+        remainingAttendance: { type: integer, minimum: 0 }
+        checkInPercentage: { type: integer, minimum: 0, maximum: 100 }
+        invitationGroups: { type: integer, minimum: 0 }
+        fullyCheckedInGroups: { type: integer, minimum: 0 }
+        partiallyCheckedInGroups: { type: integer, minimum: 0 }
+        notArrivedGroups: { type: integer, minimum: 0 }
+        duplicateAttempts: { type: integer, minimum: 0 }
+        recentArrivals:
+          type: array
+          maxItems: 50
+          items: { $ref: "#/components/schemas/RecentCheckIn" }
+        calculatedAt: { type: string, format: date-time }
+    CreditLedgerEntryType:
+      type: string
+      enum: [PURCHASE, BONUS, SEND_USAGE, REFUND, MANUAL_ADJUSTMENT, EXPIRY]
+    CreditReconciliation:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          logicalMessageUnits,
+          chargedMessageUnits,
+          refundedUnits,
+          unchargedMessageUnits,
+          excessChargeUnits,
+          reconciled,
+        ]
+      properties:
+        logicalMessageUnits: { type: integer, minimum: 0 }
+        chargedMessageUnits: { type: integer, minimum: 0 }
+        refundedUnits: { type: integer, minimum: 0 }
+        unchargedMessageUnits: { type: integer, minimum: 0 }
+        excessChargeUnits: { type: integer, minimum: 0 }
+        reconciled: { type: boolean }
+    CreditOverview:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          eventId,
+          accountId,
+          billingEnabled,
+          paymentActivationEnabled,
+          balanceUnits,
+          reservedUnits,
+          availableUnits,
+          activeReservationCount,
+          reconciliation,
+          generatedAt,
+        ]
+      properties:
+        eventId: { type: string, format: uuid }
+        accountId: { type: [string, "null"], format: uuid }
+        billingEnabled: { type: boolean }
+        paymentActivationEnabled: { type: boolean }
+        balanceUnits: { type: integer }
+        reservedUnits: { type: integer, minimum: 0 }
+        availableUnits: { type: integer }
+        activeReservationCount: { type: integer, minimum: 0 }
+        reconciliation: { $ref: "#/components/schemas/CreditReconciliation" }
+        generatedAt: { type: string, format: date-time }
+    CreditLedgerEntry:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          eventId,
+          actorUserId,
+          messageId,
+          entryType,
+          units,
+          referenceType,
+          referenceId,
+          description,
+          metadata,
+          createdAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        actorUserId: { type: [string, "null"], format: uuid }
+        messageId: { type: [string, "null"], format: uuid }
+        entryType: { $ref: "#/components/schemas/CreditLedgerEntryType" }
+        units: { type: integer }
+        referenceType: { type: string, minLength: 1, maxLength: 64 }
+        referenceId: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: [string, "null"], maxLength: 500 }
+        metadata: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+    ListCreditLedgerResponse:
+      type: object
+      additionalProperties: false
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CreditLedgerEntry" }
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, pageSize, totalItems, totalPages]
+          properties:
+            page: { type: integer, minimum: 1 }
+            pageSize: { type: integer, minimum: 1, maximum: 100 }
             totalItems: { type: integer, minimum: 0 }
             totalPages: { type: integer, minimum: 0 }

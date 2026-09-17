@@ -68,6 +68,8 @@ export interface ApiEnvironment
   CHECK_IN_TOKEN_SIGNING_SECRET: string;
   BILLING_ENABLED: boolean;
   PAYMENTS_ENABLED: boolean;
+  API_THROTTLE_TTL_SECONDS: number;
+  API_THROTTLE_LIMIT: number;
 }
 
 export interface WorkerEnvironment
@@ -202,6 +204,13 @@ const stage9ApiShape = {
     .default("dawah-local-check-in-token-signing-secret"),
   BILLING_ENABLED: environmentBoolean,
   PAYMENTS_ENABLED: environmentBoolean,
+  /**
+   * Request throttling headroom. Event-day check-in puts several scanning
+   * devices behind one venue address, so the ceiling has to be tunable per
+   * environment rather than compiled in.
+   */
+  API_THROTTLE_TTL_SECONDS: positiveInteger.min(1).max(3_600).default(60),
+  API_THROTTLE_LIMIT: positiveInteger.min(1).max(100_000).default(120),
 } as const;
 
 const runtimeShape = {

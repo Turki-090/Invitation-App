@@ -18,8 +18,8 @@
     "@dawah/queue": "workspace:*",
     "@dawah/storage": "workspace:*",
     "@prisma/client": "6.19.3",
-    "bullmq": "6.3.4"
-    ,"exceljs-hardened": "5.0.0"
+    "bullmq": "6.3.4",
+    "exceljs-hardened": "5.0.0"
   },
   "devDependencies": {
     "@dawah/typescript-config": "workspace:*",

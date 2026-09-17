@@ -26,4 +26,3 @@ export class ReportsController {
     return this.reports.get(request.user, eventId);
   }
 }
-

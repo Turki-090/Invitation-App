@@ -22,6 +22,8 @@ export default async function EventTeamPage({ params }: EventTeamPageProps) {
   const dictionary = await getDictionary(locale);
   return (
     <EventWorkspaceClient
+      billingCopy={dictionary.billing}
+      checkInCopy={dictionary.checkIn}
       common={dictionary.common}
       copy={dictionary.workspace}
       eventId={eventId}
@@ -31,6 +33,7 @@ export default async function EventTeamPage({ params }: EventTeamPageProps) {
       notificationsCopy={dictionary.notifications}
       preparationCopy={dictionary.preparation}
       remindersCopy={dictionary.reminders}
+      reportsCopy={dictionary.reports}
       section="team"
       sendingCopy={dictionary.sending}
       shellCopy={dictionary.shell}

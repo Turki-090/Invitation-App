@@ -22,6 +22,11 @@ import {
   type SendBatch,
   type SendBatchStatus,
 } from "@prisma/client";
+import {
+  chargeSendUsage,
+  refundSendUsage,
+  settleSendBatchReservation,
+} from "./credit-ledger";
 import type {
   ClaimedMessage,
   ClaimedRsvpConfirmation,
@@ -288,6 +293,12 @@ export class PrismaMessagingRepository
               }),
         },
       });
+      await chargeSendUsage(transaction, {
+        eventId: message.eventId,
+        messageId: message.id,
+        sendBatchId: message.sendBatchId,
+        units: message.creditUnits,
+      });
       await this.updateBatchState(transaction, message.sendBatchId);
     });
   }
@@ -355,6 +366,15 @@ export class PrismaMessagingRepository
               failedAt: now,
             },
       });
+      if (!failure.retry) {
+        await refundSendUsage(transaction, {
+          eventId: message.eventId,
+          messageId: message.id,
+          sendBatchId: message.sendBatchId,
+          units: message.creditUnits,
+          reasonCode: failure.providerCode,
+        });
+      }
       await this.updateBatchState(transaction, message.sendBatchId);
     });
   }
@@ -877,6 +897,25 @@ export class PrismaMessagingRepository
             )
           : null;
       await transaction.message.update({ where: { id: message.id }, data });
+      if (current.sentAt || data.sentAt) {
+        await chargeSendUsage(transaction, {
+          eventId: message.eventId,
+          messageId: message.id,
+          sendBatchId: current.sendBatchId,
+          units: current.creditUnits,
+        });
+      }
+      if (status === "FAILED") {
+        await refundSendUsage(transaction, {
+          eventId: message.eventId,
+          messageId: message.id,
+          sendBatchId: current.sendBatchId,
+          units: current.creditUnits,
+          reasonCode:
+            (evidence.kind === "STATUS" ? evidence.failureCode : null) ??
+            "PROVIDER_DELIVERY_FAILED",
+        });
+      }
       await transaction.webhookEvent.update({
         where: { id: webhookEventId },
         data: {
@@ -1372,6 +1411,11 @@ export class PrismaMessagingRepository
       where: { sendBatchId: batchId },
       data: { status: terminalStatus, completedAt },
     });
+    await settleSendBatchReservation(
+      transaction,
+      { eventId: batch.eventId, sendBatchId: batch.id },
+      completedAt,
+    );
     if (batch.status !== terminalStatus) {
       await transaction.auditLog.create({
         data: {

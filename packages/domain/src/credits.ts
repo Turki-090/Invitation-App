@@ -165,6 +165,50 @@ export function reservationCanTransition(
   );
 }
 
+export interface ReservationCharge {
+  /** Units the reservation still holds after the charge. */
+  readonly heldUnits: number;
+  readonly status: CreditReservationStatus;
+}
+
+/**
+ * An active reservation holds the units a launched batch still owes. Charging a
+ * logical send releases one held unit in the same transaction as its negative
+ * ledger entry, so the database availability guard admits the charge without a
+ * window in which the same balance could be reserved twice.
+ *
+ * `heldUnits` stays positive: the final charge keeps the last held amount and
+ * moves the reservation to `CONSUMED`, which removes it from availability math.
+ */
+export function chargeReservation(
+  reservation: {
+    readonly status: CreditReservationStatus;
+    readonly units: number;
+  },
+  units = 1,
+): ReservationCharge {
+  assertReservationUnits(reservation.units);
+  assertSafeInteger(units, "Charged reservation units");
+  if (units <= 0) {
+    throw new RangeError("Charged reservation units must be positive.");
+  }
+  if (reservation.status !== CreditReservationStatus.ACTIVE) {
+    throw new RangeError("Only an active reservation can be charged.");
+  }
+  if (units > reservation.units) {
+    throw new RangeError(
+      "A reservation cannot be charged beyond the units it holds.",
+    );
+  }
+  const remaining = reservation.units - units;
+  return remaining === 0
+    ? {
+        heldUnits: reservation.units,
+        status: CreditReservationStatus.CONSUMED,
+      }
+    : { heldUnits: remaining, status: CreditReservationStatus.ACTIVE };
+}
+
 function assertNonnegativeSafeInteger(value: number, label: string): void {
   assertSafeInteger(value, label);
   if (value < 0) throw new RangeError(`${label} cannot be negative.`);

@@ -9,7 +9,7 @@
     "start": "next start",
     "storybook": "node scripts/run-storybook.mjs dev -p 6006 --no-open",
     "test:storybook": "playwright test",
-    "test": "vitest run --passWithNoTests --environment jsdom --exclude tests/storybook/**",
+    "test": "vitest run --passWithNoTests --environment jsdom --exclude 'tests/storybook/**'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

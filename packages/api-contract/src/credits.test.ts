@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  creditOverviewSchema,
-  listCreditLedgerQuerySchema,
-} from "./credits";
+import { creditOverviewSchema, listCreditLedgerQuerySchema } from "./credits";
 
 describe("credits API contract", () => {
   it("defaults bounded ledger pagination", () => {

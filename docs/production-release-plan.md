@@ -49,8 +49,8 @@ Current delivery state:
 | MVP 5 — RSVP                | Complete    | Live provider acceptance is tracked under Stage 10 staging assurance.               |
 | MVP 6 — Reminders           | Complete    | No open repository exit-gate work; live provider acceptance remains Stage 10.       |
 | MVP 7 — Team                | Complete    | No open repository exit-gate work.                                                  |
-| MVP 8 — Reports and billing | Not started | Stage 9 reports, private exports, credit ledger, and payment abstraction.           |
-| MVP 9 — Check-in            | Not started | Stage 9 feature-flagged QR and event-day workflow.                                  |
+| MVP 8 — Reports and billing | Complete    | Payment activation stays behind a commercial flag until a provider is chosen.       |
+| MVP 9 — Check-in            | Complete    | Feature-flagged; a controlled event-day rehearsal remains Stage 10 pilot work.      |
 | Public-release readiness    | Not started | Stage 10 environments, assurance, compliance, pilot, and general-availability work. |
 
 ### What is implemented now
@@ -462,7 +462,10 @@ Implementation record:
 
 Goal: deliver MVP 8 and a feature-flagged MVP 9 suitable for a controlled event pilot.
 
-Status: **Next** — active implementation stage after the completed Stage 8 gate.
+Status: **Complete** — repository exit gate closed on 2026-09-17, including the
+real-PostgreSQL integration suite, startup smoke, the k6 load scenarios and the
+query-plan confirmations. Container image readiness and the event-day rehearsal
+against a deployed environment remain Stage 10 work.
 
 Work:
 
@@ -479,6 +482,80 @@ Exit gate:
 
 - Reports reconcile against source records, exports complete asynchronously, and credit accounting cannot go negative or charge a logical send twice.
 - A controlled event-day test handles concurrent and repeated scans safely.
+
+Implementation record:
+
+- Added reconciled server-side reporting for invitation groups, named guests,
+  expected attendance, RSVP, delivery, invitation type, check-in, and no-shows.
+  Every total in a response comes from one `RepeatableRead` transaction, the
+  delivery breakdown counts one latest message per invitation group, and
+  no-shows stay null until the event is completed.
+- Added background CSV and XLSX exports with keyset pagination, cursor-advance
+  assertions, formula escaping, capability re-checks at claim time, private
+  storage with a verified digest, expiring HMAC download links served by the
+  API, and per-requester visibility with `EXPORT_READY`/`EXPORT_FAILED`
+  notifications. Registered the export worker with readiness and shutdown.
+- Added the append-only credit ledger with reservations, usage, refunds,
+  operator adjustments, and reconciliation. A launch reserves what it will owe,
+  an accepted send releases one held unit and writes its charge in the same
+  transaction, a send the provider later fails is refunded against the same
+  message reference, settlement returns unused holds, and the two database
+  guards from the Stage 9 foundation migration keep the balance at or above what
+  is reserved. A scheduled reminder run that cannot hold its credits is excluded
+  with a recorded `INSUFFICIENT_CREDITS` reason rather than failing or
+  overspending.
+- Added a payment-provider interface with one inactive implementation, carrying
+  no invented commercial pricing, behind separate billing and payment flags.
+  Purchases and corrective adjustments stay operator-side rather than becoming
+  event-owner endpoints.
+- Kept opaque HMAC entry-pass tokens, host resolve, manual search, partial
+  attendance, duplicate-scan responses, idempotent check-in, audit records, and
+  the database capacity guard, and fixed the event-wide dashboard totals that
+  the contract had capped at one party's ceiling.
+- Added the Arabic and English reports, export, event-day check-in, and credit
+  interfaces, gated on server-computed capabilities, with the scanner stating
+  its dependence on a server connection rather than implying offline safety, and
+  six accessibility cases covering the new surfaces in both locales.
+- Documented every Stage 9 endpoint in OpenAPI, regenerated the typed client,
+  and asserted both directions in the contract compatibility test.
+- Added platform metadata and feature flags for future native clients, and made
+  request throttling configurable so event-day scanning behind one venue address
+  is not limited by a compiled-in ceiling.
+- Added Stage 9 read-path indexes, a k6 load suite for dashboards,
+  twenty-thousand-row exports, concurrent check-in, send launch, and webhook
+  spikes, and a query-plan review recording the plans to confirm and the paths
+  that remain linear by nature.
+- Fixed two defects in the partial Stage 9 work before completing it: the export
+  worker wrote storage metadata keys the storage validator rejects, which would
+  have failed every upload, and the export download used the WhatsApp media
+  secret and a compiled-in TTL instead of the dedicated export settings.
+- Fixed three concurrency defects that only the load scenarios exposed.
+  Authorization upserts the calling user, and it ran inside the report's
+  `RepeatableRead` transaction and inside check-in's `Serializable`
+  transaction, so concurrent requests from one caller collided: 28.85% of
+  report requests and 83.2% of check-in requests failed. The report now
+  authorizes before its snapshot opens, `ensureUser` writes only when the row
+  is missing or its contact details changed, check-in retries six times with
+  full jitter and answers `409 CHECK_IN_CONTENDED` when contention outlives
+  them, and a raw-query serialization failure (`P2010` with SQLSTATE `40001`)
+  is recognised as retryable alongside `P2034`. All three scenarios then ran
+  clean.
+- Made the export keyset index partial after measuring it. A composite index
+  leading with `cancelled_at` cannot supply the export's ordering, because
+  PostgreSQL does not treat `IS NULL` as an equality for that purpose, so every
+  page still sorted; `(event_id, created_at, id) WHERE cancelled_at IS NULL`
+  removes the sort and the planner chooses it unprompted.
+- Verification recorded on 2026-09-17, all passing: format, lint, OpenAPI
+  validation and generated-client drift, Prisma validation and formatting,
+  type checks, frozen-lockfile install, production builds, tracked-artifact
+  checks, all 492 unit, contract, component, provider, storage, API and worker
+  tests, all 52 Storybook accessibility and visual cases, all 41
+  real-PostgreSQL integration tests including the new Stage 9 suite, the
+  startup smoke check, all five k6 load scenarios against a 20,000-group
+  fixture, and the Stage 9 query-plan confirmations recorded in
+  `docs/query-plan-review.md`. Container image readiness (`pnpm
+smoke:containers`) was not run and remains part of Stage 10 deployment
+  preparation.
 
 ### Stage 10 — Production assurance, pilot, and release
 
@@ -523,9 +600,7 @@ Exit gate:
 
 ## Immediate next action
 
-Begin Stage 9 with reconciled report aggregates and asynchronous private exports,
-then add the append-only credit ledger and feature-flagged check-in workflow. In
-parallel, prepare the Stage 10 staging dependencies needed for the live Meta
-acceptance exercise: approved templates, a non-production phone-number ID and
+Build and verify the production container images, then prepare the Stage 10
+staging dependencies needed for the live Meta acceptance exercise: approved templates, a non-production phone-number ID and
 recipient, public HTTPS media and webhook routes, and securely managed
 credentials.
