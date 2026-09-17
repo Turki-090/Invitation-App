@@ -16,5 +16,20 @@ allowBuilds:
   prisma: true
   sharp: true
 
+# Transitive advisories closed by the Stage 10 dependency review. Each entry is
+# a security fix that the direct dependency has not yet released, so it is
+# pinned here rather than waited on. Remove an entry once the parent package
+# ships a version that resolves the advisory on its own.
+overrides:
+  # GHSA-535w-7cp7-47q4 and related: @nestjs/platform-express resolves 2.2.0,
+  # which is the version that handles every upload the API accepts.
+  multer: "2.3.0"
+  # Code injection through _.template; reached via @nestjs/config.
+  lodash: "^4.17.24"
+  # Unbounded CPU on merge keys; reached through the OpenAPI linter.
+  js-yaml: "^4.3.2"
+  # Stack exhaustion on recursive graphs; reached through the Prisma CLI config.
+  deepmerge-ts: "^8.0.0"
+
 minimumReleaseAgeExclude:
   - "@redocly/cli@2.51.2"

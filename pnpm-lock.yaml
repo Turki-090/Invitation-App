@@ -5,6 +5,12 @@ settings:
   excludeLinksFromLockfile: false
   injectWorkspacePackages: true
 
+overrides:
+  multer: 2.3.0
+  lodash: ^4.17.24
+  js-yaml: ^4.3.2
+  deepmerge-ts: ^8.0.0
+
 importers:
 
   .:
@@ -54,6 +60,9 @@ importers:
       '@dawah/messaging':
         specifier: workspace:*
         version: link:../../packages/messaging
+      '@dawah/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@dawah/queue':
         specifier: workspace:*
         version: link:../../packages/queue
@@ -230,6 +239,9 @@ importers:
       '@dawah/messaging':
         specifier: workspace:*
         version: link:../../packages/messaging
+      '@dawah/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@dawah/queue':
         specifier: workspace:*
         version: link:../../packages/queue
@@ -364,6 +376,21 @@ importers:
       '@dawah/domain':
         specifier: workspace:*
         version: link:../domain
+    devDependencies:
+      '@dawah/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 24.10.13
+        version: 24.10.13
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/node@24.10.13)(jiti@2.7.0)(jsdom@30.0.1)(supports-color@10.2.2)(tsx@4.21.0)(yaml@2.9.0)
+
+  packages/observability:
     devDependencies:
       '@dawah/typescript-config':
         specifier: workspace:*
@@ -2709,9 +2736,9 @@ packages:
     resolution: {integrity: sha512-h5k/5U50IJJFpzfL6nO9jaaumfjO/f2NjK/oYB2Djzm4p9L+3T9qWpZqZ2hAbLPuuYq9wrU08WQyBTL5GbPk5Q==}
     engines: {node: '>=6'}
 
-  deepmerge-ts@7.1.5:
-    resolution: {integrity: sha512-HOJkrhaYsweh+W+e74Yn7YStZOilkoPb6fycpwNLKzSPtruFs48nYis0zy5yJz1+ktUhHxoRDJ27RQAWLIJVJw==}
-    engines: {node: '>=16.0.0'}
+  deepmerge-ts@8.0.2:
+    resolution: {integrity: sha512-uqbvqLUMrc6p0MO+WBRtTxY55hmyh94WRwI5a++PZe54X+bfVh59FSN7uWCBCW1CCVjzjnrwzfI8zidE2obMMw==}
+    engines: {node: '>=16.9.0'}
 
   default-browser-id@5.0.1:
     resolution: {integrity: sha512-x1VCxdX4t+8wVfd1so/9w+vQ4vx7lKd2Qp5tDRutErwmR85OgmfX7RlLRMWafRMY7hbEiXIbudNrjOAPa/hL8Q==}
@@ -3074,8 +3101,8 @@ packages:
   js-tokens@9.0.1:
     resolution: {integrity: sha512-mxa9E9ITFOt0ban3j6L5MpjwegGz6lBQmM1IJkWeBZGcMxto50+eWdjC/52xDbS2vy0k7vIMK0Fe2wfL9OQSpQ==}
 
-  js-yaml@4.3.1:
-    resolution: {integrity: sha512-CY6crGq313MX8GkwvB7tzgp99vjQxY1++5y10/BKN/GUfHqWaOGQMNZkBvqSzsZKWk/ijwHlWzzkLulsGHhjWQ==}
+  js-yaml@4.3.2:
+    resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
     hasBin: true
 
   jsdom@30.0.1:
@@ -3166,8 +3193,8 @@ packages:
   lodash.uniq@4.5.0:
     resolution: {integrity: sha512-xfBaXQd9ryd9dlSDvnvI0lvxfLJlYAZzXomUYzLKtUeOQvOP5piqAWuGtrhWeqaXK9hhoM/iyJc5AV+XfsX3HQ==}
 
-  lodash@4.17.21:
-    resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
+  lodash@4.18.1:
+    resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
 
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
@@ -3274,10 +3301,6 @@ packages:
 
   msgpackr@2.1.0:
     resolution: {integrity: sha512-p/pBCVO63CsvvpkomUnNNag6+n38rULuDA6HHe70o2gtC8ODI52foF/4ko2qQcp6OiErJXTmrZeXmsGGHsIQNQ==}
-
-  multer@2.2.0:
-    resolution: {integrity: sha512-6rdyFg2kLrMh9Jee7/BMPuV9lEAd7lLW2YUpF9/YxR7njyoUwwQ0ZPh3TaIY50Sw6vlyD2HW3wGOkTS4P79xrQ==}
-    engines: {node: '>= 10.16.0'}
 
   multer@2.3.0:
     resolution: {integrity: sha512-cjNbm3sttszgZeGfJR124D+jFEfkXCVAsoPBmFn9X7UxmDSFHWqE2CoEj0vrmSpuAFnqWR1Szcm9QTsiHr60Xw==}
@@ -4851,7 +4874,7 @@ snapshots:
       '@nestjs/common': 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2)
       dotenv: 16.4.7
       dotenv-expand: 12.0.1
-      lodash: 4.17.21
+      lodash: 4.18.1
       rxjs: 7.8.2
 
   '@nestjs/core@11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
@@ -4873,7 +4896,7 @@ snapshots:
       '@nestjs/core': 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       cors: 2.8.6
       express: 5.2.1(supports-color@10.2.2)
-      multer: 2.2.0
+      multer: 2.3.0
       path-to-regexp: 8.4.2
       tslib: 2.8.1
     transitivePeerDependencies:
@@ -5107,7 +5130,7 @@ snapshots:
   '@prisma/config@6.19.3':
     dependencies:
       c12: 3.1.0
-      deepmerge-ts: 7.1.5
+      deepmerge-ts: 8.0.2
       effect: 3.21.0
       empathic: 2.0.0
     transitivePeerDependencies:
@@ -5152,7 +5175,7 @@ snapshots:
       colorette: 1.4.0
       https-proxy-agent: 7.0.6(supports-color@10.2.2)
       js-levenshtein: 1.1.6
-      js-yaml: 4.3.1
+      js-yaml: 4.3.2
       minimatch: 5.1.9
       pluralize: 8.0.0
       yaml-ast-parser: 0.0.43
@@ -5971,7 +5994,7 @@ snapshots:
 
   deep-eql@5.0.2: {}
 
-  deepmerge-ts@7.1.5: {}
+  deepmerge-ts@8.0.2: {}
 
   default-browser-id@5.0.1: {}
 
@@ -6382,7 +6405,7 @@ snapshots:
 
   js-tokens@9.0.1: {}
 
-  js-yaml@4.3.1:
+  js-yaml@4.3.2:
     dependencies:
       argparse: 2.0.1
 
@@ -6469,7 +6492,7 @@ snapshots:
 
   lodash.uniq@4.5.0: {}
 
-  lodash@4.17.21: {}
+  lodash@4.18.1: {}
 
   loupe@3.2.1: {}
 
@@ -6560,13 +6583,6 @@ snapshots:
   msgpackr@2.1.0:
     optionalDependencies:
       msgpackr-extract: 3.0.4
-
-  multer@2.2.0:
-    dependencies:
-      append-field: 1.0.0
-      busboy: 1.6.0
-      concat-stream: 2.0.0
-      type-is: 1.6.18
 
   multer@2.3.0:
     dependencies:

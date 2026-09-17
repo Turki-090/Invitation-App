@@ -278,4 +278,100 @@ describe("environment validation", () => {
       }),
     ).toThrow(/development authentication bypass/i);
   });
+  it("applies safe observability defaults", () => {
+    expect(validateApiEnvironment(safeProductionApiEnvironment)).toMatchObject({
+      LOG_LEVEL: "info",
+      LOG_FORMAT: "json",
+      METRICS_ENABLED: false,
+      SENTRY_SAMPLE_RATE: 1,
+    });
+    expect(
+      validateApiEnvironment(safeProductionApiEnvironment).METRICS_TOKEN,
+    ).toBeUndefined();
+  });
+
+  it("rejects deployed human-readable logs and debug verbosity", () => {
+    expect(() =>
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        LOG_FORMAT: "pretty",
+      }),
+    ).toThrow(/LOG_FORMAT/);
+    expect(() =>
+      validateWorkerEnvironment({
+        ...safeProductionWorkerEnvironment,
+        LOG_LEVEL: "debug",
+      }),
+    ).toThrow(/LOG_LEVEL/);
+  });
+
+  it("refuses a deployed metrics endpoint without a strong bearer token", () => {
+    expect(() =>
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        METRICS_ENABLED: "true",
+      }),
+    ).toThrow(/METRICS_TOKEN/);
+    expect(() =>
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        METRICS_ENABLED: "true",
+        METRICS_TOKEN: "too-short",
+      }),
+    ).toThrow(/METRICS_TOKEN/);
+    expect(() =>
+      validateWorkerEnvironment({
+        ...safeProductionWorkerEnvironment,
+        METRICS_ENABLED: "true",
+        METRICS_TOKEN: "dawah-local-metrics-token-placeholder-value",
+      }),
+    ).toThrow(/METRICS_TOKEN/);
+    expect(
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        METRICS_ENABLED: "true",
+        METRICS_TOKEN: "prod-metrics-token-7f3a9c2e8d4f1a6b5c",
+      }),
+    ).toMatchObject({ METRICS_ENABLED: true });
+  });
+
+  it("requires a remote HTTPS Sentry DSN when error reporting is configured", () => {
+    expect(() =>
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        SENTRY_DSN: "http://key@localhost:9000/1",
+      }),
+    ).toThrow(/SENTRY_DSN/);
+    expect(
+      validateWorkerEnvironment({
+        ...safeProductionWorkerEnvironment,
+        SENTRY_DSN: "https://key@errors.dawah.sa/1",
+        SENTRY_SAMPLE_RATE: "0.25",
+      }),
+    ).toMatchObject({ SENTRY_SAMPLE_RATE: 0.25 });
+  });
+
+  it("keeps human-readable local logging available", () => {
+    expect(
+      validateApiEnvironment({
+        NODE_ENV: "development",
+        DAWAH_ENV: "local",
+        DATABASE_URL: "postgresql://dawah:dawah@localhost:5433/dawah",
+        REDIS_URL: "redis://localhost:6379",
+        STORAGE_ENDPOINT: "http://localhost:7070",
+        STORAGE_REGION: "us-east-1",
+        STORAGE_ACCESS_KEY_ID: "dawah-local-access-key",
+        STORAGE_SECRET_ACCESS_KEY: "dawah-local-secret-key",
+        STORAGE_PRIVATE_BUCKET: "dawah-private",
+        STORAGE_FORCE_PATH_STYLE: "true",
+        LOG_FORMAT: "pretty",
+        LOG_LEVEL: "debug",
+        METRICS_ENABLED: "true",
+      }),
+    ).toMatchObject({
+      LOG_FORMAT: "pretty",
+      LOG_LEVEL: "debug",
+      METRICS_ENABLED: true,
+    });
+  });
 });

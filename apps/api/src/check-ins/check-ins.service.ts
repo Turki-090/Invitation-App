@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -22,6 +23,7 @@ import {
   type SearchCheckInPartiesResponse,
 } from "@dawah/api-contract";
 import type { ApiEnvironment } from "@dawah/config";
+import type { PlatformMetrics } from "@dawah/observability";
 import {
   calculateCheckInIncrement,
   checkInRequestFingerprint,
@@ -37,6 +39,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import type { AuthPrincipal } from "../auth/auth.types";
 import { EventAccessService } from "../events/event-access.service";
+import { PLATFORM_METRICS } from "../observability/observability.tokens";
 import { PrismaService } from "../prisma/prisma.service";
 
 const CHECK_IN_OPERATION = "EVENT_CHECK_IN";
@@ -81,7 +84,11 @@ export class CheckInsService {
   public constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(EventAccessService) private readonly access: EventAccessService,
+    @Inject(ConfigService)
     private readonly config: ConfigService<ApiEnvironment, true>,
+    @Optional()
+    @Inject(PLATFORM_METRICS)
+    private readonly metrics?: PlatformMetrics,
   ) {}
 
   public async issuePublicEntryPass(token: string): Promise<PublicEntryPass> {
@@ -371,6 +378,30 @@ export class CheckInsService {
   }
 
   public async checkIn(
+    principal: AuthPrincipal,
+    eventId: string,
+    idempotencyKey: string,
+    input: CreateCheckInInput,
+  ): Promise<CheckInResult> {
+    const result = await this.recordCheckIn(
+      principal,
+      eventId,
+      idempotencyKey,
+      input,
+    );
+    // Attendance correctness is a pilot exit criterion, so the outcome split —
+    // accepted, duplicate scan, idempotent replay — is counted, not inferred
+    // from logs after the fact.
+    this.metrics?.domainEvents.increment({
+      kind: "check_in",
+      outcome: result.idempotentReplay
+        ? "replayed"
+        : result.outcome.toLowerCase(),
+    });
+    return result;
+  }
+
+  private async recordCheckIn(
     principal: AuthPrincipal,
     eventId: string,
     idempotencyKey: string,

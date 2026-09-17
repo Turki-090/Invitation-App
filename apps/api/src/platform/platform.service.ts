@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   CURRENT_API_VERSION,
@@ -12,6 +12,7 @@ import type { ApiEnvironment } from "@dawah/config";
 @Injectable()
 export class PlatformService {
   public constructor(
+    @Inject(ConfigService)
     private readonly config: ConfigService<ApiEnvironment, true>,
   ) {}
 

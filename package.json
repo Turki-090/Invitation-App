@@ -20,6 +20,8 @@
     "openapi:generate": "openapi-typescript openapi/openapi.yaml --output packages/api-client/src/generated/schema.ts --export-type",
     "openapi:lint": "redocly lint openapi/openapi.yaml",
     "artifacts:check": "node scripts/check-tracked-artifacts.mjs",
+    "ops:check": "node scripts/check-ops-artifacts.mjs",
+    "audit": "pnpm audit --audit-level high",
     "seed": "node --env-file=.env.example --env-file-if-exists=.env database/seed.mjs",
     "smoke": "node --env-file=.env.test.example --env-file-if-exists=.env.test scripts/smoke-start.mjs",
     "smoke:containers": "node --env-file=.env.test.example --env-file-if-exists=.env.test scripts/smoke-containers.mjs",

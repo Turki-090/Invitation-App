@@ -19,19 +19,32 @@ export const defaultJobOptions = {
   removeOnFail: { age: 7 * 24 * 60 * 60, count: 5_000 },
 } satisfies JobsOptions;
 
-export type WhatsappSendJobData =
+/**
+ * Correlation carried from the request that enqueued a job into the worker
+ * that runs it. It is optional because jobs also originate inside the worker —
+ * scheduled sweeps and fan-out from a dispatch job — and because it must never
+ * participate in a deterministic job id, which is what keeps enqueueing
+ * idempotent.
+ */
+export interface JobCorrelation {
+  readonly correlationId?: string;
+}
+
+export type WhatsappSendJobData = (
   | { readonly operation: "DISPATCH_BATCH"; readonly batchId: string }
   | { readonly operation: "SEND_MESSAGE"; readonly messageId: string }
   | {
       readonly operation: "SEND_RSVP_CONFIRMATION";
       readonly confirmationId: string;
-    };
+    }
+) &
+  JobCorrelation;
 
-export interface WhatsappWebhookJobData {
+export interface WhatsappWebhookJobData extends JobCorrelation {
   readonly webhookEventId: string;
 }
 
-export interface ExportJobData {
+export interface ExportJobData extends JobCorrelation {
   readonly eventId: string;
   readonly exportJobId: string;
 }
@@ -40,7 +53,7 @@ export function exportJobId(exportJobId: string): string {
   return `export-${exportJobId}`;
 }
 
-export type ReminderJobData =
+export type ReminderJobData = (
   | { readonly operation: "SWEEP" }
   | {
       readonly operation: "RUN";
@@ -50,7 +63,9 @@ export type ReminderJobData =
       readonly scheduleKey: string;
       /** ISO instant at the start of the deterministic evaluation slot. */
       readonly scheduledFor: string;
-    };
+    }
+) &
+  JobCorrelation;
 
 export interface ReminderRunJob {
   readonly eventId: string;

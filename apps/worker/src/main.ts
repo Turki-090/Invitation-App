@@ -17,6 +17,10 @@ import {
   type WhatsappSendJobData,
   type WhatsappWebhookJobData,
 } from "@dawah/queue";
+import {
+  isAuthorizedMetricsRequest,
+  metricsContentType,
+} from "@dawah/observability";
 import { createS3ObjectStorage } from "@dawah/storage";
 import { PrismaClient } from "@prisma/client";
 import { Queue, Worker } from "bullmq";
@@ -31,6 +35,11 @@ import {
   type ImportQueueJobData,
   type ImportQueueJobName,
 } from "./import-processor";
+import {
+  createWorkerObservability,
+  instrumentMessagingProvider,
+  instrumentProcessor,
+} from "./observability";
 import { PrismaExportRepository } from "./prisma-export-repository";
 import { PrismaImportProcessorRepository } from "./prisma-import-repository";
 import { PrismaMessagingRepository } from "./prisma-messaging-repository";
@@ -38,11 +47,14 @@ import {
   PrismaReminderRepository,
   REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS,
 } from "./prisma-reminder-repository";
+import { createQueueDepthSampler, type SampledQueue } from "./queue-metrics";
 import { createReminderProcessor } from "./reminder-processor";
 import { createWhatsappSendProcessor } from "./whatsapp-send-processor";
 import { createWhatsappWebhookProcessor } from "./whatsapp-webhook-processor";
 
 const environment = validateWorkerEnvironment(process.env);
+const observability = createWorkerObservability(environment);
+const { logger, metrics, errorReporter } = observability;
 const redis = createWorkerRedis(environment.REDIS_URL, "dawah-worker");
 const prisma = new PrismaClient({ datasourceUrl: environment.DATABASE_URL });
 const producerRedis = createProducerRedis(
@@ -64,7 +76,14 @@ const storage = createS3ObjectStorage({
 });
 const healthWorker = new Worker(
   queueNames.health,
-  async (job) => ({ jobId: job.id, checkedAt: new Date().toISOString() }),
+  instrumentProcessor({
+    queue: queueNames.health,
+    observability,
+    processor: async (job: { id?: string }) => ({
+      jobId: job.id,
+      checkedAt: new Date().toISOString(),
+    }),
+  }),
   {
     concurrency: 1,
     connection: redis,
@@ -86,11 +105,19 @@ const importWorker = new Worker<
   ImportQueueJobData,
   ImportProcessorResult,
   ImportQueueJobName
->(queueNames.imports, importProcessor, {
-  concurrency: 1,
-  connection: redis,
-  prefix: environment.QUEUE_PREFIX,
-});
+>(
+  queueNames.imports,
+  instrumentProcessor({
+    queue: queueNames.imports,
+    observability,
+    processor: importProcessor,
+  }),
+  {
+    concurrency: 1,
+    connection: redis,
+    prefix: environment.QUEUE_PREFIX,
+  },
+);
 const exportProcessor = createExportProcessor({
   privateBucket: environment.STORAGE_PRIVATE_BUCKET,
   repository: new PrismaExportRepository(prisma),
@@ -101,11 +128,19 @@ const exportWorker = new Worker<
   ExportQueueJobData,
   ExportProcessorResult,
   "generate"
->(queueNames.exports, exportProcessor, {
-  concurrency: 1,
-  connection: redis,
-  prefix: environment.QUEUE_PREFIX,
-});
+>(
+  queueNames.exports,
+  instrumentProcessor({
+    queue: queueNames.exports,
+    observability,
+    processor: exportProcessor,
+  }),
+  {
+    concurrency: 1,
+    connection: redis,
+    prefix: environment.QUEUE_PREFIX,
+  },
+);
 const messagingRepository = new PrismaMessagingRepository(prisma, {
   mediaPublicApiBaseUrl: environment.META_WHATSAPP_MEDIA_PUBLIC_BASE_URL,
   mediaSigningSecret: environment.META_WHATSAPP_MEDIA_SIGNING_SECRET,
@@ -115,12 +150,15 @@ const messagingRepository = new PrismaMessagingRepository(prisma, {
   rsvpConfirmationTemplateEn:
     environment.META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_EN,
 });
-const provider = new MetaWhatsAppProvider({
-  accessToken: environment.META_WHATSAPP_ACCESS_TOKEN,
-  phoneNumberId: environment.META_WHATSAPP_PHONE_NUMBER_ID,
-  graphApiVersion: environment.META_WHATSAPP_GRAPH_API_VERSION,
-  requestTimeoutMilliseconds: environment.META_WHATSAPP_REQUEST_TIMEOUT_MS,
-});
+const provider = instrumentMessagingProvider(
+  new MetaWhatsAppProvider({
+    accessToken: environment.META_WHATSAPP_ACCESS_TOKEN,
+    phoneNumberId: environment.META_WHATSAPP_PHONE_NUMBER_ID,
+    graphApiVersion: environment.META_WHATSAPP_GRAPH_API_VERSION,
+    requestTimeoutMilliseconds: environment.META_WHATSAPP_REQUEST_TIMEOUT_MS,
+  }),
+  metrics,
+);
 const sendQueue = new Queue<WhatsappSendJobData>(queueNames.whatsappSend, {
   connection: producerRedis,
   prefix: environment.QUEUE_PREFIX,
@@ -145,7 +183,11 @@ const sendProcessor = createWhatsappSendProcessor({
 });
 whatsappSendWorker = new Worker<WhatsappSendJobData>(
   queueNames.whatsappSend,
-  sendProcessor,
+  instrumentProcessor({
+    queue: queueNames.whatsappSend,
+    observability,
+    processor: sendProcessor,
+  }),
   {
     concurrency: environment.META_WHATSAPP_SEND_CONCURRENCY,
     limiter: {
@@ -158,7 +200,11 @@ whatsappSendWorker = new Worker<WhatsappSendJobData>(
 );
 const whatsappWebhookWorker = new Worker<WhatsappWebhookJobData>(
   queueNames.whatsappWebhook,
-  createWhatsappWebhookProcessor(messagingRepository),
+  instrumentProcessor({
+    queue: queueNames.whatsappWebhook,
+    observability,
+    processor: createWhatsappWebhookProcessor(messagingRepository),
+  }),
   {
     concurrency: Math.min(environment.META_WHATSAPP_SEND_CONCURRENCY * 2, 16),
     connection: redis,
@@ -189,7 +235,11 @@ const reminderProcessor = createReminderProcessor({
 });
 const reminderWorker = new Worker<ReminderJobData>(
   queueNames.reminders,
-  reminderProcessor,
+  instrumentProcessor({
+    queue: queueNames.reminders,
+    observability,
+    processor: reminderProcessor,
+  }),
   {
     concurrency: 1,
     connection: redis,
@@ -222,10 +272,10 @@ const reminderSchedulerRegistration = reminderQueue
     return true;
   })
   .catch((error: unknown) => {
-    console.error(
-      "Reminder scheduler registration failed:",
-      error instanceof Error ? error.message : "unknown error",
-    );
+    logger.error("reminders.scheduler_registration_failed", { error });
+    errorReporter.captureException(error, {
+      transaction: "reminders/scheduler-registration",
+    });
     return false;
   });
 
@@ -262,30 +312,26 @@ const sweepRsvpConfirmations = async (): Promise<void> => {
 };
 const confirmationSweepTimer = setInterval(() => {
   void sweepRsvpConfirmations().catch((error: unknown) => {
-    console.error(
-      "RSVP confirmation outbox sweep failed:",
-      error instanceof Error ? error.message : "unknown error",
-    );
+    logger.error("messaging.confirmation_sweep_failed", { error });
   });
 }, 30_000);
 confirmationSweepTimer.unref();
 void sweepRsvpConfirmations().catch(() => undefined);
 
-healthWorker.on("error", (error) => {
-  console.error("Health worker queue connection error:", error.message);
-});
-importWorker.on("error", (error) => {
-  console.error("Import worker queue connection error:", error.message);
-});
-exportWorker.on("error", (error) => {
-  console.error("Export worker queue connection error:", error.message);
-});
-exportWorker.on("failed", (job, error) => {
-  console.error(`Export job ${job?.id ?? "unknown"} failed:`, error.message);
-});
-whatsappSendWorker.on("error", (error) => {
-  console.error("WhatsApp send worker queue connection error:", error.message);
-});
+// Queue connection errors are reported once per worker rather than per job:
+// they mean Redis is unreachable, which readiness already fails on.
+for (const [queue, worker] of [
+  [queueNames.health, healthWorker],
+  [queueNames.imports, importWorker],
+  [queueNames.exports, exportWorker],
+  [queueNames.whatsappSend, whatsappSendWorker],
+  [queueNames.whatsappWebhook, whatsappWebhookWorker],
+  [queueNames.reminders, reminderWorker],
+] as const) {
+  worker.on("error", (error: Error) => {
+    logger.error("queue.connection_error", { queue, error });
+  });
+}
 whatsappSendWorker.on("failed", (job) => {
   if (!job) return;
   const maximumAttempts =
@@ -294,23 +340,47 @@ whatsappSendWorker.on("failed", (job) => {
   const exhaustedAt = new Date(job.finishedOn ?? Date.now());
   void messagingRepository
     .recordExhaustedSendJob(job.data, exhaustedAt)
-    .catch(() => {
-      console.error(
-        `WhatsApp exhausted-job persistence failed for job ${job.id ?? "unknown"}.`,
-      );
+    .catch((error: unknown) => {
+      // The message stays queued in the database if this write is lost, so the
+      // failure has to be visible as its own incident, not only as a job retry.
+      logger.error("messaging.exhausted_job_persistence_failed", {
+        jobId: job.id,
+        error,
+      });
+      errorReporter.captureException(error, {
+        transaction: "whatsapp-send/record-exhausted-job",
+      });
     });
 });
-whatsappWebhookWorker.on("error", (error) => {
-  console.error(
-    "WhatsApp webhook worker queue connection error:",
-    error.message,
-  );
-});
-reminderWorker.on("error", (error) => {
-  console.error("Reminder worker queue connection error:", error.message);
-});
-reminderWorker.on("failed", (job, error) => {
-  console.error(`Reminder job ${job?.id ?? "unknown"} failed:`, error.message);
+
+/**
+ * Read-only queue handles used for depth sampling. The send and reminder
+ * queues already have producers in this process; the rest are produced by the
+ * API, so backlog visibility for them needs its own inspection connection.
+ */
+const inspectionRedis = createProducerRedis(
+  environment.REDIS_URL,
+  "dawah-worker-metrics",
+);
+const inspectedQueues = [
+  queueNames.imports,
+  queueNames.exports,
+  queueNames.whatsappWebhook,
+].map(
+  (name) =>
+    new Queue(name, {
+      connection: inspectionRedis,
+      prefix: environment.QUEUE_PREFIX,
+    }),
+);
+const queueDepthSampler = createQueueDepthSampler({
+  logger,
+  metrics,
+  queues: [
+    sendQueue,
+    reminderQueue,
+    ...inspectedQueues,
+  ] as unknown as SampledQueue[],
 });
 
 const server = createServer(async (request, response) => {
@@ -323,6 +393,27 @@ const server = createServer(async (request, response) => {
 
   if (request.url === "/health/live") {
     respond(response, 200, { status: "ok" });
+    return;
+  }
+
+  if (request.url === "/metrics") {
+    if (!environment.METRICS_ENABLED) {
+      respond(response, 404, { error: "not_found" });
+      return;
+    }
+    if (
+      !isAuthorizedMetricsRequest(
+        request.headers.authorization,
+        environment.METRICS_TOKEN,
+      )
+    ) {
+      respond(response, 401, { error: "unauthorized" });
+      return;
+    }
+    await queueDepthSampler.sample();
+    response.statusCode = 200;
+    response.setHeader("Content-Type", metricsContentType);
+    response.end(metrics.registry.render());
     return;
   }
 
@@ -431,9 +522,11 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(environment.WORKER_PORT, "0.0.0.0", () => {
-  console.info(
-    `Dawah worker health server listening on ${environment.WORKER_PORT}.`,
-  );
+  logger.info("worker.started", {
+    port: environment.WORKER_PORT,
+    metricsEnabled: environment.METRICS_ENABLED,
+    errorReportingEnabled: errorReporter.enabled,
+  });
 });
 
 let shuttingDown = false;
@@ -441,7 +534,7 @@ const shutdown = async (signal: string): Promise<void> => {
   if (shuttingDown) return;
   shuttingDown = true;
   clearInterval(confirmationSweepTimer);
-  console.info(`Dawah worker received ${signal}; shutting down.`);
+  logger.info("worker.shutdown_started", { signal });
 
   server.closeIdleConnections();
   const graceful = Promise.allSettled([
@@ -454,10 +547,13 @@ const shutdown = async (signal: string): Promise<void> => {
     reminderWorker.close(),
     sendQueue.close(),
     reminderQueue.close(),
+    ...inspectedQueues.map((queue) => queue.close()),
+    errorReporter.flush(2_000),
     prisma.$disconnect(),
     redis.quit(),
     producerRedis.quit(),
     reminderProducerRedis.quit(),
+    inspectionRedis.quit(),
   ]).then(() => true);
   const finished = await resolvesWithin(graceful, 10_000);
   if (!finished) {
@@ -471,21 +567,20 @@ const shutdown = async (signal: string): Promise<void> => {
       reminderWorker.close(true),
       sendQueue.close(),
       reminderQueue.close(),
+      ...inspectedQueues.map((queue) => queue.close()),
     ]);
     await prisma.$disconnect().catch(() => undefined);
     redis.disconnect(false);
     producerRedis.disconnect(false);
     reminderProducerRedis.disconnect(false);
+    inspectionRedis.disconnect(false);
   }
 };
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     void shutdown(signal).catch((error: unknown) => {
-      console.error(
-        "Worker shutdown failed:",
-        error instanceof Error ? error.message : "unknown error",
-      );
+      logger.error("worker.shutdown_failed", { error });
       process.exitCode = 1;
     });
   });

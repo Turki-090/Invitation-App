@@ -46,6 +46,8 @@ tags:
     description: API version metadata and feature availability for web and native clients.
   - name: webhooks
     description: Authenticated provider callbacks processed asynchronously.
+  - name: operations
+    description: Operator-facing endpoints for deployment monitoring; never used by product clients.
 paths:
   /health/live:
     get:
@@ -78,6 +80,26 @@ paths:
               schema: { $ref: "#/components/schemas/Readiness" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /internal/metrics:
+    get:
+      summary: Scrape Prometheus metrics
+      description: |
+        Operator-only scrape endpoint. It is guarded by a dedicated bearer token
+        that is not a user access token, reports as absent when metrics are
+        disabled, and exposes operational counters only.
+      tags: [operations]
+      operationId: scrapeMetrics
+      security:
+        - metricsToken: []
+      responses:
+        "200":
+          description: Prometheus text exposition of the current metric values.
+          content:
+            text/plain:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /platform:
     get:
       summary: Read API version metadata and feature availability
@@ -2060,6 +2082,10 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    metricsToken:
+      type: http
+      scheme: bearer
+      description: Deployment-managed scrape credential; distinct from any user access token.
   parameters:
     EventId:
       name: eventId
@@ -2233,6 +2259,9 @@ components:
             code: { type: string }
             message: { type: string }
             details: { type: object, additionalProperties: true }
+            requestId:
+              type: string
+              description: Correlation identifier for this request, echoed in the x-request-id response header.
     Readiness:
       type: object
       additionalProperties: false

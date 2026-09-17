@@ -66,8 +66,14 @@ pnpm test
 pnpm test:integration
 pnpm build
 pnpm artifacts:check
+pnpm ops:check
+pnpm audit --audit-level high
 pnpm smoke
 ```
+
+`pnpm ops:check` validates the alert rules and dashboard in `ops/` against the
+metric names the code actually emits, so a renamed metric fails the build
+instead of leaving an alert that never fires.
 
 Stage 2 adds Storybook, accessibility checks, and visual regression:
 
@@ -95,6 +101,15 @@ template versioning, readiness rules, immutable snapshots, and preparation UI
 are documented in
 [`docs/invitation-preparation-stage5.md`](docs/invitation-preparation-stage5.md).
 
+The Stage 10 observability boundary, correlation model, metrics contract,
+deployed-configuration refusals, operational runbooks, PDPL position, security
+review, and the production-readiness checklist are documented in
+[`docs/production-assurance-stage10.md`](docs/production-assurance-stage10.md).
+Start with [`docs/operations/observability.md`](docs/operations/observability.md)
+for what the platform emits and
+[`docs/runbooks/event-night-incident.md`](docs/runbooks/event-night-incident.md)
+for what to do when an event is in progress.
+
 The Stage 6 WhatsApp provider boundary, confirmed and idempotent send batches,
 immutable message evidence, bounded worker behavior, signed webhook reduction,
 deterministic queue recovery, checksum-bound private invitation-image delivery,
@@ -108,6 +123,23 @@ contract change, run `pnpm openapi:generate`; this refreshes the typed client in
 `packages/api-client`. `pnpm openapi:check` fails when the checked-in output is
 stale, while contract compatibility tests keep the runtime Zod types assignable
 to the generated shapes.
+
+## Operations
+
+Deployed environments must set `LOG_FORMAT=json`, a `LOG_LEVEL` other than
+`debug`, and — when `METRICS_ENABLED` is true — a `METRICS_TOKEN` of at least 32
+characters. Startup validation refuses anything else, along with local hosts,
+insecure Redis, placeholder secrets, non-HTTPS origins, and development
+authentication flags.
+
+Metrics are scraped from `GET /api/v1/internal/metrics` on the API and
+`GET /metrics` on the worker health port, both bearer-guarded and private.
+Alert rules, a Grafana dashboard, and a reference scrape configuration are in
+`ops/`.
+
+Every response carries `x-request-id` and `x-correlation-id`, and a failed
+response includes `requestId` in its error body. One `correlationId` follows an
+operation from the API request into the queue job it enqueues.
 
 ## Production images
 

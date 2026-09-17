@@ -28,6 +28,22 @@ export interface ImportAndAssetLimitsEnvironment {
   ASSET_MAX_IMAGE_PIXELS: number;
 }
 
+/**
+ * Logging, metrics, and error-reporting configuration shared by both deployed
+ * services. Stage 10 requires a deployed environment to emit machine-readable
+ * redacted logs and to guard its metrics endpoint, so the constraints are
+ * enforced here rather than left to a deployment checklist.
+ */
+export interface ObservabilityEnvironment {
+  LOG_LEVEL: "debug" | "info" | "warn" | "error";
+  LOG_FORMAT: "json" | "pretty";
+  RELEASE_VERSION?: string;
+  METRICS_ENABLED: boolean;
+  METRICS_TOKEN?: string;
+  SENTRY_DSN?: string;
+  SENTRY_SAMPLE_RATE: number;
+}
+
 export interface WhatsappMediaEnvironment {
   META_WHATSAPP_MEDIA_PUBLIC_BASE_URL: string;
   META_WHATSAPP_MEDIA_SIGNING_SECRET: string;
@@ -44,6 +60,7 @@ export interface ApiEnvironment
   extends
     StorageEnvironment,
     ImportAndAssetLimitsEnvironment,
+    ObservabilityEnvironment,
     WhatsappMediaEnvironment,
     WhatsappRsvpConfirmationEnvironment {
   NODE_ENV: NodeEnvironment;
@@ -76,6 +93,7 @@ export interface WorkerEnvironment
   extends
     StorageEnvironment,
     ImportAndAssetLimitsEnvironment,
+    ObservabilityEnvironment,
     WhatsappMediaEnvironment,
     WhatsappRsvpConfirmationEnvironment {
   NODE_ENV: NodeEnvironment;
@@ -213,6 +231,22 @@ const stage9ApiShape = {
   API_THROTTLE_LIMIT: positiveInteger.min(1).max(100_000).default(120),
 } as const;
 
+const observabilityShape = {
+  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  /**
+   * `pretty` exists for a readable local console. A deployed environment must
+   * emit JSON, because the redacted structured line is the only artifact an
+   * incident responder and the log pipeline can both rely on.
+   */
+  LOG_FORMAT: z.enum(["json", "pretty"]).default("json"),
+  /** Build identity stamped onto logs, metrics, and error reports. */
+  RELEASE_VERSION: optionalText,
+  METRICS_ENABLED: environmentBoolean,
+  METRICS_TOKEN: optionalText,
+  SENTRY_DSN: optionalUrl,
+  SENTRY_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(1),
+} as const;
+
 const runtimeShape = {
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -227,6 +261,7 @@ const apiEnvironmentSchema = z
     ...importAndAssetLimitsShape,
     ...whatsappMediaShape,
     ...whatsappRsvpConfirmationShape,
+    ...observabilityShape,
     ...stage9ApiShape,
     DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }),
@@ -265,6 +300,7 @@ const apiEnvironmentSchema = z
   .passthrough()
   .superRefine((environment, context) => {
     validateRuntimeMode(environment, context);
+    validateObservability(environment, context);
     validateDevelopmentBypass(
       environment.DAWAH_DEV_AUTH_BYPASS,
       environment,
@@ -351,6 +387,7 @@ const workerEnvironmentSchema = z
     ...importAndAssetLimitsShape,
     ...whatsappMediaShape,
     ...whatsappRsvpConfirmationShape,
+    ...observabilityShape,
     ...exportRetentionShape,
     DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }),
@@ -378,6 +415,7 @@ const workerEnvironmentSchema = z
   .passthrough()
   .superRefine((environment, context) => {
     validateRuntimeMode(environment, context);
+    validateObservability(environment, context);
     if (isDeployedEnvironment(environment.DAWAH_ENV)) {
       validateRemotePostgres(environment.DATABASE_URL, context);
       validateSecureRedis(environment.REDIS_URL, context);
@@ -533,6 +571,59 @@ function validateRuntimeMode(
       context,
       "NODE_ENV",
       "Staging and production deployments require NODE_ENV=production.",
+    );
+  }
+}
+
+/**
+ * Deployed observability requirements.
+ *
+ * A staging or production service must emit parseable redacted JSON, must not
+ * run at debug level where verbose payloads are most likely to reach the log
+ * pipeline, and must not expose an unauthenticated metrics endpoint. An
+ * unauthenticated scrape is treated as a configuration error rather than as an
+ * accepted default.
+ */
+function validateObservability(
+  environment: ObservabilityEnvironment & { DAWAH_ENV: DeploymentEnvironment },
+  context: z.RefinementCtx,
+): void {
+  if (!isDeployedEnvironment(environment.DAWAH_ENV)) return;
+
+  if (environment.LOG_FORMAT !== "json") {
+    addIssue(
+      context,
+      "LOG_FORMAT",
+      "Deployed services must emit structured JSON logs.",
+    );
+  }
+  if (environment.LOG_LEVEL === "debug") {
+    addIssue(
+      context,
+      "LOG_LEVEL",
+      "Debug logging is not permitted in a deployed environment.",
+    );
+  }
+  if (environment.METRICS_ENABLED) {
+    if (!environment.METRICS_TOKEN || environment.METRICS_TOKEN.length < 32) {
+      addIssue(
+        context,
+        "METRICS_TOKEN",
+        "A deployed metrics endpoint requires a bearer token of at least 32 characters.",
+      );
+    } else {
+      validateNonPlaceholderSecret(
+        environment.METRICS_TOKEN,
+        "METRICS_TOKEN",
+        context,
+      );
+    }
+  }
+  if (environment.SENTRY_DSN !== undefined) {
+    validateRequiredRemoteHttpsUrl(
+      environment.SENTRY_DSN,
+      "SENTRY_DSN",
+      context,
     );
   }
 }

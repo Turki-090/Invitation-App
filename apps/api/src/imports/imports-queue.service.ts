@@ -6,6 +6,7 @@ import {
   defaultJobOptions,
   queueNames,
 } from "@dawah/queue";
+import { currentCorrelationId } from "@dawah/observability";
 import { Queue } from "bullmq";
 
 export interface ImportQueueJobData {
@@ -13,6 +14,7 @@ export interface ImportQueueJobData {
   eventId: string;
   importJobId: string;
   expectedRevision: number;
+  correlationId?: string;
 }
 
 @Injectable()
@@ -37,9 +39,11 @@ export class ImportsQueueService implements OnModuleDestroy {
 
   public enqueue(data: ImportQueueJobData): Promise<unknown> {
     const name = data.operation === "PARSE" ? "parse" : "validate";
-    return this.queue.add(name, data, {
-      jobId: `${name}-${data.importJobId}-${data.expectedRevision}`,
-    });
+    return this.queue.add(
+      name,
+      { ...data, correlationId: currentCorrelationId() },
+      { jobId: `${name}-${data.importJobId}-${data.expectedRevision}` },
+    );
   }
 
   public async onModuleDestroy(): Promise<void> {

@@ -14,6 +14,8 @@ if (!databaseUrl || !redisUrl) {
   );
 }
 
+const metricsToken = "dawah-smoke-metrics-scrape-token-value";
+
 const smokeEnvironment = {
   ...process.env,
   NODE_ENV: "test",
@@ -22,6 +24,10 @@ const smokeEnvironment = {
   REDIS_URL: redisUrl,
   QUEUE_PREFIX: `dawah:smoke:${process.pid}`,
   API_PORT: "4100",
+  LOG_LEVEL: "warn",
+  LOG_FORMAT: "json",
+  METRICS_ENABLED: "true",
+  METRICS_TOKEN: metricsToken,
   API_CORS_ORIGINS: "http://127.0.0.1:3100",
   API_BODY_LIMIT_BYTES: "1048576",
   API_READY_TIMEOUT_MS: "3000",
@@ -59,6 +65,7 @@ try {
     waitFor("web application", "http://127.0.0.1:3100/"),
   ]);
   await verifyOpenApiRuntime();
+  await verifyObservabilitySurface();
   console.info("Web, API, and worker startup smoke checks passed.");
 } catch (error) {
   for (const processInfo of processes) {
@@ -99,6 +106,52 @@ async function waitFor(name, url) {
   }
 
   throw new Error(`${name} did not become ready (${lastStatus}).`);
+}
+
+/**
+ * Confirms at runtime what unit tests can only assert in isolation: both
+ * services expose a guarded scrape endpoint that renders real metrics, and the
+ * API issues and echoes the correlation identifiers support depends on.
+ */
+async function verifyObservabilitySurface() {
+  const scrapes = [
+    ["API", "http://127.0.0.1:4100/api/v1/internal/metrics", "api"],
+    ["worker", "http://127.0.0.1:4101/metrics", "worker"],
+  ];
+
+  for (const [name, url, service] of scrapes) {
+    const unauthorized = await fetch(url);
+    if (unauthorized.status !== 401) {
+      throw new Error(
+        `${name} metrics answered an unauthenticated scrape with ${unauthorized.status}.`,
+      );
+    }
+
+    const authorized = await fetch(url, {
+      headers: { Authorization: `Bearer ${metricsToken}` },
+    });
+    if (!authorized.ok) {
+      throw new Error(
+        `${name} metrics rejected an authorized scrape with ${authorized.status}.`,
+      );
+    }
+    const body = await authorized.text();
+    if (!body.includes(`dawah_build_info{service="${service}"`)) {
+      throw new Error(`${name} metrics did not report its build identity.`);
+    }
+  }
+
+  const correlated = await fetch("http://127.0.0.1:4100/api/v1/health/live", {
+    headers: { "x-correlation-id": "smoke-correlation-1" },
+  });
+  if (correlated.headers.get("x-correlation-id") !== "smoke-correlation-1") {
+    throw new Error(
+      "The API did not echo the supplied correlation identifier.",
+    );
+  }
+  if (!correlated.headers.get("x-request-id")) {
+    throw new Error("The API did not issue a request identifier.");
+  }
 }
 
 async function verifyOpenApiRuntime() {

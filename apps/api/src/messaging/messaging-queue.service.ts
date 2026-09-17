@@ -11,6 +11,7 @@ import {
   type WhatsappSendJobData,
   type WhatsappWebhookJobData,
 } from "@dawah/queue";
+import { currentCorrelationId } from "@dawah/observability";
 import { Queue } from "bullmq";
 
 @Injectable()
@@ -46,7 +47,11 @@ export class MessagingQueueService implements OnModuleDestroy {
   ): Promise<unknown> {
     const job = await this.sendQueue.add(
       "dispatch",
-      { operation: "DISPATCH_BATCH", batchId },
+      {
+        operation: "DISPATCH_BATCH",
+        batchId,
+        correlationId: currentCorrelationId(),
+      },
       { jobId: whatsappBatchJobId(batchId) },
     );
     await this.retryFailedJob(job, beforeFailedJobRetry);
@@ -60,7 +65,7 @@ export class MessagingQueueService implements OnModuleDestroy {
     const jobs = await this.webhookQueue.addBulk(
       webhookEventIds.map((webhookEventId) => ({
         name: "process",
-        data: { webhookEventId },
+        data: { webhookEventId, correlationId: currentCorrelationId() },
         opts: { jobId: whatsappWebhookJobId(webhookEventId) },
       })),
     );
@@ -77,7 +82,7 @@ export class MessagingQueueService implements OnModuleDestroy {
     )[0]!;
     const job = await this.sendQueue.add(
       definition.name,
-      definition.data,
+      { ...definition.data, correlationId: currentCorrelationId() },
       definition.opts,
     );
     await this.retryFailedJob(job);

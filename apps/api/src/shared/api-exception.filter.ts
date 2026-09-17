@@ -3,10 +3,16 @@ import {
   Catch,
   HttpException,
   HttpStatus,
-  Logger,
+  Inject,
   type ExceptionFilter,
 } from "@nestjs/common";
-import type { Response } from "express";
+import {
+  getRequestContext,
+  type ErrorReporter,
+  type Logger,
+} from "@dawah/observability";
+import type { Request, Response } from "express";
+import { ERROR_REPORTER, LOGGER } from "../observability/observability.tokens";
 
 interface ExceptionPayload {
   code?: string;
@@ -16,10 +22,15 @@ interface ExceptionPayload {
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(ApiExceptionFilter.name);
+  public constructor(
+    @Inject(LOGGER) private readonly logger: Logger,
+    @Inject(ERROR_REPORTER) private readonly errorReporter: ErrorReporter,
+  ) {}
 
   public catch(exception: unknown, host: ArgumentsHost): void {
-    const response = host.switchToHttp().getResponse<Response>();
+    const http = host.switchToHttp();
+    const response = http.getResponse<Response>();
+    const request = http.getRequest<Request>();
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
@@ -30,12 +41,18 @@ export class ApiExceptionFilter implements ExceptionFilter {
       typeof raw === "object" && raw !== null ? raw : {};
 
     if (!(exception instanceof HttpException)) {
-      this.logger.error(
-        "Unhandled request exception.",
-        exception instanceof Error ? exception.stack : String(exception),
-      );
+      const context = getRequestContext();
+      // The structured record carries the stack; the response never does.
+      this.logger.error("http.unhandled_exception", {
+        method: request.method,
+        error: exception,
+      });
+      this.errorReporter.captureException(exception, {
+        transaction: `${request.method} ${context?.route ?? "unknown"}`,
+      });
     }
 
+    const requestId = getRequestContext()?.requestId;
     response.status(status).json({
       error: {
         code:
@@ -47,6 +64,9 @@ export class ApiExceptionFilter implements ExceptionFilter {
             ? "The request could not be completed."
             : String(raw)),
         ...(payload.details === undefined ? {} : { details: payload.details }),
+        // Returned so a host can quote one identifier to support and an
+        // operator can find the matching server-side record without guessing.
+        ...(requestId === undefined ? {} : { requestId }),
       },
     });
   }
