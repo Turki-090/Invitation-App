@@ -63,8 +63,9 @@ async function bootstrap(): Promise<void> {
   logger.info("api.started", {
     port,
     metricsEnabled: config.get("METRICS_ENABLED", { infer: true }),
-    errorReportingEnabled:
-      config.get("SENTRY_DSN", { infer: true }) !== undefined,
+    // Boolean, not a defined check: an unset variable still reaches the
+    // config service as an empty string, which would report as configured.
+    errorReportingEnabled: Boolean(config.get("SENTRY_DSN", { infer: true })),
   });
 }
 

@@ -87,6 +87,7 @@ export class RsvpService {
     @Inject(EventAccessService) private readonly access: EventAccessService,
     @Inject(MessagingQueueService)
     private readonly messagingQueue: MessagingQueueService,
+    @Inject(ConfigService)
     private readonly config: ConfigService<ApiEnvironment, true>,
     @Optional()
     @Inject(PLATFORM_METRICS)

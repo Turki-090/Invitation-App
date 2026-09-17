@@ -84,6 +84,7 @@ export class CheckInsService {
   public constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(EventAccessService) private readonly access: EventAccessService,
+    @Inject(ConfigService)
     private readonly config: ConfigService<ApiEnvironment, true>,
     @Optional()
     @Inject(PLATFORM_METRICS)

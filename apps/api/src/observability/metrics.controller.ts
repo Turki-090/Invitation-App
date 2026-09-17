@@ -30,6 +30,7 @@ import { PLATFORM_METRICS } from "./observability.tokens";
 export class MetricsController {
   public constructor(
     @Inject(PLATFORM_METRICS) private readonly metrics: PlatformMetrics,
+    @Inject(ConfigService)
     private readonly config: ConfigService<ApiEnvironment, true>,
   ) {}
 
