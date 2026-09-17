@@ -1,9 +1,9 @@
 # Dawah production and release plan
 
-Status date: 2026-09-13
+Status date: 2026-09-17
 
 The “Current position” section reflects the verified repository state through
-Stage 8. Dated completion records under each roadmap stage remain the detailed
+Stage 10. Dated completion records under each roadmap stage remain the detailed
 source of evidence.
 
 This plan maps the current repository to the requirements in `GPT — Wedding Platform Master Business & Technical Build Specification.md` and the visual rules in `System Design/`. It targets a production web release for Saudi Arabia and the GCC. Native iOS and Android applications remain a post-web-release phase and are not a launch dependency.
@@ -39,19 +39,19 @@ check-in, and production assurance remain in Stages 9 and 10.
 
 Current delivery state:
 
-| Scope                       | Status      | Remaining work                                                                      |
-| --------------------------- | ----------- | ----------------------------------------------------------------------------------- |
-| Engineering foundation      | Complete    | Production deployment and operations are intentionally completed in Stage 10.       |
-| MVP 1 — Foundation          | Complete    | No open repository exit-gate work.                                                  |
-| MVP 2 — Event creation      | Complete    | No open repository exit-gate work.                                                  |
-| MVP 3 — Guest management    | Complete    | No separate post-release import expansion is planned.                               |
-| MVP 4 — WhatsApp            | Complete    | Live provider acceptance is tracked under Stage 10 staging assurance.               |
-| MVP 5 — RSVP                | Complete    | Live provider acceptance is tracked under Stage 10 staging assurance.               |
-| MVP 6 — Reminders           | Complete    | No open repository exit-gate work; live provider acceptance remains Stage 10.       |
-| MVP 7 — Team                | Complete    | No open repository exit-gate work.                                                  |
-| MVP 8 — Reports and billing | Complete    | Payment activation stays behind a commercial flag until a provider is chosen.       |
-| MVP 9 — Check-in            | Complete    | Feature-flagged; a controlled event-day rehearsal remains Stage 10 pilot work.      |
-| Public-release readiness    | Not started | Stage 10 environments, assurance, compliance, pilot, and general-availability work. |
+| Scope                       | Status      | Remaining work                                                                                                                |
+| --------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Engineering foundation      | Complete    | Production deployment and operations are intentionally completed in Stage 10.                                                 |
+| MVP 1 — Foundation          | Complete    | No open repository exit-gate work.                                                                                            |
+| MVP 2 — Event creation      | Complete    | No open repository exit-gate work.                                                                                            |
+| MVP 3 — Guest management    | Complete    | No separate post-release import expansion is planned.                                                                         |
+| MVP 4 — WhatsApp            | Complete    | Live provider acceptance is tracked under Stage 10 staging assurance.                                                         |
+| MVP 5 — RSVP                | Complete    | Live provider acceptance is tracked under Stage 10 staging assurance.                                                         |
+| MVP 6 — Reminders           | Complete    | No open repository exit-gate work; live provider acceptance remains Stage 10.                                                 |
+| MVP 7 — Team                | Complete    | No open repository exit-gate work.                                                                                            |
+| MVP 8 — Reports and billing | Complete    | Payment activation stays behind a commercial flag until a provider is chosen.                                                 |
+| MVP 9 — Check-in            | Complete    | Feature-flagged; a controlled event-day rehearsal remains Stage 10 pilot work.                                                |
+| Public-release readiness    | In progress | Stage 10 repository work is complete; environments, provider acceptance, compliance review, rehearsals, and the pilot remain. |
 
 ### What is implemented now
 
@@ -561,8 +561,12 @@ smoke:containers`) was not run and remains part of Stage 10 deployment
 
 Goal: prove that the complete system can be deployed, operated, recovered, and safely released.
 
-Status: **Planned** — external environment preparation may proceed in parallel;
-pilot and release gates follow Stage 9.
+Status: **Repository work complete; deployed-environment work outstanding.**
+The observability, configuration, testing, dependency, and documentation half of
+the stage is delivered and verified. Provisioning, live provider acceptance,
+recovery and rehearsal evidence, legal review, the pilot, and the go/no-go
+decision require a deployed environment or a real event and are tracked in
+`docs/production-readiness-checklist.md`.
 
 Work:
 
@@ -587,6 +591,60 @@ Exit gate:
 - The pilot succeeds without data-isolation, message-duplication, attendance-count, privacy, or recovery failures.
 - Product, engineering, security, operations, and business owners approve general availability.
 
+The checklist is `docs/production-readiness-checklist.md`, with 8 sections and
+an exception register. Stage 10 detail is in
+`docs/production-assurance-stage10.md`.
+
+#### Repository work completed 2026-09-17
+
+- Added `packages/observability`: structured redacted logging, request and job
+  correlation, a bounded-cardinality Prometheus registry, and a Sentry
+  error-reporting boundary written against the documented envelope endpoint
+  rather than the vendor SDK, so neither deployed service inherits automatic
+  instrumentation of request bodies and headers.
+- Wired both services: correlation middleware and a guarded metrics endpoint in
+  the API, instrumented processors, provider call accounting, and scrape-time
+  queue-depth sampling in the worker. The API's structured logger also replaces
+  the framework's console logger, so framework output is redacted and correlated
+  like everything else.
+- Propagated correlation from an API request into the queue job it enqueues,
+  through the job payload rather than the deterministic job id, so idempotent
+  enqueueing is unaffected.
+- Extended deployed-environment validation to refuse human-readable logs, debug
+  verbosity, and an unauthenticated metrics endpoint.
+- Added `/internal/metrics` to the OpenAPI contract and a `requestId` to the
+  error response shape, so a host can quote one identifier to support.
+- Added the Stage 10 diagnostics integration suite: real host workflows against
+  real PostgreSQL with real personal data, asserting that no guest name, phone,
+  email, invitation capability, entry pass, or signed URL parameter reaches a
+  log line, metric label, or error report, and that one correlation identifier
+  spans the API request and the worker job it produced.
+- Closed six high-severity transitive dependency advisories with pinned
+  workspace overrides (`multer` through `@nestjs/platform-express`, `lodash`
+  through `@nestjs/config`, `js-yaml` through the OpenAPI linter, `deepmerge-ts`
+  through the Prisma CLI), and added `pnpm audit` and pull-request dependency
+  review as CI release gates.
+- Added alert rules and a dashboard as reviewed artefacts, plus `pnpm ops:check`
+  in CI, which fails when an expression references a metric the code no longer
+  emits or an alert names a runbook that does not exist.
+- Wrote the operational documentation set: seven runbooks, three operations
+  documents, the PDPL data map and workflows, the production-access policy, the
+  repository security review, and the readiness checklist.
+- Verification recorded on 2026-09-17, all passing: OpenAPI validation and
+  generated-client drift, formatting, linting, type checks across 25 workspace
+  tasks, 587 unit and contract tests, 47 real-PostgreSQL integration tests
+  including the new Stage 10 suite, operational-artifact validation against 21
+  declared metrics, and a clean high-severity dependency audit.
+
+#### Open repository items carried into the release
+
+- Nonce-based CSP to remove `script-src 'unsafe-inline'` from the web
+  application (security review finding 1).
+- Deletion and recovery tooling; the workflow is documented but performed
+  manually today (finding 2).
+- Full-stack Playwright journeys across a running web, API, worker, and database
+  (checklist item 6.11).
+
 ## Release milestones
 
 | Milestone                          | Required stages                   | Audience                                                        |
@@ -600,7 +658,14 @@ Exit gate:
 
 ## Immediate next action
 
-Build and verify the production container images, then prepare the Stage 10
-staging dependencies needed for the live Meta acceptance exercise: approved templates, a non-production phone-number ID and
-recipient, public HTTPS media and webhook routes, and securely managed
-credentials.
+Provision the staging environment against
+`docs/operations/environments.md`, then run the live Meta acceptance exercise:
+approved templates, a non-production phone-number id and recipient, public HTTPS
+media and webhook routes, and securely managed credentials. Record the result in
+`docs/production-readiness-checklist.md` item 8.1 without retaining guest
+personal data or credentials.
+
+The observability configuration that staging needs is already defined:
+`LOG_FORMAT=json`, `LOG_LEVEL=info`, a `METRICS_TOKEN` of at least 32
+characters, and a `SENTRY_DSN`. The scrape configuration and alert rules are in
+`ops/`.

@@ -38,6 +38,28 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/internal/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Scrape Prometheus metrics
+         * @description Operator-only scrape endpoint. It is guarded by a dedicated bearer token
+         *     that is not a user access token, reports as absent when metrics are
+         *     disabled, and exposes operational counters only.
+         */
+        get: operations["scrapeMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/platform": {
         parameters: {
             query?: never;
@@ -1529,6 +1551,8 @@ export type components = {
                 details?: {
                     [key: string]: unknown;
                 };
+                /** @description Correlation identifier for this request, echoed in the x-request-id response header. */
+                requestId?: string;
             };
         };
         Readiness: {
@@ -3182,6 +3206,29 @@ export interface operations {
             };
             429: components["responses"]["TooManyRequests"];
             503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    scrapeMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Prometheus text exposition of the current metric values. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getPlatformMetadata: {

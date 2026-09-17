@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { enrichRequestContext } from "@dawah/observability";
 import {
   hasPermission,
   MembershipRole,
@@ -40,9 +41,12 @@ export class EventAccessService {
     const existing = await client.user.findUnique({
       where: { authProviderId: principal.subject },
     });
-    if (existing && !this.contactChanged(existing, principal)) return existing;
+    if (existing && !this.contactChanged(existing, principal)) {
+      this.attributeRequest(existing);
+      return existing;
+    }
 
-    return client.user.upsert({
+    const user = await client.user.upsert({
       where: { authProviderId: principal.subject },
       create: {
         authProviderId: principal.subject,
@@ -54,6 +58,20 @@ export class EventAccessService {
         ...(principal.phone ? { phoneE164: principal.phone } : {}),
       },
     });
+    this.attributeRequest(user);
+    return user;
+  }
+
+  /**
+   * Attributes the active request to the internal user row.
+   *
+   * Every authenticated path resolves the principal here, which makes it the
+   * one place that knows the internal identifier. The auth-provider subject,
+   * email, and phone stay out of the correlation context deliberately: logs
+   * must remain correlatable without becoming a personal-data store.
+   */
+  private attributeRequest(user: User): void {
+    enrichRequestContext({ actorId: user.id });
   }
 
   private contactChanged(user: User, principal: AuthPrincipal): boolean {

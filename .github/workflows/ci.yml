@@ -76,7 +76,44 @@ jobs:
       - run: pnpm test:integration
       - run: pnpm build
       - run: pnpm artifacts:check
+      - run: pnpm ops:check
       - run: pnpm smoke
       - run: docker build -f apps/api/Dockerfile -t dawah-api:stage1 .
       - run: docker build -f apps/worker/Dockerfile -t dawah-worker:stage1 .
       - run: pnpm smoke:containers
+
+  # Dependency review is a release gate, not a build step: it must be able to
+  # fail a pull request without blocking the functional verification above.
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Audit dependencies for high and critical advisories
+        run: pnpm audit --audit-level high
+
+  # Surfaces license and advisory changes introduced by a pull request itself,
+  # which a whole-tree audit cannot distinguish from pre-existing findings.
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure

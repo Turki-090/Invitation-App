@@ -1,0 +1,156 @@
+# Dawah alert rules.
+#
+# Every expression below is written against a metric defined in
+# packages/observability/src/platform-metrics.ts. Changing a metric name there
+# without changing it here silently disables an alert, so the two files are
+# reviewed together.
+#
+# Severity contract:
+#   page  - a host-visible failure or an unrecoverable trend; wakes on-call.
+#   ticket- degradation that must be handled in business hours.
+groups:
+  - name: dawah-availability
+    interval: 30s
+    rules:
+      - alert: DawahServiceDown
+        expr: up{job=~"dawah-api|dawah-worker"} == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.job }} is not being scraped in {{ $labels.environment }}."
+          description: >-
+            The process is gone or unreachable. Check the platform's health
+            endpoints, then the deployment's recent release history.
+          runbook: docs/runbooks/event-night-incident.md
+
+      - alert: DawahApiServerErrorRate
+        expr: |
+          sum(rate(dawah_http_errors_total{kind="server"}[5m]))
+            / clamp_min(sum(rate(dawah_http_requests_total[5m])), 0.001) > 0.02
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "More than 2% of API requests are failing with a server error."
+          description: >-
+            Correlate by the requestId on a failing response, then read the
+            matching structured log line and error report.
+          runbook: docs/runbooks/event-night-incident.md
+
+      - alert: DawahApiLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, route) (rate(dawah_http_request_duration_seconds_bucket[10m]))
+          ) > 2
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "p95 latency above 2s on {{ $labels.route }}."
+          description: >-
+            Compare against the k6 thresholds in load/README.md before treating
+            this as a regression; report and export routes have their own
+            budgets.
+          runbook: docs/runbooks/load-and-query-plan-testing.md
+
+      - alert: DawahReleaseSkew
+        expr: count(count by (release) (dawah_build_info)) > 1
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "More than one release is serving traffic."
+          description: >-
+            Expected briefly during a gradual rollout. Sustained skew means a
+            rollout stalled; finish or roll it back.
+          runbook: docs/runbooks/migration-and-rollback.md
+
+  - name: dawah-queues
+    interval: 30s
+    rules:
+      - alert: DawahQueueBacklogAging
+        expr: dawah_queue_oldest_waiting_job_age_seconds > 300
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "Oldest waiting job in {{ $labels.queue }} is over five minutes old."
+          description: >-
+            Backlog age matters more than depth: a deep queue draining quickly
+            is healthy. Follow the queue-backlog runbook and never delete a
+            backlog without a recorded recovery decision.
+          runbook: docs/runbooks/queue-backlog.md
+
+      - alert: DawahQueueJobsExhausted
+        expr: increase(dawah_queue_jobs_total{outcome="exhausted"}[15m]) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: "Jobs in {{ $labels.queue }} have exhausted their retries."
+          description: >-
+            An exhausted send leaves durable evidence in the database for
+            operator review; it is not silently lost. Confirm the permanent
+            failure list before resending.
+          runbook: docs/runbooks/whatsapp-failures.md
+
+      - alert: DawahExportsStalled
+        expr: |
+          dawah_queue_depth{queue="exports", state="waiting"} > 0
+            and dawah_queue_oldest_waiting_job_age_seconds{queue="exports"} > 900
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Export jobs are waiting longer than fifteen minutes."
+          description: >-
+            Hosts are watching an export that never arrives. Check worker
+            health and private object storage before requeueing.
+          runbook: docs/runbooks/queue-backlog.md
+
+  - name: dawah-provider
+    interval: 30s
+    rules:
+      - alert: DawahWhatsAppSendFailures
+        expr: |
+          sum(rate(dawah_provider_requests_total{outcome=~"failed.*"}[10m]))
+            / clamp_min(sum(rate(dawah_provider_requests_total[10m])), 0.001) > 0.1
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "Over 10% of WhatsApp sends are being rejected by the provider."
+          description: >-
+            Separate permanent from transient: a rise in
+            outcome="failed_permanent" usually means a template or recipient
+            policy problem, not an outage.
+          runbook: docs/runbooks/whatsapp-failures.md
+
+      - alert: DawahWhatsAppRateLimited
+        expr: increase(dawah_provider_requests_total{outcome="rate_limited"}[5m]) > 20
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "The WhatsApp provider is rate limiting outbound sends."
+          description: >-
+            The worker already backs off through its limiter. Escalate only if
+            backlog age is also rising.
+          runbook: docs/runbooks/whatsapp-failures.md
+
+      - alert: DawahProviderLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, operation) (rate(dawah_provider_request_duration_seconds_bucket[10m]))
+          ) > 5
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "p95 provider latency above 5s for {{ $labels.operation }}."
+          description: >-
+            Sends stay durable and retryable, so this degrades throughput
+            rather than correctness. Watch backlog age for escalation.
+          runbook: docs/runbooks/whatsapp-failures.md

@@ -8,6 +8,7 @@ import {
   queueNames,
   type ExportJobData,
 } from "@dawah/queue";
+import { currentCorrelationId } from "@dawah/observability";
 import { Queue } from "bullmq";
 
 @Injectable()
@@ -31,9 +32,13 @@ export class ExportsQueueService implements OnModuleDestroy {
   }
 
   public enqueue(data: ExportJobData): Promise<unknown> {
-    return this.queue.add("generate", data, {
-      jobId: exportJobId(data.exportJobId),
-    });
+    // The correlation identifier rides in the payload, never in the job id:
+    // the deterministic id is what makes enqueueing idempotent.
+    return this.queue.add(
+      "generate",
+      { ...data, correlationId: currentCorrelationId() },
+      { jobId: exportJobId(data.exportJobId) },
+    );
   }
 
   public async onModuleDestroy(): Promise<void> {

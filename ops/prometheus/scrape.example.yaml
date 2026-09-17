@@ -1,0 +1,36 @@
+# Reference scrape configuration.
+#
+# Copy into the deployment's Prometheus-compatible collector and replace the
+# targets and the credential reference. The bearer token is the deployment's
+# METRICS_TOKEN: it is not a user access token and must be issued, stored, and
+# rotated as its own secret (docs/runbooks/credential-rotation.md).
+#
+# Both endpoints are private. They must not be published through the public
+# ingress that serves /api/v1 to browsers.
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  external_labels:
+    environment: staging # replace per deployment
+
+rule_files:
+  - alerts.yaml
+
+scrape_configs:
+  - job_name: dawah-api
+    metrics_path: /api/v1/internal/metrics
+    scheme: https
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/dawah-metrics-token
+    static_configs:
+      - targets: ["api.internal.example:4000"]
+
+  - job_name: dawah-worker
+    metrics_path: /metrics
+    scheme: https
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/dawah-metrics-token
+    static_configs:
+      - targets: ["worker.internal.example:4001"]

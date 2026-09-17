@@ -5,8 +5,14 @@ import { ConfigService } from "@nestjs/config";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { json, type Request, urlencoded } from "express";
 import helmet from "helmet";
+import {
+  correlationIdHeader,
+  requestIdHeader,
+  type Logger,
+} from "@dawah/observability";
 import { AppModule } from "./app.module";
-import { ApiExceptionFilter } from "./shared/api-exception.filter";
+import { NestLoggerAdapter } from "./observability/nest-logger.adapter";
+import { LOGGER } from "./observability/observability.tokens";
 import { configureTrustedProxy } from "./shared/trusted-proxy";
 
 async function bootstrap(): Promise<void> {
@@ -15,6 +21,10 @@ async function bootstrap(): Promise<void> {
     bufferLogs: true,
   });
   const config = app.get(ConfigService<ApiEnvironment, true>);
+  const logger = app.get<Logger>(LOGGER);
+  // Replaces the buffered default console logger, so framework output is
+  // redacted, structured, and correlated like every other line.
+  app.useLogger(new NestLoggerAdapter(logger));
 
   app.setGlobalPrefix("api/v1");
   // Honor forwarded client addresses only from local/private ingress hops. A
@@ -42,12 +52,20 @@ async function bootstrap(): Promise<void> {
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     origin: config.get("API_CORS_ORIGINS", { infer: true }),
+    // Browser clients need to read the correlation identifiers so a host can
+    // quote one back to support for a failed operation.
+    exposedHeaders: [requestIdHeader, correlationIdHeader],
   });
-  app.useGlobalFilters(new ApiExceptionFilter());
   app.enableShutdownHooks();
 
   const port = config.get("API_PORT", { infer: true });
   await app.listen(port, "0.0.0.0");
+  logger.info("api.started", {
+    port,
+    metricsEnabled: config.get("METRICS_ENABLED", { infer: true }),
+    errorReportingEnabled:
+      config.get("SENTRY_DSN", { infer: true }) !== undefined,
+  });
 }
 
 void bootstrap();

@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -24,6 +25,7 @@ import {
   type SubmitRsvpInput,
 } from "@dawah/api-contract";
 import type { ApiEnvironment } from "@dawah/config";
+import type { PlatformMetrics } from "@dawah/observability";
 import {
   evaluateGuestRsvpPolicy,
   InvitationInvariantError,
@@ -34,6 +36,7 @@ import { Prisma } from "@prisma/client";
 import type { AuthPrincipal } from "../auth/auth.types";
 import { EventAccessService } from "../events/event-access.service";
 import { MessagingQueueService } from "../messaging/messaging-queue.service";
+import { PLATFORM_METRICS } from "../observability/observability.tokens";
 import { PrismaService } from "../prisma/prisma.service";
 
 const invitationRsvpInclude = Prisma.validator<Prisma.InvitationGroupInclude>()(
@@ -85,7 +88,19 @@ export class RsvpService {
     @Inject(MessagingQueueService)
     private readonly messagingQueue: MessagingQueueService,
     private readonly config: ConfigService<ApiEnvironment, true>,
+    @Optional()
+    @Inject(PLATFORM_METRICS)
+    private readonly metrics?: PlatformMetrics,
   ) {}
+
+  /**
+   * Counts a business outcome for the operations dashboard. Optional so that
+   * the service stays constructible in tests and so a metrics failure can
+   * never affect an RSVP that has already been committed.
+   */
+  private recordDomainEvent(kind: string, outcome: string): void {
+    this.metrics?.domainEvents.increment({ kind, outcome });
+  }
 
   public async getPublicInvitation(
     token: string,
@@ -132,6 +147,7 @@ export class RsvpService {
       }, this.transactionOptions()),
     );
     await this.enqueueConfirmation(applied.confirmationId);
+    this.recordDomainEvent("rsvp_submission", "guest");
     return applied.result;
   }
 
@@ -190,6 +206,7 @@ export class RsvpService {
       }, this.transactionOptions()),
     );
     await this.enqueueConfirmation(applied.confirmationId);
+    this.recordDomainEvent("rsvp_submission", "host");
     return applied.result;
   }
 
