@@ -37,10 +37,22 @@ describe("check-in domain", () => {
   });
 
   it.each([
-    [{ attendeeCount: 0, checkedInAttendance: 0, confirmedAttendance: 2 }, "CHECK_IN_INCREMENT_INVALID"],
-    [{ attendeeCount: 1, checkedInAttendance: 0, confirmedAttendance: 0 }, "CHECK_IN_NOT_ELIGIBLE"],
-    [{ attendeeCount: 1, checkedInAttendance: 2, confirmedAttendance: 2 }, "ALREADY_CHECKED_IN"],
-    [{ attendeeCount: 2, checkedInAttendance: 1, confirmedAttendance: 2 }, "CHECK_IN_CAPACITY_EXCEEDED"],
+    [
+      { attendeeCount: 0, checkedInAttendance: 0, confirmedAttendance: 2 },
+      "CHECK_IN_INCREMENT_INVALID",
+    ],
+    [
+      { attendeeCount: 1, checkedInAttendance: 0, confirmedAttendance: 0 },
+      "CHECK_IN_NOT_ELIGIBLE",
+    ],
+    [
+      { attendeeCount: 1, checkedInAttendance: 2, confirmedAttendance: 2 },
+      "ALREADY_CHECKED_IN",
+    ],
+    [
+      { attendeeCount: 2, checkedInAttendance: 1, confirmedAttendance: 2 },
+      "CHECK_IN_CAPACITY_EXCEEDED",
+    ],
   ] as const)("rejects an unsafe increment with %s", (input, code) => {
     expect(() => calculateCheckInIncrement(input)).toThrowError(
       expect.objectContaining({ code }) as CheckInInvariantError,

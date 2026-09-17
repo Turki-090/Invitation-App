@@ -242,6 +242,9 @@ importers:
       bullmq:
         specifier: 6.3.4
         version: 6.3.4(ioredis@6.0.0(supports-color@10.2.2))
+      exceljs-hardened:
+        specifier: 5.0.0
+        version: 5.0.0
     devDependencies:
       '@dawah/typescript-config':
         specifier: workspace:*

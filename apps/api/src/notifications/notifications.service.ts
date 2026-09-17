@@ -3,6 +3,7 @@ import type {
   ListNotificationsQuery,
   ListNotificationsResponse,
   Notification as NotificationContract,
+  NotificationKind,
 } from "@dawah/api-contract";
 import { Permission } from "@dawah/domain";
 import type { AuthPrincipal } from "../auth/auth.types";
@@ -102,11 +103,7 @@ export class NotificationsService {
   private map(notification: {
     id: string;
     eventId: string;
-    kind:
-      | "MESSAGE_BATCH_COMPLETED"
-      | "MESSAGE_BATCH_FAILED"
-      | "REMINDER_BATCH_COMPLETED"
-      | "TEAM_MEMBER_JOINED";
+    kind: NotificationKind;
     sourceType: string;
     sourceId: string;
     data: unknown;

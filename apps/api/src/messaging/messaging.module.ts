@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { CreditsModule } from "../credits/credits.module";
 import { EventsModule } from "../events/events.module";
 import { StorageModule } from "../storage/storage.module";
 import { MessagingController } from "./messaging.controller";
@@ -11,7 +12,7 @@ import { WhatsappWebhookController } from "./whatsapp-webhook.controller";
 import { WhatsappWebhookService } from "./whatsapp-webhook.service";
 
 @Module({
-  imports: [AuthModule, EventsModule, StorageModule],
+  imports: [AuthModule, CreditsModule, EventsModule, StorageModule],
   controllers: [
     MessagingController,
     MessagingMediaController,

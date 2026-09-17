@@ -60,9 +60,7 @@ export const listExportJobsQuerySchema = z.object({
   status: exportJobStatusSchema.optional(),
 });
 
-export type ListExportJobsQuery = z.infer<
-  typeof listExportJobsQuerySchema
->;
+export type ListExportJobsQuery = z.infer<typeof listExportJobsQuerySchema>;
 
 export const listExportJobsResponseSchema = z.object({
   items: z.array(exportJobSchema),
@@ -84,4 +82,3 @@ export const exportDownloadQuerySchema = z.object({
 });
 
 export type ExportDownloadQuery = z.infer<typeof exportDownloadQuerySchema>;
-

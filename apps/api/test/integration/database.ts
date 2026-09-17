@@ -40,6 +40,13 @@ export class TestDatabase {
     // independent of those production invariants.
     await this.prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
+        "check_in_records",
+        "check_in_states",
+        "entry_passes",
+        "credit_ledger_entries",
+        "credit_reservations",
+        "credit_accounts",
+        "export_jobs",
         "webhook_events",
         "message_attempts",
         "notifications",

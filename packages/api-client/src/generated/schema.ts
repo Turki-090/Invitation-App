@@ -38,6 +38,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/platform": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read API version metadata and feature availability */
+        get: operations["getPlatformMetadata"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events": {
         parameters: {
             query?: never;
@@ -200,6 +217,29 @@ export type paths = {
          * @description Applies a capability-scoped, idempotent attendance selection and returns the resulting server-calculated state. The submission UUID may be safely retried with the identical payload.
          */
         post: operations["submitPublicInvitationRsvp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/invitations/{token}/entry-pass": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Opaque, high-entropy capability returned only when private-link access is issued. */
+                token: components["parameters"]["PublicInvitationToken"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue the opaque entry pass for a confirmed private invitation
+         * @description Returns the same opaque pass while the invitation keeps a confirmed RSVP and the event still accepts entry passes. Unavailable passes intentionally share the private-invitation not-found response.
+         */
+        post: operations["issuePublicEntryPass"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1024,6 +1064,229 @@ export type paths = {
         head?: never;
         /** Update an automatic reminder rule */
         patch: operations["updateReminderRule"];
+        trace?: never;
+    };
+    "/events/{eventId}/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Read the reconciled event report
+         * @description Aggregates invitation groups, named guests, expected attendance, RSVP, latest delivery status, invitation types, and check-in from source records inside one repeatable-read snapshot.
+         */
+        get: operations["getEventReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** List the caller's export requests */
+        get: operations["listExportJobs"];
+        put?: never;
+        /**
+         * Request a background guest export
+         * @description Queues a private CSV or XLSX build. The file is generated asynchronously and stays visible only to the requester.
+         */
+        post: operations["createExportJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/exports/{exportJobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Export-request UUID. */
+                exportJobId: components["parameters"]["ExportJobId"];
+            };
+            cookie?: never;
+        };
+        /** Read one export request */
+        get: operations["getExportJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/exports/{exportJobId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Export-request UUID. */
+                exportJobId: components["parameters"]["ExportJobId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Download a completed export with an expiring signature
+         * @description Serves checksum-verified private bytes to the requesting member only while the expiry-bounded signature and the retention window are both valid.
+         */
+        get: operations["downloadExportJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/check-ins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record an arrival for an invitation group
+         * @description Adds arriving attendees without ever exceeding the confirmed attendance. A repeated idempotency key replays the stored result, and a scan for an already complete party reports a duplicate instead of adding attendance.
+         */
+        post: operations["createCheckIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/check-ins/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve a scanned entry pass to its party */
+        post: operations["resolveEntryPass"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/check-ins/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Search parties manually by name or phone number
+         * @description Phone numbers are masked unless the membership may view full guest phone numbers.
+         */
+        get: operations["searchCheckInParties"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/check-ins/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** Read the event-day check-in dashboard */
+        get: operations["getCheckInDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Read the credit position for an event
+         * @description Reports balance, reservations, and the reconciliation between logical sends and ledger charges. Commercial pricing is not part of this contract.
+         */
+        get: operations["getCreditOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/credits/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** List append-only credit ledger entries */
+        get: operations["listCreditLedgerEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/events/{eventId}/team": {
@@ -2172,7 +2435,7 @@ export type components = {
         /** @enum {string} */
         ReminderTriggerKind: "AFTER_INITIAL_INVITATION" | "BEFORE_RSVP_DEADLINE";
         /** @enum {string} */
-        ReminderExclusionReasonCode: "EVENT_NOT_REMINDABLE" | "INVITATION_CANCELLED" | "RSVP_NOT_PENDING" | "INITIAL_INVITATION_NOT_SENT" | "INITIAL_DELIVERY_FAILED" | "COOLDOWN_ACTIVE" | "TEMPLATE_NOT_APPROVED" | "CURRENT_SNAPSHOT_REQUIRED" | "AUDIENCE_MISMATCH" | "RULE_NOT_DUE" | "RULE_LIMIT_REACHED";
+        ReminderExclusionReasonCode: "EVENT_NOT_REMINDABLE" | "INVITATION_CANCELLED" | "RSVP_NOT_PENDING" | "INITIAL_INVITATION_NOT_SENT" | "INITIAL_DELIVERY_FAILED" | "COOLDOWN_ACTIVE" | "TEMPLATE_NOT_APPROVED" | "CURRENT_SNAPSHOT_REQUIRED" | "AUDIENCE_MISMATCH" | "RULE_NOT_DUE" | "RULE_LIMIT_REACHED" | "INSUFFICIENT_CREDITS";
         /** @enum {string} */
         ReminderRunSource: "MANUAL" | "SCHEDULED";
         ReminderReadinessRequest: {
@@ -2453,7 +2716,7 @@ export type components = {
             alreadyAccepted: boolean;
         };
         /** @enum {string} */
-        NotificationKind: "MESSAGE_BATCH_COMPLETED" | "MESSAGE_BATCH_FAILED" | "REMINDER_BATCH_COMPLETED" | "TEAM_MEMBER_JOINED";
+        NotificationKind: "MESSAGE_BATCH_COMPLETED" | "MESSAGE_BATCH_FAILED" | "REMINDER_BATCH_COMPLETED" | "TEAM_MEMBER_JOINED" | "EXPORT_READY" | "EXPORT_FAILED";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -2474,6 +2737,274 @@ export type components = {
         ListNotificationsResponse: {
             items: components["schemas"]["Notification"][];
             unreadCount: number;
+            pagination: {
+                page: number;
+                pageSize: number;
+                totalItems: number;
+                totalPages: number;
+            };
+        };
+        PlatformMetadata: {
+            /** @constant */
+            apiVersion: "v1";
+            /** @constant */
+            minimumSupportedApiVersion: "v1";
+            features: {
+                reportsEnabled: boolean;
+                exportsEnabled: boolean;
+                checkInEnabled: boolean;
+                billingEnabled: boolean;
+                paymentsEnabled: boolean;
+            };
+            nativeClients: {
+                ios: components["schemas"]["NativeClientVersions"];
+                android: components["schemas"]["NativeClientVersions"];
+            };
+        };
+        NativeClientVersions: {
+            minimumSupportedVersion: string | null;
+            latestVersion: string | null;
+        };
+        ReportMessageStatusCounts: {
+            queued: number;
+            sending: number;
+            sent: number;
+            delivered: number;
+            read: number;
+            responded: number;
+            failed: number;
+            cancelled: number;
+        };
+        EventReport: {
+            /** Format: uuid */
+            eventId: string;
+            /** Format: date-time */
+            generatedAt: string;
+            invitationGroups: {
+                active: number;
+                cancelled: number;
+                withInitialInvitation: number;
+                withoutInitialInvitation: number;
+            };
+            namedGuests: number;
+            expectedAttendance: number;
+            rsvp: {
+                acceptedGroups: number;
+                partiallyAcceptedGroups: number;
+                declinedGroups: number;
+                pendingGroups: number;
+            };
+            invitationTypes: {
+                singleGroups: number;
+                namedGroupGroups: number;
+                primaryWithCompanionsGroups: number;
+            };
+            delivery: {
+                latestInvitationMessages: number;
+                notSentGroups: number;
+                byStatus: components["schemas"]["ReportMessageStatusCounts"];
+            };
+            checkIn: {
+                checkedInGroups: number;
+                checkedInAttendees: number;
+                notArrivedAttendees: number;
+                noShowAttendees: number | null;
+            };
+        };
+        /** @enum {string} */
+        ExportFormat: "CSV" | "XLSX";
+        /** @enum {string} */
+        ExportPreset: "FULL_GUEST_LIST" | "CONFIRMED_ATTENDANCE" | "PENDING_RSVP" | "CHECK_IN_LIST" | "FINAL_ATTENDANCE";
+        /** @enum {string} */
+        ExportJobStatus: "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED" | "EXPIRED";
+        CreateExport: {
+            format: components["schemas"]["ExportFormat"];
+            preset: components["schemas"]["ExportPreset"];
+        };
+        ExportOutput: {
+            filename: string;
+            contentType: string;
+            byteSize: number;
+            sha256: string;
+            downloadUrl: string;
+        };
+        ExportJob: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            format: components["schemas"]["ExportFormat"];
+            preset: components["schemas"]["ExportPreset"];
+            status: components["schemas"]["ExportJobStatus"];
+            rowCount: number | null;
+            output: components["schemas"]["ExportOutput"] | null;
+            failureCode: string | null;
+            failureMessage: string | null;
+            /** Format: date-time */
+            requestedAt: string;
+            /** Format: date-time */
+            processingAt: string | null;
+            /** Format: date-time */
+            completedAt: string | null;
+            /** Format: date-time */
+            failedAt: string | null;
+            /** Format: date-time */
+            expiresAt: string | null;
+        };
+        ListExportJobsResponse: {
+            items: components["schemas"]["ExportJob"][];
+            pagination: {
+                page: number;
+                pageSize: number;
+                totalItems: number;
+                totalPages: number;
+            };
+        };
+        EntryPassToken: string;
+        PublicEntryPass: {
+            token: components["schemas"]["EntryPassToken"];
+            qrPayload: components["schemas"]["EntryPassToken"];
+            /** Format: date-time */
+            issuedAt: string;
+            /** Format: date-time */
+            expiresAt: string | null;
+        };
+        ResolveEntryPass: {
+            token: components["schemas"]["EntryPassToken"];
+        };
+        /** @enum {string} */
+        CheckInSource: "QR" | "MANUAL";
+        /** @enum {string} */
+        CheckInPartyStatus: "NOT_ARRIVED" | "PARTIALLY_CHECKED_IN" | "CHECKED_IN";
+        /** @enum {string} */
+        CheckInOutcome: "PARTIALLY_CHECKED_IN" | "CHECKED_IN" | "ALREADY_CHECKED_IN";
+        CheckInParty: {
+            /** Format: uuid */
+            invitationGroupId: string;
+            displayName: string;
+            phoneDisplay: string | null;
+            phoneMasked: boolean;
+            confirmedAttendance: number;
+            checkedInAttendance: number;
+            remainingAttendance: number;
+            status: components["schemas"]["CheckInPartyStatus"];
+            /** Format: date-time */
+            firstCheckedInAt: string | null;
+            /** Format: date-time */
+            lastCheckedInAt: string | null;
+            lastCheckedInBy: string | null;
+            lastDeviceId: string | null;
+        };
+        ResolvedEntryPass: components["schemas"]["CheckInParty"] & {
+            /** Format: date-time */
+            resolvedAt: string;
+        };
+        SearchCheckInPartiesResponse: {
+            items: components["schemas"]["CheckInParty"][];
+        };
+        CreateCheckIn: {
+            /** Format: uuid */
+            invitationGroupId: string;
+            attendeeCount: number;
+            source: components["schemas"]["CheckInSource"];
+            deviceId?: string;
+        };
+        CheckInResult: {
+            outcome: components["schemas"]["CheckInOutcome"];
+            /** Format: uuid */
+            invitationGroupId: string;
+            displayName: string;
+            confirmedAttendance: number;
+            previousCheckedInAttendance: number;
+            checkedInAttendance: number;
+            remainingAttendance: number;
+            incrementedBy: number;
+            /** Format: date-time */
+            checkedInAt: string | null;
+            checkedInBy: string | null;
+            deviceId: string | null;
+            /** Format: uuid */
+            recordId: string | null;
+            idempotentReplay: boolean;
+        };
+        RecentCheckIn: {
+            /** Format: uuid */
+            recordId: string;
+            /** Format: uuid */
+            invitationGroupId: string;
+            displayName: string;
+            attendeeCount: number;
+            checkedInAttendance: number;
+            confirmedAttendance: number;
+            source: components["schemas"]["CheckInSource"];
+            /** Format: date-time */
+            checkedInAt: string;
+            checkedInBy: string | null;
+            deviceId: string | null;
+        };
+        CheckInDashboard: {
+            /** Format: uuid */
+            eventId: string;
+            expectedAttendance: number;
+            checkedInAttendance: number;
+            remainingAttendance: number;
+            checkInPercentage: number;
+            invitationGroups: number;
+            fullyCheckedInGroups: number;
+            partiallyCheckedInGroups: number;
+            notArrivedGroups: number;
+            duplicateAttempts: number;
+            recentArrivals: components["schemas"]["RecentCheckIn"][];
+            /** Format: date-time */
+            calculatedAt: string;
+        };
+        /** @enum {string} */
+        CreditLedgerEntryType: "PURCHASE" | "BONUS" | "SEND_USAGE" | "REFUND" | "MANUAL_ADJUSTMENT" | "EXPIRY";
+        CreditReconciliation: {
+            logicalMessageUnits: number;
+            chargedMessageUnits: number;
+            refundedUnits: number;
+            unchargedMessageUnits: number;
+            excessChargeUnits: number;
+            reconciled: boolean;
+        };
+        CreditOverview: {
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            accountId: string | null;
+            billingEnabled: boolean;
+            paymentActivationEnabled: boolean;
+            balanceUnits: number;
+            reservedUnits: number;
+            availableUnits: number;
+            activeReservationCount: number;
+            reconciliation: components["schemas"]["CreditReconciliation"];
+            /** Format: date-time */
+            generatedAt: string;
+        };
+        CreditLedgerEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            actorUserId: string | null;
+            /** Format: uuid */
+            messageId: string | null;
+            entryType: components["schemas"]["CreditLedgerEntryType"];
+            units: number;
+            referenceType: string;
+            referenceId: string;
+            description: string | null;
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ListCreditLedgerResponse: {
+            items: components["schemas"]["CreditLedgerEntry"][];
             pagination: {
                 page: number;
                 pageSize: number;
@@ -2596,6 +3127,8 @@ export type components = {
         MembershipId: string;
         /** @description Operational-notification UUID. */
         NotificationId: string;
+        /** @description Export-request UUID. */
+        ExportJobId: string;
         /** @description Caller-generated visible ASCII key unique to this logical mutation. */
         IdempotencyKey: string;
     };
@@ -2649,6 +3182,27 @@ export interface operations {
             };
             429: components["responses"]["TooManyRequests"];
             503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getPlatformMetadata: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Supported API versions, enabled features, and native client version floors. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformMetadata"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
         };
     };
     listEvents: {
@@ -2946,6 +3500,33 @@ export interface operations {
                 };
             };
             400: components["responses"]["ValidationError"];
+            404: components["responses"]["PublicInvitationNotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    issuePublicEntryPass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Opaque, high-entropy capability returned only when private-link access is issued. */
+                token: components["parameters"]["PublicInvitationToken"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Opaque entry-pass token that doubles as the QR payload. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "private, no-store, max-age=0, must-revalidate";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicEntryPass"];
+                };
+            };
             404: components["responses"]["PublicInvitationNotFound"];
             409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
@@ -4403,6 +4984,351 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getEventReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reconciled report totals for the event. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listExportJobs: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ExportJobStatus"];
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paged export requests created by the calling member. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListExportJobsResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    createExportJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExport"];
+            };
+        };
+        responses: {
+            /** @description The export was accepted and queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportJob"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getExportJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Export-request UUID. */
+                exportJobId: components["parameters"]["ExportJobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Export request state with a freshly signed download URL when the file is ready. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportJob"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    downloadExportJob: {
+        parameters: {
+            query: {
+                expires: number;
+                signature: string;
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+                /** @description Export-request UUID. */
+                exportJobId: components["parameters"]["ExportJobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Export file bytes. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "private, no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createCheckIn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated visible ASCII key unique to this logical mutation. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCheckIn"];
+            };
+        };
+        responses: {
+            /** @description The resulting attendance for the party. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInResult"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    resolveEntryPass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveEntryPass"];
+            };
+        };
+        responses: {
+            /** @description The party the scanned pass belongs to. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolvedEntryPass"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    searchCheckInParties: {
+        parameters: {
+            query: {
+                query: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching parties with their current attendance. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchCheckInPartiesResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getCheckInDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reconciled arrival totals and the most recent arrivals. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInDashboard"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getCreditOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Credit position and reconciliation for the event. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditOverview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listCreditLedgerEntries: {
+        parameters: {
+            query?: {
+                entryType?: components["schemas"]["CreditLedgerEntryType"];
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Event UUID. */
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paged ledger entries, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCreditLedgerResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
         };
     };

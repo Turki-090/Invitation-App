@@ -35,6 +35,7 @@ import {
   type StoredAsset,
 } from "@prisma/client";
 import type { AuthPrincipal } from "../auth/auth.types";
+import { CreditLedgerService } from "../credits/credit-ledger.service";
 import { EventAccessService } from "../events/event-access.service";
 import { MessagingQueueService } from "../messaging/messaging-queue.service";
 import {
@@ -88,6 +89,8 @@ export class RemindersService {
     @Inject(EventAccessService) private readonly access: EventAccessService,
     @Inject(MessagingQueueService)
     private readonly queue: MessagingQueueService,
+    @Inject(CreditLedgerService)
+    private readonly credits: CreditLedgerService,
   ) {}
 
   public async readiness(
@@ -206,6 +209,16 @@ export class RemindersService {
             queuedAt: evaluatedAt,
           },
         });
+        await this.credits.reserveForSendBatch(
+          transaction,
+          {
+            eventId,
+            sendBatchId: batchId,
+            units: state.eligible.length,
+            createdByUserId: user.id,
+          },
+          evaluatedAt,
+        );
         await transaction.message.createMany({
           data: state.eligible.map((evaluation) => {
             const snapshot = evaluation.snapshot!;

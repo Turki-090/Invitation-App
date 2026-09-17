@@ -141,6 +141,42 @@ const stories = [
     width: 900,
     height: 800,
   },
+  {
+    id: "host-reports-and-exports--arabic",
+    locale: "ar-SA",
+    width: 1200,
+    height: 1200,
+  },
+  {
+    id: "host-reports-and-exports--english",
+    locale: "en",
+    width: 1200,
+    height: 1200,
+  },
+  {
+    id: "host-event-day-check-in--arabic",
+    locale: "ar-SA",
+    width: 1200,
+    height: 1200,
+  },
+  {
+    id: "host-event-day-check-in--english",
+    locale: "en",
+    width: 1200,
+    height: 1200,
+  },
+  {
+    id: "host-credits-and-billing--arabic",
+    locale: "ar-SA",
+    width: 1200,
+    height: 1000,
+  },
+  {
+    id: "host-credits-and-billing--english",
+    locale: "en",
+    width: 1200,
+    height: 1000,
+  },
 ] as const;
 
 async function analyze(page: Page) {

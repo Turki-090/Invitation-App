@@ -800,6 +800,7 @@ const arSA = {
     reasonAudienceMismatch: "الدعوة خارج الشريحة المحددة",
     reasonRuleNotDue: "موعد القاعدة لم يحن",
     reasonRuleLimitReached: "بلغت الدعوة الحد الأقصى للتذكيرات",
+    reasonInsufficientCredits: "الرصيد غير كافٍ لتشغيل هذا التذكير",
   },
   reports: {
     metadataTitle: "تقارير المناسبة",
@@ -882,6 +883,8 @@ const arSA = {
     loadError: "تعذر تحميل حالة الدخول.",
     refresh: "تحديث",
     expected: "الحضور المتوقع",
+    peopleUnit: "شخص",
+    groupsUnit: "مجموعة",
     arrived: "وصلوا",
     remaining: "متبقٍ",
     completeGroups: "مجموعات مكتملة",
@@ -890,7 +893,8 @@ const arSA = {
       "تحتاج الكاميرا إلى اتصال بالخادم. لا يُسجّل أي حضور دون تأكيد ناجح.",
     startCamera: "تشغيل الكاميرا",
     stopCamera: "إيقاف الكاميرا",
-    cameraUnavailable: "الكاميرا أو قارئ الرموز غير متاح؛ استخدم الإدخال اليدوي.",
+    cameraUnavailable:
+      "الكاميرا أو قارئ الرموز غير متاح؛ استخدم الإدخال اليدوي.",
     tokenLabel: "رمز الدخول",
     tokenPlaceholder: "الصق الرمز الموجود تحت QR",
     resolve: "التحقق من الرمز",
@@ -940,8 +944,7 @@ const arSA = {
     billingDisabled: "الفوترة التجارية غير مفعّلة في هذه البيئة.",
     paymentsDisabled: "الدفع الإلكتروني غير مفعّل؛ لا يمكن إنشاء عملية شراء.",
     permissionDeniedTitle: "الفوترة غير متاحة لهذا الدور",
-    permissionDeniedDescription:
-      "إدارة الفوترة محصورة بمالك المناسبة.",
+    permissionDeniedDescription: "إدارة الفوترة محصورة بمالك المناسبة.",
     entryPurchase: "شراء",
     entryBonus: "رصيد إضافي",
     entrySendUsage: "استخدام إرسال",
@@ -1069,6 +1072,8 @@ const arSA = {
     batchFailed: "توجد رسائل فشل إرسالها",
     reminderCompleted: "اكتمل إرسال التذكيرات",
     memberJoined: "انضم عضو جديد إلى فريق المناسبة",
+    exportReady: "ملف التصدير جاهز للتنزيل",
+    exportFailed: "تعذر إنشاء ملف التصدير",
   },
   publicInvitation: {
     metadataTitle: "دعوة خاصة",

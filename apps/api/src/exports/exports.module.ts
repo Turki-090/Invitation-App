@@ -13,4 +13,3 @@ import { ExportsService } from "./exports.service";
   providers: [ExportsQueueService, ExportsService],
 })
 export class ExportsModule {}
-

@@ -100,21 +100,21 @@ export class CheckInsController {
   public checkIn(
     @Req() request: AuthenticatedRequest,
     @Param("eventId", new ParseUUIDPipe({ version: "4" })) eventId: string,
-    @Headers(
-      "idempotency-key",
-      new ZodValidationPipe(checkInIdempotencyKeySchema),
-    )
-    idempotencyKey: string,
+    @Headers("idempotency-key") idempotencyKeyValue: string | undefined,
     @Body(new ZodValidationPipe(createCheckInSchema))
     input: CreateCheckInInput,
   ): Promise<CheckInResult> {
     return this.checkIns.checkIn(
       request.user,
       eventId,
-      idempotencyKey,
+      parseCheckInIdempotencyKey(idempotencyKeyValue),
       input,
     );
   }
+}
+
+function parseCheckInIdempotencyKey(value: string | undefined): string {
+  return new ZodValidationPipe(checkInIdempotencyKeySchema).transform(value);
 }
 
 function setPrivateGuestHeaders(response: Response): void {

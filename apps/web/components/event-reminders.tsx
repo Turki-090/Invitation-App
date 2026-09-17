@@ -918,6 +918,7 @@ function exclusionReasonLabel(
     EVENT_NOT_REMINDABLE: copy.reasonEventNotRemindable,
     INITIAL_DELIVERY_FAILED: copy.reasonInitialDeliveryFailed,
     INITIAL_INVITATION_NOT_SENT: copy.reasonInitialInvitationNotSent,
+    INSUFFICIENT_CREDITS: copy.reasonInsufficientCredits,
     INVITATION_CANCELLED: copy.reasonInvitationCancelled,
     RSVP_NOT_PENDING: copy.reasonRsvpNotPending,
     RULE_LIMIT_REACHED: copy.reasonRuleLimitReached,

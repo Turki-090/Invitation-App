@@ -13,19 +13,27 @@ const config: StorybookConfig = {
   },
   docs: { autodocs: "tag" },
   async viteFinal(config) {
-    const replacement = path.resolve(
-      storybookDirectory,
-      "../../../packages/ui/src/index.ts",
-    );
+    const sourceAliases = {
+      "@dawah/ui": "../../../packages/ui/src/index.ts",
+    } as const;
     config.resolve ??= {};
-    if (Array.isArray(config.resolve.alias)) {
-      config.resolve.alias.unshift({ find: "@dawah/ui", replacement });
-    } else {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        "@dawah/ui": replacement,
-      };
+    for (const [find, target] of Object.entries(sourceAliases)) {
+      const replacement = path.resolve(storybookDirectory, target);
+      if (Array.isArray(config.resolve.alias)) {
+        config.resolve.alias.unshift({ find, replacement });
+      } else {
+        config.resolve.alias = { ...config.resolve.alias, [find]: replacement };
+      }
     }
+    // Workspace packages ship CommonJS for Nest and the worker, and pnpm links
+    // them from `packages/*/dist` rather than `node_modules`. Rollup's CommonJS
+    // conversion only covers `node_modules` by default, so without this any
+    // story reaching the API client fails on an unresolvable named export.
+    config.build ??= {};
+    config.build.commonjsOptions = {
+      ...config.build.commonjsOptions,
+      include: [/node_modules/, /packages[/\\][^/\\]+[/\\]dist/],
+    };
     return config;
   },
 };

@@ -1,0 +1,31 @@
+{
+  "authProviderId": "dawah-local-development-host",
+  "userId": "00000000-0000-4000-8000-000000000901",
+  "eventId": "00000000-0000-4000-8000-000000000902",
+  "membershipId": "00000000-0000-4000-8000-000000000903",
+  "templateId": "00000000-0000-4000-8000-000000000904",
+  "creditAccountId": "00000000-0000-4000-8000-000000000905",
+  "sendBatchId": "00000000-0000-4000-8000-000000000906",
+  "invitationGroups": 20000,
+  "checkInTargets": 20,
+  "checkInTargetAttendees": 60,
+  "messagedGroups": 8000,
+  "sendableGroups": 2000,
+  "checkedInGroups": 4000,
+  "auditLogs": 5000,
+  "ledgerEntries": 2000,
+  "purchasedCreditUnits": 50000,
+  "cancelledEvery": 50,
+  "idPrefixes": {
+    "invitationGroup": "11111111",
+    "guestMember": "22222222",
+    "rsvp": "33333333",
+    "rsvpMember": "44444444",
+    "snapshot": "55555555",
+    "message": "66666666",
+    "checkInState": "77777777",
+    "checkInRecord": "78787878",
+    "creditLedgerEntry": "88888888",
+    "auditLog": "99999999"
+  }
+}

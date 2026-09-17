@@ -2451,3 +2451,112 @@ dialog:has(.event-wizard) {
     padding-block-start: 14px;
   }
 }
+
+/* Stage 9 reports, exports, check-in, and credits */
+.reports-page,
+.check-in-page,
+.billing-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.reports-export-form {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, 0.6fr) auto;
+}
+.reports-export-list,
+.billing-ledger-list,
+.check-in-party-list,
+.check-in-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.reports-export,
+.billing-ledger-entry,
+.check-in-party,
+.check-in-recent {
+  align-items: center;
+  background: var(--surface-sunken);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+}
+.reports-export__details,
+.billing-ledger-entry__details,
+.check-in-party__details,
+.check-in-recent > div {
+  display: grid;
+  gap: 4px;
+}
+.reports-export__meta,
+.check-in-party__meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.reports-definition-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.reports-definition-list > div {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+.reports-definition-list dt {
+  color: var(--text-secondary);
+}
+.reports-definition-list dd {
+  font-weight: var(--weight-semibold);
+  margin: 0;
+}
+.reports-loading,
+.check-in-loading,
+.billing-loading {
+  display: grid;
+  gap: 10px;
+}
+.check-in-scanner,
+.check-in-search,
+.check-in-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.check-in-scanner__video {
+  aspect-ratio: 4 / 3;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  object-fit: cover;
+  width: 100%;
+}
+.check-in-scanner__fallback,
+.check-in-empty {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .reports-export-form {
+    grid-template-columns: 1fr;
+  }
+  .reports-export,
+  .billing-ledger-entry,
+  .check-in-party,
+  .check-in-recent {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

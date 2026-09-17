@@ -9,6 +9,7 @@ import {
   type CheckInResult,
   type CreateCheckInInput,
   type CreateExportInput,
+  type CreditOverview,
   type CreateReminderRuleInput,
   type CreateInvitationTemplateInput,
   type CreatePreparationSnapshotsInput,
@@ -31,6 +32,8 @@ import {
   type ListInvitationsQuery,
   type ListNotificationsQuery,
   type ListNotificationsResponse,
+  type ListCreditLedgerQuery,
+  type ListCreditLedgerResponse,
   type ListExportJobsQuery,
   type ListExportJobsResponse,
   type ListReminderRunsResponse,
@@ -358,6 +361,29 @@ export async function createCheckIn(
     supabase,
     `/events/${eventId}/check-ins`,
     jsonRequest("POST", input, { "Idempotency-Key": idempotencyKey }),
+  );
+}
+
+export async function getCreditOverview(
+  supabase: SupabaseClient | null,
+  eventId: string,
+): Promise<CreditOverview> {
+  return requestAuthenticatedJson(supabase, `/events/${eventId}/credits`);
+}
+
+export async function listCreditLedger(
+  supabase: SupabaseClient | null,
+  eventId: string,
+  query: ListCreditLedgerQuery = { page: 1, pageSize: 20 },
+): Promise<ListCreditLedgerResponse> {
+  const search = new URLSearchParams({
+    page: String(query.page),
+    pageSize: String(query.pageSize),
+  });
+  if (query.entryType) search.set("entryType", query.entryType);
+  return requestAuthenticatedJson(
+    supabase,
+    `/events/${eventId}/credits/ledger?${search.toString()}`,
   );
 }
 

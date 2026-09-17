@@ -58,8 +58,7 @@ export function calculateCheckInIncrement(
     );
   }
 
-  const checkedInAttendance =
-    input.checkedInAttendance + input.attendeeCount;
+  const checkedInAttendance = input.checkedInAttendance + input.attendeeCount;
   if (checkedInAttendance > input.confirmedAttendance) {
     throw new CheckInInvariantError(
       "CHECK_IN_CAPACITY_EXCEEDED",
@@ -82,8 +81,10 @@ export function calculateCheckInIncrement(
 export function createEntryPassToken(passId: string, secret: string): string {
   const canonicalPassId = canonicalUuid(passId);
   assertSigningSecret(secret);
-  const encodedId = Buffer.from(canonicalPassId.replaceAll("-", ""), "hex")
-    .toString("base64url");
+  const encodedId = Buffer.from(
+    canonicalPassId.replaceAll("-", ""),
+    "hex",
+  ).toString("base64url");
   const signature = createHmac("sha256", secret)
     .update(`${ENTRY_PASS_PREFIX}:${canonicalPassId}`, "utf8")
     .digest("base64url");
@@ -170,7 +171,9 @@ function assertNonNegativeInteger(value: number, field: string): void {
 
 function assertSigningSecret(secret: string): void {
   if (Buffer.byteLength(secret, "utf8") < 32) {
-    throw new RangeError("The entry-pass signing secret must be at least 32 bytes.");
+    throw new RangeError(
+      "The entry-pass signing secret must be at least 32 bytes.",
+    );
   }
 }
 

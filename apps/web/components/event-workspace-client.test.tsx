@@ -73,6 +73,10 @@ const event: EventDetail = {
   canPrepareInvitations: true,
   canSendInvitations: true,
   canSendReminders: true,
+  canViewReports: true,
+  canExportGuests: true,
+  canCheckIn: true,
+  canManageBilling: true,
   canManageTeam: true,
   canEditEvent: true,
   canArchiveEvent: true,
@@ -108,6 +112,10 @@ const secondEvent: EventSummary = {
   canPrepareInvitations: true,
   canSendInvitations: true,
   canSendReminders: true,
+  canViewReports: true,
+  canExportGuests: true,
+  canCheckIn: true,
+  canManageBilling: true,
   canManageTeam: true,
   canEditEvent: true,
   canArchiveEvent: true,
@@ -134,6 +142,8 @@ function renderWorkspace(section: "overview" | "sending" | "settings") {
   return render(
     <QueryClientProvider client={queryClient}>
       <EventWorkspaceClient
+        billingCopy={en.billing}
+        checkInCopy={en.checkIn}
         common={en.common}
         copy={en.workspace}
         eventId={eventId}
@@ -143,6 +153,7 @@ function renderWorkspace(section: "overview" | "sending" | "settings") {
         notificationsCopy={en.notifications}
         preparationCopy={en.preparation}
         remindersCopy={en.reminders}
+        reportsCopy={en.reports}
         sendingCopy={en.sending}
         section={section}
         shellCopy={en.shell}
@@ -300,5 +311,49 @@ describe("event workspace", () => {
       screen.queryByRole("button", { name: en.workspace.saveChanges }),
     ).toBeNull();
     expect(screen.queryByLabelText(new RegExp(en.events.nameAr))).toBeNull();
+  });
+
+  it("links the reports, check-in, and credits entries for a permitted membership", async () => {
+    renderWorkspace("overview");
+
+    await screen.findByRole("heading", { name: event.nameEn ?? "" });
+    expect(
+      screen
+        .getAllByRole("link", { name: en.reports.navigation })[0]
+        ?.getAttribute("href"),
+    ).toBe(`/en/events/${eventId}/reports`);
+    expect(
+      screen
+        .getAllByRole("link", { name: en.checkIn.navigation })[0]
+        ?.getAttribute("href"),
+    ).toBe(`/en/events/${eventId}/check-in`);
+    expect(
+      screen
+        .getAllByRole("link", { name: en.billing.navigation })[0]
+        ?.getAttribute("href"),
+    ).toBe(`/en/events/${eventId}/billing`);
+  });
+
+  it("hides the reports, check-in, and credits entries without their capabilities", async () => {
+    api.getEvent.mockResolvedValue({
+      ...event,
+      canViewReports: false,
+      canExportGuests: false,
+      canCheckIn: false,
+      canManageBilling: false,
+    });
+
+    renderWorkspace("overview");
+
+    await screen.findByRole("heading", { name: event.nameEn ?? "" });
+    expect(
+      screen.queryByRole("link", { name: en.reports.navigation }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: en.checkIn.navigation }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: en.billing.navigation }),
+    ).toBeNull();
   });
 });

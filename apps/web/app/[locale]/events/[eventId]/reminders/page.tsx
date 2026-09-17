@@ -24,6 +24,8 @@ export default async function EventRemindersPage({
   const dictionary = await getDictionary(locale);
   return (
     <EventWorkspaceClient
+      billingCopy={dictionary.billing}
+      checkInCopy={dictionary.checkIn}
       common={dictionary.common}
       copy={dictionary.workspace}
       eventId={eventId}
@@ -33,6 +35,7 @@ export default async function EventRemindersPage({
       notificationsCopy={dictionary.notifications}
       preparationCopy={dictionary.preparation}
       remindersCopy={dictionary.reminders}
+      reportsCopy={dictionary.reports}
       section="reminders"
       sendingCopy={dictionary.sending}
       shellCopy={dictionary.shell}

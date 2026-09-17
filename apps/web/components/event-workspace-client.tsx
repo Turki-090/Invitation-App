@@ -38,8 +38,11 @@ import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LocaleSwitcher } from "./locale-switcher";
 import { GuestManagement } from "./guest-management";
+import { EventBilling } from "./event-billing";
+import { EventCheckIn } from "./event-check-in";
 import { EventPreparation } from "./event-preparation";
 import { EventReminders } from "./event-reminders";
+import { EventReports } from "./event-reports";
 import { EventSending } from "./event-sending";
 import { EventTeam } from "./event-team";
 import { NotificationCenter } from "./notification-center";
@@ -62,6 +65,9 @@ type WorkspaceSection =
   | "preparation"
   | "sending"
   | "reminders"
+  | "reports"
+  | "check-in"
+  | "billing"
   | "team"
   | "settings";
 type EditableEventStatus = Exclude<EventDetail["status"], "ARCHIVED">;
@@ -71,10 +77,13 @@ interface EventWorkspaceClientProps {
   locale: AppLocale;
   section: WorkspaceSection;
   copy: Dictionary["workspace"];
+  billingCopy: Dictionary["billing"];
+  checkInCopy: Dictionary["checkIn"];
   guestsCopy: Dictionary["guests"];
   notificationsCopy: Dictionary["notifications"];
   preparationCopy: Dictionary["preparation"];
   remindersCopy: Dictionary["reminders"];
+  reportsCopy: Dictionary["reports"];
   sendingCopy: Dictionary["sending"];
   teamCopy: Dictionary["team"];
   eventsCopy: Dictionary["events"];
@@ -104,10 +113,13 @@ export function EventWorkspaceClient({
   locale,
   section,
   copy,
+  billingCopy,
+  checkInCopy,
   guestsCopy,
   notificationsCopy,
   preparationCopy,
   remindersCopy,
+  reportsCopy,
   sendingCopy,
   teamCopy,
   eventsCopy,
@@ -198,6 +210,39 @@ export function EventWorkspaceClient({
             href: `/${locale}/events/${eventId}/reminders`,
             icon: "bell" as const,
             active: section === "reminders",
+          },
+        ]
+      : []),
+    ...(event.data?.canViewReports
+      ? [
+          {
+            id: "reports",
+            label: reportsCopy.navigation,
+            href: `/${locale}/events/${eventId}/reports`,
+            icon: "chart-bar" as const,
+            active: section === "reports",
+          },
+        ]
+      : []),
+    ...(event.data?.canCheckIn
+      ? [
+          {
+            id: "check-in",
+            label: checkInCopy.navigation,
+            href: `/${locale}/events/${eventId}/check-in`,
+            icon: "scan-line" as const,
+            active: section === "check-in",
+          },
+        ]
+      : []),
+    ...(event.data?.canManageBilling
+      ? [
+          {
+            id: "billing",
+            label: billingCopy.navigation,
+            href: `/${locale}/events/${eventId}/billing`,
+            icon: "badge-check" as const,
+            active: section === "billing",
           },
         ]
       : []),
@@ -367,6 +412,48 @@ export function EventWorkspaceClient({
           <EventReminders
             common={common}
             copy={remindersCopy}
+            eventId={eventId}
+            locale={locale}
+            supabase={supabase}
+          />
+        ) : section === "reports" && !event.data.canViewReports ? (
+          <EmptyState
+            description={reportsCopy.permissionDeniedDescription}
+            icon="circle-alert"
+            title={reportsCopy.permissionDeniedTitle}
+          />
+        ) : section === "reports" ? (
+          <EventReports
+            common={common}
+            copy={reportsCopy}
+            eventId={eventId}
+            locale={locale}
+            supabase={supabase}
+          />
+        ) : section === "check-in" && !event.data.canCheckIn ? (
+          <EmptyState
+            description={checkInCopy.permissionDeniedDescription}
+            icon="circle-alert"
+            title={checkInCopy.permissionDeniedTitle}
+          />
+        ) : section === "check-in" ? (
+          <EventCheckIn
+            common={common}
+            copy={checkInCopy}
+            eventId={eventId}
+            locale={locale}
+            supabase={supabase}
+          />
+        ) : section === "billing" && !event.data.canManageBilling ? (
+          <EmptyState
+            description={billingCopy.permissionDeniedDescription}
+            icon="circle-alert"
+            title={billingCopy.permissionDeniedTitle}
+          />
+        ) : section === "billing" ? (
+          <EventBilling
+            common={common}
+            copy={billingCopy}
             eventId={eventId}
             locale={locale}
             supabase={supabase}

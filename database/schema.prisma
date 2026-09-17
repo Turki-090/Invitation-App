@@ -436,6 +436,9 @@ model InvitationGroup {
   entryPasses         EntryPass[]
   checkInState        CheckInState?
   checkInRecords      CheckInRecord[]
+  // The ascending export keyset index is partial on `cancelled_at IS NULL`,
+  // which Prisma cannot express, so it lives in the Stage 9 index migration
+  // alongside the other partial indexes this schema depends on.
 
   @@unique([id, eventId], map: "invitation_groups_id_event_key")
   @@index([eventId, rsvpStatus])
@@ -444,6 +447,7 @@ model InvitationGroup {
   @@index([eventId, cancelledAt, createdAt(sort: Desc), id])
   @@index([eventId, invitationType, cancelledAt])
   @@index([eventId, cancelledAt, expectedAttendees])
+  @@index([eventId, cancelledAt, rsvpStatus], map: "invitation_groups_event_active_rsvp_idx")
   @@map("invitation_groups")
 }
 
@@ -753,6 +757,8 @@ model Message {
   @@unique([provider, providerMessageId], map: "messages_provider_message_key")
   @@unique([predecessorMessageId], map: "messages_predecessor_key")
   @@index([eventId, status, createdAt(sort: Desc), id], map: "messages_event_status_created_id_idx")
+  @@index([eventId, messageType, invitationGroupId, createdAt(sort: Desc), id(sort: Desc)], map: "messages_event_type_invitation_latest_idx")
+  @@index([eventId, sentAt], map: "messages_event_sent_idx")
   @@index([sendBatchId, status, id], map: "messages_batch_status_id_idx")
   @@index([invitationGroupId, messageType, createdAt(sort: Desc)], map: "messages_invitation_type_created_idx")
   @@map("messages")
@@ -1125,6 +1131,7 @@ model AuditLog {
 
   @@index([eventId, createdAt])
   @@index([actorUserId, createdAt])
+  @@index([eventId, action], map: "audit_logs_event_action_idx")
   @@map("audit_logs")
 }
 

@@ -32,7 +32,30 @@ import type {
   SendReadinessResponse,
   WhatsappWebhookAcknowledgement,
 } from "./messaging";
+import type {
+  CheckInDashboard,
+  CheckInParty,
+  CheckInResult,
+  CreateCheckInInput,
+  PublicEntryPass,
+  ResolveEntryPassInput,
+  ResolvedEntryPass,
+  SearchCheckInPartiesResponse,
+} from "./check-ins";
+import type {
+  CreditLedgerEntry,
+  CreditOverview,
+  CreditReconciliation,
+  ListCreditLedgerResponse,
+} from "./credits";
+import type {
+  CreateExportInput,
+  ExportJob,
+  ListExportJobsResponse,
+} from "./exports";
 import type { ListNotificationsResponse, Notification } from "./notifications";
+import type { PlatformMetadata } from "./platform";
+import type { EventReport } from "./reports";
 import type {
   CreateInvitationTemplateInput,
   InvitationTemplate,
@@ -125,6 +148,27 @@ type OpenApiAcceptTeamInvitation =
   components["schemas"]["AcceptTeamInvitation"];
 type OpenApiAcceptTeamInvitationResult =
   components["schemas"]["AcceptTeamInvitationResult"];
+type OpenApiPlatformMetadata = components["schemas"]["PlatformMetadata"];
+type OpenApiEventReport = components["schemas"]["EventReport"];
+type OpenApiCreateExport = components["schemas"]["CreateExport"];
+type OpenApiExportJob = components["schemas"]["ExportJob"];
+type OpenApiListExportJobsResponse =
+  components["schemas"]["ListExportJobsResponse"];
+type OpenApiPublicEntryPass = components["schemas"]["PublicEntryPass"];
+type OpenApiResolveEntryPass = components["schemas"]["ResolveEntryPass"];
+type OpenApiCheckInParty = components["schemas"]["CheckInParty"];
+type OpenApiResolvedEntryPass = components["schemas"]["ResolvedEntryPass"];
+type OpenApiSearchCheckInPartiesResponse =
+  components["schemas"]["SearchCheckInPartiesResponse"];
+type OpenApiCreateCheckIn = components["schemas"]["CreateCheckIn"];
+type OpenApiCheckInResult = components["schemas"]["CheckInResult"];
+type OpenApiCheckInDashboard = components["schemas"]["CheckInDashboard"];
+type OpenApiCreditOverview = components["schemas"]["CreditOverview"];
+type OpenApiCreditReconciliation =
+  components["schemas"]["CreditReconciliation"];
+type OpenApiCreditLedgerEntry = components["schemas"]["CreditLedgerEntry"];
+type OpenApiListCreditLedgerResponse =
+  components["schemas"]["ListCreditLedgerResponse"];
 type OpenApiNotification = components["schemas"]["Notification"];
 type OpenApiListNotificationsResponse =
   components["schemas"]["ListNotificationsResponse"];
@@ -311,6 +355,61 @@ describe("OpenAPI runtime contract compatibility", () => {
     assertAssignable<
       AcceptTeamInvitationResult,
       OpenApiAcceptTeamInvitationResult
+    >();
+  });
+
+  it("keeps Stage 9 reporting and export contracts aligned", () => {
+    assertAssignable<OpenApiPlatformMetadata, PlatformMetadata>();
+    assertAssignable<PlatformMetadata, OpenApiPlatformMetadata>();
+    assertAssignable<OpenApiEventReport, EventReport>();
+    assertAssignable<EventReport, OpenApiEventReport>();
+    assertAssignable<OpenApiCreateExport, CreateExportInput>();
+    assertAssignable<CreateExportInput, OpenApiCreateExport>();
+    assertAssignable<OpenApiExportJob, ExportJob>();
+    assertAssignable<ExportJob, OpenApiExportJob>();
+    assertAssignable<OpenApiListExportJobsResponse, ListExportJobsResponse>();
+    assertAssignable<ListExportJobsResponse, OpenApiListExportJobsResponse>();
+  });
+
+  it("keeps Stage 9 check-in contracts aligned", () => {
+    assertAssignable<OpenApiPublicEntryPass, PublicEntryPass>();
+    assertAssignable<PublicEntryPass, OpenApiPublicEntryPass>();
+    assertAssignable<OpenApiResolveEntryPass, ResolveEntryPassInput>();
+    assertAssignable<ResolveEntryPassInput, OpenApiResolveEntryPass>();
+    assertAssignable<OpenApiCheckInParty, CheckInParty>();
+    assertAssignable<CheckInParty, OpenApiCheckInParty>();
+    assertAssignable<OpenApiResolvedEntryPass, ResolvedEntryPass>();
+    assertAssignable<ResolvedEntryPass, OpenApiResolvedEntryPass>();
+    assertAssignable<
+      OpenApiSearchCheckInPartiesResponse,
+      SearchCheckInPartiesResponse
+    >();
+    assertAssignable<
+      SearchCheckInPartiesResponse,
+      OpenApiSearchCheckInPartiesResponse
+    >();
+    assertAssignable<OpenApiCreateCheckIn, CreateCheckInInput>();
+    assertAssignable<CreateCheckInInput, OpenApiCreateCheckIn>();
+    assertAssignable<OpenApiCheckInResult, CheckInResult>();
+    assertAssignable<CheckInResult, OpenApiCheckInResult>();
+    assertAssignable<OpenApiCheckInDashboard, CheckInDashboard>();
+    assertAssignable<CheckInDashboard, OpenApiCheckInDashboard>();
+  });
+
+  it("keeps Stage 9 credit contracts aligned", () => {
+    assertAssignable<OpenApiCreditReconciliation, CreditReconciliation>();
+    assertAssignable<CreditReconciliation, OpenApiCreditReconciliation>();
+    assertAssignable<OpenApiCreditOverview, CreditOverview>();
+    assertAssignable<CreditOverview, OpenApiCreditOverview>();
+    assertAssignable<OpenApiCreditLedgerEntry, CreditLedgerEntry>();
+    assertAssignable<CreditLedgerEntry, OpenApiCreditLedgerEntry>();
+    assertAssignable<
+      OpenApiListCreditLedgerResponse,
+      ListCreditLedgerResponse
+    >();
+    assertAssignable<
+      ListCreditLedgerResponse,
+      OpenApiListCreditLedgerResponse
     >();
   });
 

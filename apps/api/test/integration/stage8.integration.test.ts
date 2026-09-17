@@ -20,6 +20,7 @@ import type { PrismaService } from "../../src/prisma/prisma.service";
 import { RemindersService } from "../../src/reminders/reminders.service";
 import { RsvpService } from "../../src/rsvp/rsvp.service";
 import { TeamService } from "../../src/team/team.service";
+import { createCreditLedger } from "./credits";
 import { TestDatabase } from "./database";
 import {
   createEventFixture,
@@ -320,11 +321,13 @@ describe("Stage 8 PostgreSQL collaboration and reminders integration", () => {
       prismaService,
       access,
       queues.service,
+      createCreditLedger(prismaService),
     );
     const reminders = new RemindersService(
       prismaService,
       access,
       queues.service,
+      createCreditLedger(prismaService),
     );
     const rsvp = rsvpService(queues.service);
     const notifications = new NotificationsService(prismaService, access);
@@ -764,11 +767,13 @@ describe("Stage 8 PostgreSQL collaboration and reminders integration", () => {
       prismaService,
       access,
       queues.service,
+      createCreditLedger(prismaService),
     );
     const reminders = new RemindersService(
       prismaService,
       access,
       queues.service,
+      createCreditLedger(prismaService),
     );
     const messagingRepository = new PrismaMessagingRepository(prisma, {
       mediaPublicApiBaseUrl: "https://api.example.test/api/v1",

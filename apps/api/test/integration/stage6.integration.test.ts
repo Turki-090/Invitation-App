@@ -32,6 +32,7 @@ import type { PrismaService } from "../../src/prisma/prisma.service";
 import { PrismaMessagingRepository } from "../../../worker/src/prisma-messaging-repository";
 import { createWhatsappSendProcessor } from "../../../worker/src/whatsapp-send-processor";
 import { createWhatsappWebhookProcessor } from "../../../worker/src/whatsapp-webhook-processor";
+import { createCreditLedger } from "./credits";
 import { TestDatabase } from "./database";
 import {
   createEventFixture,
@@ -147,6 +148,7 @@ describe("Stage 6 PostgreSQL messaging integration", () => {
       prismaService,
       access,
       queues.service,
+      createCreditLedger(prismaService),
     );
     const readiness = await messaging.readiness(principal, event.id, {
       templateId: template.id,
@@ -735,6 +737,7 @@ describe("Stage 6 PostgreSQL messaging integration", () => {
       prismaService,
       access,
       queues.service,
+      createCreditLedger(prismaService),
     );
     const readiness = await messaging.readiness(principal, event.id, {
       templateId: template.id,
