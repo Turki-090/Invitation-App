@@ -228,9 +228,9 @@ const authenticaOtpShape = {
    * deliverable channel here. A fallback channel is configured on the
    * Authentica application itself.
    */
-  AUTHENTICA_OTP_METHOD: z.enum(["whatsapp", "sms"]).default("whatsapp"),
+  AUTHENTICA_OTP_METHOD: z.enum(["whatsapp", "sms"]).default("sms"),
   AUTHENTICA_OTP_TEMPLATE_ID: positiveInteger.max(1_000_000).default(1),
-  AUTHENTICA_REQUEST_TIMEOUT_MS: positiveInteger.max(60_000).default(10_000),
+  AUTHENTICA_REQUEST_TIMEOUT_MS: positiveInteger.max(3_000).default(2_500),
   /** Standard Webhooks secret issued by Supabase, stored as `v1,whsec_…`. */
   SUPABASE_SEND_SMS_HOOK_SECRET: optionalText,
 } as const;
@@ -713,7 +713,8 @@ function isStandardWebhookSecret(value: string): boolean {
     .replace(/^v1,/, "")
     .replace(/^whsec_/, "");
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) return false;
-  return Buffer.from(encoded, "base64").byteLength >= 16;
+  const decoded = Buffer.from(encoded, "base64");
+  return decoded.byteLength >= 16 && decoded.toString("base64") === encoded;
 }
 
 function validateDevelopmentBypass(

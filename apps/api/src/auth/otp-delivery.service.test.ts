@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import type { Logger } from "@dawah/observability";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OtpDeliveryService } from "./otp-delivery.service";
+import type { OtpAttemptStore, OtpAttempt } from "./otp-attempt-store";
 
 const secretBytes = Buffer.from("dawah-supabase-send-sms-hook-secret");
 const hookSecret = `v1,whsec_${secretBytes.toString("base64")}`;
@@ -26,10 +27,29 @@ const logger = {
   level: "info",
 } as unknown as Logger;
 
-function service(overrides: Record<string, unknown> = {}) {
+function memoryStore() {
+  const rows = new Map<string, OtpAttempt>();
+  return {
+    claim: vi.fn(async (key: string, fingerprint: string) => {
+      const existing = rows.get(key);
+      if (existing) return existing;
+      rows.set(key, { fingerprint, httpCode: null });
+      return null;
+    }),
+    complete: vi.fn(async (key: string, httpCode: number) => {
+      rows.get(key)!.httpCode = httpCode;
+    }),
+  };
+}
+
+function service(
+  overrides: Record<string, unknown> = {},
+  store = memoryStore(),
+) {
   return new OtpDeliveryService(
     new ConfigService({ ...configuration, ...overrides }),
     logger,
+    store as unknown as OtpAttemptStore,
   );
 }
 
@@ -76,6 +96,69 @@ afterEach(() => {
 });
 
 describe("OtpDeliveryService", () => {
+  it("deduplicates concurrent requests across service instances and replays success", async () => {
+    const fetch = stubAuthentica(accepted());
+    const store = memoryStore();
+    const first = service({}, store);
+    const second = service({}, store);
+    const send = (instance: OtpDeliveryService) =>
+      instance.deliver(
+        hookRequest.rawBody,
+        hookRequest.headers,
+        hookRequest.payload,
+      );
+    const results = await Promise.all([send(first), send(second)]);
+    expect(results.map((r) => r.httpCode).sort()).toEqual([200, 409]);
+    expect(await send(second)).toEqual({ httpCode: 200 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains failed attempts and fails closed if persistence is unavailable", async () => {
+    const fetch = stubAuthentica(new Error("ambiguous acceptance"));
+    const store = memoryStore();
+    const instance = service({}, store);
+    for (let i = 0; i < 2; i++)
+      await instance.deliver(
+        hookRequest.rawBody,
+        hookRequest.headers,
+        hookRequest.payload,
+      );
+    expect(fetch).toHaveBeenCalledTimes(1);
+    store.claim.mockRejectedValueOnce(new Error("database offline"));
+    expect(
+      await instance.deliver(
+        hookRequest.rawBody,
+        hookRequest.headers,
+        hookRequest.payload,
+      ),
+    ).toMatchObject({ httpCode: 503 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses only the signed body, preserves leading zero OTPs, and never logs secrets", async () => {
+    const fetch = stubAuthentica(accepted());
+    const signed = signedRequest({
+      user: { phone: "966501234567" },
+      sms: { otp: "001234" },
+    });
+    await service().deliver(signed.rawBody, signed.headers, {
+      sms: { otp: "999999" },
+    });
+    expect(JSON.parse(String(fetch.mock.calls[0]![1]?.body)).otp).toBe(
+      "001234",
+    );
+    const logs = JSON.stringify([
+      vi.mocked(logger.info).mock.calls,
+      vi.mocked(logger.error).mock.calls,
+    ]);
+    for (const value of [
+      "001234",
+      "966501234567",
+      hookSecret,
+      configuration.AUTHENTICA_API_KEY,
+    ])
+      expect(logs).not.toContain(value);
+  });
   it("delivers a signed Supabase code through Authentica", async () => {
     const fetch = stubAuthentica(accepted());
 
@@ -94,7 +177,6 @@ describe("OtpDeliveryService", () => {
       otp: "123456",
       template_id: 1,
       phone: "+966501234567",
-      fallback_phone: "+966501234567",
     });
   });
 
@@ -137,7 +219,7 @@ describe("OtpDeliveryService", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("asks Supabase to retry a transient provider fault", async () => {
+  it("does not retry an ambiguous provider fault", async () => {
     stubAuthentica(new Response("", { status: 503 }));
 
     await expect(
@@ -146,7 +228,7 @@ describe("OtpDeliveryService", () => {
         hookRequest.headers,
         hookRequest.payload,
       ),
-    ).resolves.toMatchObject({ httpCode: 503, retryAfterSeconds: 1 });
+    ).resolves.toMatchObject({ httpCode: 502 });
   });
 
   it("does not ask Supabase to retry a rejected request", async () => {

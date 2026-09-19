@@ -29,6 +29,32 @@ const headers = {
 };
 
 describe("verifySupabaseAuthHookSignature", () => {
+  it("rejects future timestamps and noncanonical secret/signature encodings", () => {
+    const future = String(Number(timestamp) + 301);
+    expect(
+      verifySupabaseAuthHookSignature(
+        body,
+        {
+          ...headers,
+          timestamp: future,
+          signature: sign(headers.id, future, body),
+        },
+        secret,
+        { now },
+      ),
+    ).toBe(false);
+    expect(
+      verifySupabaseAuthHookSignature(body, headers, `${secret}!`, { now }),
+    ).toBe(false);
+    expect(
+      verifySupabaseAuthHookSignature(
+        body,
+        { ...headers, signature: `${headers.signature}!` },
+        secret,
+        { now },
+      ),
+    ).toBe(false);
+  });
   it("accepts a correctly signed, fresh request", () => {
     expect(
       verifySupabaseAuthHookSignature(body, headers, secret, { now }),
@@ -159,6 +185,10 @@ describe("parseSupabaseSendSmsHookPayload", () => {
       { user: { phone: "966501234567" } },
       { user: {}, sms: { otp: "123456" } },
       { user: { phone: "not-a-number" }, sms: { otp: "123456" } },
+      { user: { phone: "0501234567" }, sms: { otp: "123456" } },
+      { user: { phone: "9660501234567" }, sms: { otp: "123456" } },
+      { user: { phone: "966111111111111" }, sms: { otp: "123456" } },
+      { user: { phone: "966501234567" }, sms: { otp: " 123456 " } },
       { user: { phone: "966501234567" }, sms: { otp: "12" } },
       { user: { phone: "966501234567" }, sms: { otp: "12 34 56" } },
     ]) {

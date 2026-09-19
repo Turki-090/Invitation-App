@@ -31,6 +31,22 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const response = http.getResponse<Response>();
     const request = http.getRequest<Request>();
+    // Parser errors can contain OTPs. Keep all hook exceptions out of logs.
+    if (
+      request.path?.toLowerCase().replace(/\/$/, "") ===
+      "/api/v1/webhooks/supabase-otp"
+    ) {
+      const code =
+        exception instanceof HttpException ? exception.getStatus() : 500;
+      this.logger.warn("auth.otp.hook_request_failed", { status: code });
+      response.status(code).json({
+        error: {
+          http_code: code,
+          message: "The SMS hook request could not be processed.",
+        },
+      });
+      return;
+    }
     const status =
       exception instanceof HttpException
         ? exception.getStatus()

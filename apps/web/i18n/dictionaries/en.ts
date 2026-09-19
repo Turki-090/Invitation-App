@@ -34,7 +34,8 @@ const en = {
     fact3Label: "accurate expected-attendee counting",
     phoneLabel: "Mobile number",
     phoneHint: "Example: +9665XXXXXXXX",
-    phoneValidation: "Enter a valid number in international format.",
+    phoneValidation:
+      "Enter a valid mobile number, such as 0501234567 or +966501234567.",
     sendCode: "Send verification code",
     codeLabel: "Verification code",
     codeHint: "Code sent to {phone}",
@@ -318,6 +319,12 @@ const en = {
     snapshotsCreated: "Prepared {count} invitation snapshots",
     snapshotError: "Content snapshots could not be created.",
     uploadTitle: "Upload guest file",
+    downloadExcelTemplate: "Download Excel template",
+    downloadCsvTemplate: "Download CSV template",
+    templateInstructions:
+      "Download a template, enter one invitation per row, then upload the completed file. Keep the column headers. The Excel template includes instructions and keeps phone numbers as text.",
+    templateFieldHelp:
+      "Guest name and phone number are required. Use 05XXXXXXXX or +9665XXXXXXXX for Saudi numbers. Invitation type: single, named_group, or primary_with_companions. Separate named members with |. Companion count: 0–100, only for primary_with_companions. Save CSV as UTF-8 and keep phone cells as text.",
     uploadDescription:
       "The file is stored privately, parsed in the background, and never imports rows without confirmation.",
     dropFile: "Drop an Excel or CSV file here",

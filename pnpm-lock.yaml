@@ -148,6 +148,9 @@ importers:
       '@dawah/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@dawah/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@dawah/ui':
         specifier: workspace:*
         version: link:../../packages/ui

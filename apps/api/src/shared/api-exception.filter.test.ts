@@ -14,7 +14,7 @@ import type { Request, Response } from "express";
 import { describe, expect, it, vi } from "vitest";
 import { ApiExceptionFilter } from "./api-exception.filter";
 
-function harness() {
+function harness(path = "/api/v1/events") {
   const lines: Record<string, unknown>[] = [];
   const logger = createLogger({
     service: "api",
@@ -35,7 +35,7 @@ function harness() {
   const host = {
     switchToHttp: () => ({
       getResponse: () => response as unknown as Response,
-      getRequest: () => ({ method: "POST" }) as Request,
+      getRequest: () => ({ method: "POST", path }) as Request,
     }),
   } as unknown as ArgumentsHost;
 
@@ -50,6 +50,21 @@ function harness() {
 }
 
 describe("ApiExceptionFilter", () => {
+  it("never logs or reports an SMS hook parser exception containing a code", () => {
+    const context = harness("/api/v1/webhooks/supabase-otp");
+    context.filter.catch(
+      new SyntaxError("Invalid JSON near sms otp 123456"),
+      context.host,
+    );
+    expect(context.json).toHaveBeenCalledWith({
+      error: {
+        http_code: 500,
+        message: "The SMS hook request could not be processed.",
+      },
+    });
+    expect(JSON.stringify(context.lines)).not.toContain("123456");
+    expect(context.captured).toHaveLength(0);
+  });
   it("passes an expected HTTP failure through without reporting it", () => {
     const context = harness();
     context.filter.catch(

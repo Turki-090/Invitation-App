@@ -51,7 +51,7 @@ describe("AuthenticaOtpProvider", () => {
     });
   });
 
-  it("marks throttling and provider outages retryable", async () => {
+  it("classifies throttling separately from ambiguous provider outages", async () => {
     for (const [status, providerCode] of [
       [429, "PROVIDER_RATE_LIMITED"],
       [503, "PROVIDER_UNAVAILABLE"],
@@ -59,7 +59,7 @@ describe("AuthenticaOtpProvider", () => {
       const fetch = vi.fn().mockResolvedValue(new Response("", { status }));
       await expect(provider(fetch).sendOtp(input)).rejects.toMatchObject({
         providerCode,
-        retryable: true,
+        retryable: status === 429,
         httpStatus: status,
       });
     }
@@ -78,7 +78,7 @@ describe("AuthenticaOtpProvider", () => {
     }
   });
 
-  it("reports a transport failure as retryable without leaking the request", async () => {
+  it("reports a transport failure without retrying or leaking the request", async () => {
     const fetch = vi.fn().mockRejectedValue(new Error("socket hang up"));
 
     const error = await provider(fetch)
@@ -88,7 +88,7 @@ describe("AuthenticaOtpProvider", () => {
     expect(error).toBeInstanceOf(AuthenticaError);
     expect(error).toMatchObject({
       providerCode: "PROVIDER_NETWORK_ERROR",
-      retryable: true,
+      retryable: false,
     });
     expect((error as Error).message).not.toContain("966501234567");
     expect((error as Error).message).not.toContain("123456");
@@ -111,7 +111,7 @@ describe("AuthenticaOtpProvider", () => {
 
     await expect(timed.sendOtp(input)).rejects.toMatchObject({
       providerCode: "PROVIDER_TIMEOUT",
-      retryable: true,
+      retryable: false,
     });
   });
 

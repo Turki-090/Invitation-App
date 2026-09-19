@@ -1,0 +1,476 @@
+openapi: 3.1.0
+info:
+  title: Authentica API Documentation
+  version: 2.0.0
+  description: |
+    Authentica provides secure and flexible customer authentication through **OTP verification** via **SMS**, **WhatsApp**, and **Email**.
+    It also supports **Face** and **Voice** verification for enhanced identity assurance.
+
+    You can easily integrate with our system using RESTful APIs and manage your authentication process through multiple secure and customizable channels.
+
+    Our system provides many templates to send OTP messages via SMS channel using Authentica default sender name.
+
+    Our APIs are designed for easy integration, offering clear endpoints to help you implement robust authentication solutions in your applications.
+
+    ## Getting Started
+
+    1. Sign up for an Authentica account at [https://portal.authentica.sa](https://portal.authentica.sa)
+    2. [Get Your API Key](https://portal.authentica.sa/applications/)
+    3. Use your API key in the `X-Authorization` header for all requests
+
+    ## Workflows
+
+    ### OTP Verification Workflow
+
+    1. **Send OTP** - Use the `/send-otp` endpoint to send an OTP via SMS, WhatsApp, or Email
+    2. **Verify OTP** - Use the `/verify-otp` endpoint to validate the OTP entered by your customer
+
+    ### Face Verification Workflow
+
+    Use the `/verify-by-face` endpoint to compare two images: a reference image and a real-time image captured by your application.
+
+    ### Voice Verification Workflow
+
+    Use the `/verify-by-voice` endpoint to compare two audio samples: a reference audio and a real-time audio recorded by your application.
+  contact:
+    name: Authentica Support
+    url: https://wa.me/966536553944
+
+servers:
+  - url: https://api.authentica.sa/api/v2
+    description: Production server
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Authorization
+      description: |
+        API key for authentication. [Get Your API Key](https://portal.authentica.sa/applications/)
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Unauthorized
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+        message:
+          type: string
+
+paths:
+  /balance:
+    get:
+      tags:
+        - Balance Monitoring
+      summary: Get Current Balance
+      description: |
+        This endpoint retrieves your current account balance.
+
+        The balance is displayed in credits, which are used to pay for SMS, WhatsApp, Email, and other verification services.
+      operationId: getBalance
+      responses:
+        "200":
+          description: Balance retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      balance:
+                        type: number
+                        example: 21934
+                        description: Current account balance in credits
+                  message:
+                    type: string
+                    example: Balance retrieved successfully
+              examples:
+                success:
+                  summary: Successful balance retrieval
+                  value:
+                    success: true
+                    data:
+                      balance: 21934
+                    message: Balance retrieved successfully
+        "401":
+          description: Unauthorized - Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                unauthorized:
+                  summary: Unauthorized error
+                  value:
+                    errors:
+                      - message: Unauthorized
+
+  /send-otp:
+    post:
+      tags:
+        - OTP Verification
+      summary: Send OTP
+      description: |
+        Send an OTP (One-Time Password) to a user's mobile number or email address.
+
+        **Features:**
+        - SMS delivery via your own sender name or Authentica's default sender
+        - Email delivery via your own email or Authentica's default email
+        - Multiple templates available
+
+        **Note:** Check Application settings on Authentica dashboard to set default values for OTP options.
+      operationId: sendOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                method:
+                  type: string
+                  enum: [sms, whatsapp, email]
+                  description: Delivery method for the OTP. Required if no default channel is configured.
+                  example: sms
+                phone:
+                  type: string
+                  description: Valid international phone number. Required if method is sms or whatsapp.
+                  example: "+966551234567"
+                  pattern: '^\+[1-9]\d{1,14}$'
+                email:
+                  type: string
+                  format: email
+                  description: Valid email address. Required if method is email.
+                  example: "user@example.com"
+                template_id:
+                  type: integer
+                  description: Template ID for the OTP message. Default is 1.
+                  example: 31
+                  default: 1
+            examples:
+              sms:
+                summary: Send OTP via SMS
+                value:
+                  method: sms
+                  phone: "+966551234567"
+                  template_id: 31
+              whatsapp:
+                summary: Send OTP via WhatsApp
+                value:
+                  method: whatsapp
+                  phone: "+966551234567"
+                  template_id: 1
+              email:
+                summary: Send OTP via Email
+                value:
+                  method: email
+                  email: "user@example.com"
+                  template_id: 1
+      responses:
+        "200":
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    nullable: true
+                  message:
+                    type: string
+                    example: OTP send successfully
+              examples:
+                success:
+                  summary: OTP sent successfully
+                  value:
+                    success: true
+                    data: null
+                    message: OTP send successfully
+        "401":
+          description: Unauthorized - Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /verify-otp:
+    post:
+      tags:
+        - OTP Verification
+      summary: Verify OTP
+      description: |
+        Verify the OTP entered by your customer for authentication.
+
+        This endpoint validates the OTP against the one sent via `/send-otp` endpoint.
+      operationId: verifyOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - otp
+              properties:
+                phone:
+                  type: string
+                  description: Phone number used to send the OTP. Required if sms or whatsapp was used.
+                  example: "+966551234567"
+                email:
+                  type: string
+                  format: email
+                  description: Email used to send the OTP. Required if email was used.
+                  example: "user@example.com"
+                otp:
+                  type: string
+                  description: The OTP entered by the customer
+                  example: "123456"
+            examples:
+              phone:
+                summary: Verify OTP with phone number
+                value:
+                  phone: "+966551234567"
+                  otp: "123456"
+              email:
+                summary: Verify OTP with email
+                value:
+                  email: "user@example.com"
+                  otp: "123456"
+      responses:
+        "200":
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OTP verified successfully
+              examples:
+                success:
+                  summary: OTP verified successfully
+                  value:
+                    status: true
+                    message: OTP verified successfully
+        "401":
+          description: Unauthorized - Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /verify-by-face:
+    post:
+      tags:
+        - Face Verification
+      summary: Verify By Face
+      description: |
+        Verify whether the reference image and the real-time image match.
+
+        This endpoint compares two face images:
+        - `registered_face_image`: Reference image
+        - `query_face_image`: Real-time image captured by your application
+      operationId: verifyByFace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - registered_face_image
+                - query_face_image
+              properties:
+                user_id:
+                  type: string
+                  description: Unique identifier of your user
+                  example: "user123"
+                registered_face_image:
+                  type: string
+                  format: byte
+                  description: Base64-encoded reference image
+                  example: "/9j/4AAQSkZJRgABAQEAYABgAAD..."
+                query_face_image:
+                  type: string
+                  format: byte
+                  description: Base64-encoded real-time image captured by your application
+                  example: "/9j/4AAQSkZJRgABAQEAYABgAAD..."
+            examples:
+              verify_face:
+                summary: Verify face images
+                value:
+                  user_id: "user123"
+                  registered_face_image: "/9j/4AAQSkZJRgABAQEAYABgAAD..."
+                  query_face_image: "/9j/4AAQSkZJRgABAQEAYABgAAD..."
+      responses:
+        "200":
+          description: Face verification completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user_id:
+                        type: string
+                        example: "user123"
+                      result:
+                        type: boolean
+                        description: Verification result - true if faces match, false otherwise
+                        example: true
+              examples:
+                match:
+                  summary: Faces match
+                  value:
+                    success: true
+                    data:
+                      user_id: "user123"
+                      result: true
+                no_match:
+                  summary: Faces don't match
+                  value:
+                    success: true
+                    data:
+                      user_id: "user123"
+                      result: false
+        "401":
+          description: Unauthorized - Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /verify-by-voice:
+    post:
+      tags:
+        - Voice Verification
+      summary: Verify By Voice
+      description: |
+        Verify whether the reference audio and the real-time audio match.
+
+        This endpoint compares two voice samples:
+        - `registered_audio`: Reference audio
+        - `query_audio`: Real-time audio recorded by your application
+      operationId: verifyByVoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - registered_audio
+                - query_audio
+              properties:
+                user_id:
+                  type: string
+                  description: Unique identifier of your user
+                  example: "user123"
+                registered_audio:
+                  type: string
+                  format: byte
+                  description: Base64-encoded reference audio
+                  example: "SUQzBAAAAAAAIVRYWFgAAAA..."
+                query_audio:
+                  type: string
+                  format: byte
+                  description: Base64-encoded real-time audio recorded by your application
+                  example: "SUQzBAAAAAAAIVRYWFgAAAA..."
+            examples:
+              verify_voice:
+                summary: Verify voice samples
+                value:
+                  user_id: "user123"
+                  registered_audio: "SUQzBAAAAAAAIVRYWFgAAAA..."
+                  query_audio: "SUQzBAAAAAAAIVRYWFgAAAA..."
+      responses:
+        "200":
+          description: Voice verification completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user_id:
+                        type: string
+                        example: "user123"
+                      result:
+                        type: boolean
+                        description: Verification result - true if voices match, false otherwise
+                        example: true
+              examples:
+                match:
+                  summary: Voices match
+                  value:
+                    success: true
+                    data:
+                      user_id: "user123"
+                      result: true
+                no_match:
+                  summary: Voices don't match
+                  value:
+                    success: true
+                    data:
+                      user_id: "user123"
+                      result: false
+        "401":
+          description: Unauthorized - Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+tags:
+  - name: Balance Monitoring
+    description: Monitor your account balance and credits
+  - name: OTP Verification
+    description: Send and verify one-time passwords via SMS, WhatsApp, or Email
+  - name: Face Verification
+    description: Verify users through facial recognition
+  - name: Voice Verification
+    description: Verify users through voice biometrics

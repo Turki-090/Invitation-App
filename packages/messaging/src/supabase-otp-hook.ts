@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { normalizeLoginPhone } from "@dawah/domain";
 
 /**
  * Supabase Auth "send SMS" hook.
@@ -78,7 +79,7 @@ export function parseSupabaseSendSmsHookPayload(
     throw new SupabaseAuthHookPayloadError();
   }
 
-  const otp = typeof sms.otp === "string" ? sms.otp.trim() : "";
+  const otp = typeof sms.otp === "string" ? sms.otp : "";
   if (!/^\d{4,10}$/.test(otp)) throw new SupabaseAuthHookPayloadError();
 
   const phone = normalizePhone(user.phone);
@@ -95,7 +96,13 @@ export function parseSupabaseSendSmsHookPayload(
 function normalizePhone(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const digits = value.trim().replace(/^\+/, "");
-  return /^\d{8,15}$/.test(digits) ? `+${digits}` : null;
+  if (!/^[1-9]\d{7,14}$/.test(digits)) return null;
+  try {
+    const normalized = normalizeLoginPhone(`+${digits}`);
+    return normalized === `+${digits}` ? normalized : null;
+  } catch {
+    return null;
+  }
 }
 
 function decodeSecret(secret: string): Buffer | null {
@@ -103,9 +110,11 @@ function decodeSecret(secret: string): Buffer | null {
     .trim()
     .replace(/^v1,/, "")
     .replace(/^whsec_/, "");
-  if (encoded.length === 0) return null;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) return null;
   const key = Buffer.from(encoded, "base64");
-  return key.byteLength > 0 ? key : null;
+  return key.byteLength >= 16 && key.toString("base64") === encoded
+    ? key
+    : null;
 }
 
 function isFreshTimestamp(
@@ -119,6 +128,7 @@ function isFreshTimestamp(
 }
 
 function matches(candidate: string, expected: Buffer): boolean {
+  if (!/^[A-Za-z0-9+/]{43}=$/.test(candidate)) return false;
   const supplied = Buffer.from(candidate, "base64");
   return (
     supplied.byteLength === expected.byteLength &&
