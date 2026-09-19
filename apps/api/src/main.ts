@@ -35,8 +35,13 @@ async function bootstrap(): Promise<void> {
   app.use(
     json({
       limit: config.get("API_BODY_LIMIT_BYTES", { infer: true }),
+      // Signature verification needs the exact bytes that were signed, which
+      // re-serializing the parsed body would not reproduce.
       verify: (request: Request & { rawBody?: Buffer }, _response, body) => {
-        if (request.originalUrl.includes("/webhooks/whatsapp")) {
+        if (
+          request.originalUrl.includes("/webhooks/whatsapp") ||
+          request.originalUrl.includes("/webhooks/supabase-otp")
+        ) {
           request.rawBody = Buffer.from(body);
         }
       },

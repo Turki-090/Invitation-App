@@ -32,6 +32,7 @@ import type {
   SendReadinessResponse,
   WhatsappWebhookAcknowledgement,
 } from "./messaging";
+import type { SupabaseAuthHookError } from "./auth";
 import type {
   CheckInDashboard,
   CheckInParty,
@@ -121,6 +122,8 @@ type OpenApiResendReadinessResponse =
   components["schemas"]["ResendReadinessResponse"];
 type OpenApiWebhookAcknowledgement =
   components["schemas"]["WhatsappWebhookAcknowledgement"];
+type OpenApiSupabaseAuthHookError =
+  components["schemas"]["SupabaseAuthHookError"];
 type OpenApiCreateInvitationTemplate =
   components["schemas"]["CreateInvitationTemplate"];
 type OpenApiInvitationTemplate = components["schemas"]["InvitationTemplate"];
@@ -273,6 +276,8 @@ describe("OpenAPI runtime contract compatibility", () => {
       WhatsappWebhookAcknowledgement,
       OpenApiWebhookAcknowledgement
     >();
+    assertAssignable<OpenApiSupabaseAuthHookError, SupabaseAuthHookError>();
+    assertAssignable<SupabaseAuthHookError, OpenApiSupabaseAuthHookError>();
   });
 
   it("keeps template-purpose contracts aligned", () => {

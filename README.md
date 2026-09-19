@@ -116,6 +116,21 @@ deterministic queue recovery, checksum-bound private invitation-image delivery,
 capability-aware localized UI, and current-snapshot safe-resend contract are documented in
 [`docs/whatsapp-messaging-stage6.md`](docs/whatsapp-messaging-stage6.md).
 
+## Host sign-in
+
+Hosts sign in with a phone one-time code. Supabase Auth generates the code,
+verifies it, and issues the session; Authentica delivers it over WhatsApp with
+an SMS fallback, through Supabase's send-SMS hook at
+`POST /api/v1/webhooks/supabase-otp`. The API authenticates that hook with its
+Standard Webhooks signature and forwards the code — it never generates,
+verifies, stores, or logs one.
+
+Delivery is off by default and requires `AUTHENTICA_OTP_ENABLED`, an Authentica
+API key, and the Supabase hook secret; startup validation refuses a partial
+configuration. Account setup, the Supabase hook configuration, and the staging
+acceptance exercise are documented in
+[`docs/operations/authentica-otp-activation.md`](docs/operations/authentica-otp-activation.md).
+
 ## API contract workflow
 
 `openapi/openapi.yaml` is the only public transport-contract source. After a
