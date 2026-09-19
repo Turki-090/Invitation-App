@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dawah/domain": "workspace:*",
     "@dawah/api-client": "workspace:*",
     "@dawah/api-contract": "workspace:*",
     "@dawah/config": "workspace:*",

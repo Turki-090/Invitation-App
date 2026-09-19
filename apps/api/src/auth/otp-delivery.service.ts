@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { createHash, createHmac } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
 import type { ApiEnvironment } from "@dawah/config";
 import {
@@ -10,6 +11,7 @@ import {
 } from "@dawah/messaging";
 import type { Logger } from "@dawah/observability";
 import { LOGGER } from "../observability/observability.tokens";
+import { OtpAttemptStore } from "./otp-attempt-store";
 
 export interface OtpDeliverySignatureHeaders {
   readonly id: string | undefined;
@@ -41,6 +43,7 @@ export class OtpDeliveryService {
   public constructor(
     @Inject(ConfigService) config: ConfigService<ApiEnvironment, true>,
     @Inject(LOGGER) private readonly logger: Logger,
+    @Inject(OtpAttemptStore) private readonly attempts: OtpAttemptStore,
   ) {
     this.enabled = config.get("AUTHENTICA_OTP_ENABLED", { infer: true });
     this.hookSecret = config.get("SUPABASE_SEND_SMS_HOOK_SECRET", {
@@ -68,7 +71,7 @@ export class OtpDeliveryService {
   public async deliver(
     rawBody: Buffer | undefined,
     headers: OtpDeliverySignatureHeaders,
-    payload: unknown,
+    _payload: unknown,
   ): Promise<OtpDeliveryOutcome> {
     if (!this.enabled || !this.hookSecret) {
       this.logger.error("auth.otp.delivery_not_configured");
@@ -89,37 +92,75 @@ export class OtpDeliveryService {
 
     let request;
     try {
-      request = parseSupabaseSendSmsHookPayload(payload);
+      request = parseSupabaseSendSmsHookPayload(
+        JSON.parse(rawBody.toString("utf8")),
+      );
     } catch (error) {
-      if (!(error instanceof SupabaseAuthHookPayloadError)) throw error;
+      if (
+        !(error instanceof SupabaseAuthHookPayloadError) &&
+        !(error instanceof SyntaxError)
+      )
+        throw error;
       this.logger.warn("auth.otp.hook_payload_rejected");
       return { httpCode: 400, message: "The hook payload is not supported." };
     }
 
+    const key = createHash("sha256").update(headers.id!).digest("hex");
+    // A keyed digest prevents brute-forcing a short OTP from a stored hash.
+    const fingerprint = createHmac("sha256", this.hookSecret)
+      .update(rawBody)
+      .digest("hex");
+    try {
+      const previous = await this.attempts.claim(key, fingerprint);
+      if (previous) {
+        if (previous.fingerprint !== fingerprint)
+          return { httpCode: 400, message: "The hook identifier was reused." };
+        if (previous.httpCode === 200) return delivered;
+        return {
+          httpCode: previous.httpCode ?? 409,
+          message:
+            "The code delivery attempt cannot be repeated. Request a new code.",
+        };
+      }
+    } catch {
+      this.logger.error("auth.otp.deduplication_unavailable");
+      return {
+        httpCode: 503,
+        message: "Sign-in code delivery is temporarily unavailable.",
+      };
+    }
+
+    let outcome: OtpDeliveryOutcome = delivered;
     try {
       await this.provider.sendOtp({
         method: this.method,
         otp: request.otp,
         phone: request.phone,
         templateId: this.templateId,
-        // Satisfies an Authentica application whose fallback channel is SMS or
-        // WhatsApp; the hook knows one recipient, and it is the same person.
-        fallbackPhone: request.phone,
       });
     } catch (error) {
-      if (!(error instanceof AuthenticaError)) throw error;
-      return this.deliveryFailure(error);
+      outcome =
+        error instanceof AuthenticaError
+          ? this.deliveryFailure(error)
+          : { httpCode: 502, message: "The code could not be delivered." };
     }
 
-    this.logger.info("auth.otp.delivered", { channel: this.method });
-    return delivered;
+    try {
+      await this.attempts.complete(key, outcome.httpCode);
+    } catch {
+      this.logger.error("auth.otp.outcome_persistence_failed");
+      return {
+        httpCode: 503,
+        message:
+          "The delivery outcome could not be confirmed. Request a new code.",
+      };
+    }
+    if (outcome.httpCode === 200)
+      this.logger.info("auth.otp.accepted", { channel: this.method });
+    return outcome;
   }
 
-  /**
-   * A retryable fault asks Supabase to try again within its own budget; a
-   * rejected request does not, because a second identical call would only
-   * spend balance.
-   */
+  /** No automatic resend: provider acceptance may precede a failed response. */
   private deliveryFailure(error: AuthenticaError): OtpDeliveryOutcome {
     this.logger.error("auth.otp.delivery_failed", {
       providerCode: error.providerCode,
@@ -127,11 +168,11 @@ export class OtpDeliveryService {
       retryable: error.retryable,
       channel: this.method,
     });
-    return error.retryable
+    return error.providerCode === "PROVIDER_RATE_LIMITED"
       ? {
-          httpCode: 503,
-          message: "The code could not be delivered. Try again.",
-          retryAfterSeconds: 1,
+          httpCode: 429,
+          message:
+            "Code delivery is rate limited. Wait before requesting another code.",
         }
       : { httpCode: 502, message: "The code could not be delivered." };
   }

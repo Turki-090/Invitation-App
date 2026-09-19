@@ -3,8 +3,8 @@
 Status: accepted.
 
 Host sign-in is a phone one-time code. Supabase Auth generates and verifies that
-code and issues the session; Authentica delivers it over WhatsApp with an SMS
-fallback, through Supabase's send-SMS hook rather than through a client call.
+code and issues the session; Authentica delivers it over SMS through Supabase's
+send-SMS hook rather than through a client call.
 
 Authentica also offers verification, and it is deliberately unused. Verifying
 there would make delivery capable of issuing sessions, and would put a second
@@ -19,3 +19,7 @@ that enables delivery without a usable hook secret.
 
 See `docs/operations/authentica-otp-activation.md`. The vendor's API
 blueprint is kept at `docs/vendor/authenticasa.apib` for reference.
+
+# Review update — 2026-09-19
+
+SMS is now the default delivery channel. The hook persists a deduplication claim before sending and never automatically retries an ambiguous provider result. The current public Authentica schema omits the custom `otp` field documented in the older blueprint. Production activation remains blocked on vendor confirmation and a real handset-to-Supabase-session test. See the updated activation runbook for details.

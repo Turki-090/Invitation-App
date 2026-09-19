@@ -10,3 +10,4 @@ export * from "./phone";
 export * from "./reminders";
 export * from "./rsvp";
 export * from "./types";
+export * from "./login-phone";

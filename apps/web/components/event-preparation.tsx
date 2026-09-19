@@ -919,6 +919,26 @@ function ImportPreparation({
   return (
     <div className="preparation-stack">
       <Card subtitle={copy.uploadDescription} title={copy.uploadTitle}>
+        <div className="preparation-stack">
+          <p>{copy.templateInstructions}</p>
+          <div className="preparation-actions">
+            <a
+              className="dawah-button dawah-button--secondary dawah-button--md"
+              href="/templates/guest-import.xlsx"
+              download
+            >
+              {copy.downloadExcelTemplate}
+            </a>
+            <a
+              className="dawah-button dawah-button--ghost dawah-button--md"
+              href="/templates/guest-import.csv"
+              download
+            >
+              {copy.downloadCsvTemplate}
+            </a>
+          </div>
+          <p>{copy.templateFieldHelp}</p>
+        </div>
         <div
           className="preparation-dropzone"
           onDragOver={(event) => event.preventDefault()}

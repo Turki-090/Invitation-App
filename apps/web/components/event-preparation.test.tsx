@@ -329,6 +329,16 @@ describe("event preparation", () => {
       "guests.csv",
       { type: "text/csv" },
     );
+    expect(
+      screen
+        .getByRole("link", { name: en.preparation.downloadExcelTemplate })
+        .getAttribute("href"),
+    ).toBe("/templates/guest-import.xlsx");
+    expect(
+      screen
+        .getByRole("link", { name: en.preparation.downloadCsvTemplate })
+        .hasAttribute("download"),
+    ).toBe(true);
     await user.upload(
       await screen.findByLabelText(en.preparation.chooseFile),
       file,

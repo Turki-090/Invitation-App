@@ -375,13 +375,13 @@ describe("environment validation", () => {
     });
   });
 
-  it("defaults sign-in code delivery to off and to the Authentica WhatsApp channel", () => {
+  it("defaults sign-in code delivery to off and to the Authentica SMS channel", () => {
     expect(validateApiEnvironment(safeProductionApiEnvironment)).toMatchObject({
       AUTHENTICA_OTP_ENABLED: false,
       AUTHENTICA_BASE_URL: "https://api.authentica.sa/api/v2",
-      AUTHENTICA_OTP_METHOD: "whatsapp",
+      AUTHENTICA_OTP_METHOD: "sms",
       AUTHENTICA_OTP_TEMPLATE_ID: 1,
-      AUTHENTICA_REQUEST_TIMEOUT_MS: 10_000,
+      AUTHENTICA_REQUEST_TIMEOUT_MS: 2_500,
     });
   });
 

@@ -29,7 +29,7 @@ const arSA = {
     fact3Label: "عدّ دقيق للأشخاص المتوقعين",
     phoneLabel: "رقم الجوال",
     phoneHint: "مثال: +9665XXXXXXXX",
-    phoneValidation: "أدخل رقمًا صحيحًا بصيغة دولية.",
+    phoneValidation: "أدخل رقم جوال صحيحًا مثل 0501234567 أو +966501234567.",
     sendCode: "إرسال رمز التحقق",
     codeLabel: "رمز التحقق",
     codeHint: "أُرسل الرمز إلى {phone}",
@@ -303,6 +303,12 @@ const arSA = {
     snapshotsCreated: "تم تجهيز {count} نسخة دعوة ثابتة",
     snapshotError: "تعذر إنشاء نسخ المحتوى الثابتة.",
     uploadTitle: "رفع ملف الضيوف",
+    downloadExcelTemplate: "تحميل نموذج Excel",
+    downloadCsvTemplate: "تحميل نموذج CSV",
+    templateInstructions:
+      "حمّل النموذج، وأدخل دعوة واحدة في كل صف، ثم ارفع الملف المكتمل. احتفظ بعناوين الأعمدة. يتضمن نموذج Excel التعليمات ويحفظ أرقام الجوال كنص.",
+    templateFieldHelp:
+      "اسم الضيف ورقم الجوال مطلوبان. استخدم 05XXXXXXXX أو +9665XXXXXXXX للأرقام السعودية. نوع الدعوة: single أو named_group أو primary_with_companions. افصل أسماء المجموعة بعلامة |. عدد المرافقين من 0 إلى 100 لدعوة primary_with_companions فقط. احفظ CSV بترميز UTF-8 وأبقِ خلايا الجوال كنص.",
     uploadDescription:
       "يُحفظ الملف بخصوصية ويُحلل في الخلفية، ولا تُستورد أي صفوف قبل التأكيد.",
     dropFile: "أسقط ملف Excel أو CSV هنا",

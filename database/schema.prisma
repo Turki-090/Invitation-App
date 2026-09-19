@@ -940,6 +940,16 @@ model WebhookEvent {
   @@map("webhook_events")
 }
 
+model OtpDeliveryAttempt {
+  key         String   @id @db.Char(64)
+  fingerprint String   @db.Char(64)
+  httpCode    Int?     @map("http_code")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt], map: "otp_delivery_attempts_created_idx")
+  @@map("otp_delivery_attempts")
+}
+
 model IdempotencyRecord {
   id             String                  @id @default(uuid()) @db.Uuid
   eventId        String                  @map("event_id") @db.Uuid

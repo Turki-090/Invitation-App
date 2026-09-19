@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button, Field, Input } from "@dawah/ui";
-import { isValidPhoneNumber } from "libphonenumber-js";
+import { normalizeLoginPhone } from "@dawah/domain";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -28,10 +28,14 @@ export function SignInForm({ locale, copy, redirectTo }: SignInFormProps) {
     phone: z
       .string()
       .trim()
-      .refine(
-        (value) => value.startsWith("+") && isValidPhoneNumber(value),
-        copy.phoneValidation,
-      ),
+      .refine((value) => {
+        try {
+          normalizeLoginPhone(value);
+          return true;
+        } catch {
+          return false;
+        }
+      }, copy.phoneValidation),
   });
   const codeSchema = z.object({
     code: z
@@ -59,14 +63,14 @@ export function SignInForm({ locale, copy, redirectTo }: SignInFormProps) {
         return;
       }
       const { error } = await supabase.auth.signInWithOtp({
-        phone: submittedPhone,
+        phone: normalizeLoginPhone(submittedPhone),
         options: { shouldCreateUser: true },
       });
       if (error) {
         setServerError(copy.sendFailed);
         return;
       }
-      setPhone(submittedPhone);
+      setPhone(normalizeLoginPhone(submittedPhone));
     },
   );
 
