@@ -22,6 +22,8 @@ silently weakening a check.
 | `META_WHATSAPP_MEDIA_SIGNING_SECRET` | Signed private invitation-image URLs | **Invalidating** | Outstanding media links stop resolving mid-send.                      |
 | `EXPORT_DOWNLOAD_SIGNING_SECRET`     | Signed export download URLs          | **Invalidating** | Links already given to hosts stop working.                            |
 | `CHECK_IN_TOKEN_SIGNING_SECRET`      | Entry passes in guests' hands        | **Invalidating** | Every issued QR pass stops resolving.                                 |
+| `AUTHENTICA_API_KEY`                 | Sign-in code delivery                | Overlap          | Sign-in codes stop being delivered; no host can sign in.              |
+| `SUPABASE_SEND_SMS_HOOK_SECRET`      | The Supabase send-code hook          | Provider-coupled | Hook calls are rejected; no host can sign in until both sides match.  |
 | `METRICS_TOKEN`                      | Metrics scrape                       | Overlap          | Scrapes fail until the collector is updated; no user impact.          |
 | `SENTRY_DSN`                         | Error reporting destination          | Overlap          | Reports are dropped while mismatched.                                 |
 | Supabase keys                        | Authentication                       | Provider-coupled | Hosts cannot sign in while mismatched.                                |
@@ -63,6 +65,24 @@ Rotate these only when:
 After rotating `CHECK_IN_TOKEN_SIGNING_SECRET`, every entry pass must be
 reissued before the next event. Treat a compromise-driven rotation as an
 incident: the invalidation is the point, and guests will need new passes.
+
+## Sign-in code delivery rotation
+
+`AUTHENTICA_API_KEY` and `SUPABASE_SEND_SMS_HOOK_SECRET` both sit on the only
+path a host has to sign in, so a mismatch is a total sign-in outage rather than
+a degraded one. Neither is invalidating: nothing signed by them is already in
+someone's hands.
+
+Rotate the API key by overlap — issue a new key in the Authentica portal, update
+the secret store, restart the API, sign in once against staging or with an
+operator number, then revoke the old key.
+
+The hook secret cannot overlap: Supabase issues one secret per hook, and the API
+accepts the rotation list in the signature header only for as long as Supabase
+sends it. Regenerate the secret in the Supabase dashboard, update the secret
+store, and restart the API in the same change window. Sign-ins attempted between
+the two fail with `auth.otp.hook_signature_rejected` and succeed on retry, so
+rotate outside event hours.
 
 ## Compromise response
 

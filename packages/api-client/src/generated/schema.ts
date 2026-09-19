@@ -1540,6 +1540,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/webhooks/supabase-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deliver a Supabase-issued sign-in code through Authentica
+         * @description Supabase Auth send-SMS hook. Supabase generates and later verifies the code; this endpoint only hands it to Authentica for delivery over WhatsApp or SMS. Authenticated with the Standard Webhooks signature issued by Supabase, never with a platform access token.
+         */
+        post: operations["deliverSupabaseOtp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -2453,6 +2473,12 @@ export type components = {
             accepted: true;
             queuedEvents: number;
             duplicateEvents: number;
+        };
+        SupabaseAuthHookError: {
+            error: {
+                http_code: number;
+                message: string;
+            };
         };
         /** @enum {string} */
         ReminderAudience: "ALL_PENDING" | "SENT_UNREAD" | "READ_NO_RESPONSE" | "APPROACHING_DEADLINE";
@@ -5739,6 +5765,85 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             429: components["responses"]["TooManyRequests"];
             503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    deliverSupabaseOtp: {
+        parameters: {
+            query?: never;
+            header: {
+                "webhook-id": string;
+                "webhook-timestamp": string;
+                "webhook-signature": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    user: {
+                        phone?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                    sms: {
+                        otp: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                } & {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Code accepted by the delivery provider. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Signed payload carried no deliverable recipient or code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupabaseAuthHookError"];
+                };
+            };
+            /** @description Missing, stale, or invalid hook signature. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupabaseAuthHookError"];
+                };
+            };
+            /** @description Delivery provider rejected the code; retrying would not help. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupabaseAuthHookError"];
+                };
+            };
+            /** @description Delivery is unconfigured or temporarily unavailable; retry after the advertised delay. */
+            503: {
+                headers: {
+                    /** @description Seconds Supabase should wait before retrying. */
+                    "retry-after"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupabaseAuthHookError"];
+                };
+            };
         };
     };
 }

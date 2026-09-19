@@ -374,4 +374,64 @@ describe("environment validation", () => {
       METRICS_ENABLED: true,
     });
   });
+
+  it("defaults sign-in code delivery to off and to the Authentica WhatsApp channel", () => {
+    expect(validateApiEnvironment(safeProductionApiEnvironment)).toMatchObject({
+      AUTHENTICA_OTP_ENABLED: false,
+      AUTHENTICA_BASE_URL: "https://api.authentica.sa/api/v2",
+      AUTHENTICA_OTP_METHOD: "whatsapp",
+      AUTHENTICA_OTP_TEMPLATE_ID: 1,
+      AUTHENTICA_REQUEST_TIMEOUT_MS: 10_000,
+    });
+  });
+
+  it("accepts enabled sign-in code delivery with a real key and hook secret", () => {
+    expect(
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        AUTHENTICA_OTP_ENABLED: "true",
+        AUTHENTICA_API_KEY: "$2y$10$prod-authentica-key-7f3a9c2e8d4f",
+        AUTHENTICA_OTP_METHOD: "sms",
+        AUTHENTICA_OTP_TEMPLATE_ID: "31",
+        SUPABASE_SEND_SMS_HOOK_SECRET: `v1,whsec_${Buffer.from(
+          "prod-supabase-send-sms-hook-secret",
+        ).toString("base64")}`,
+      }),
+    ).toMatchObject({
+      AUTHENTICA_OTP_ENABLED: true,
+      AUTHENTICA_OTP_METHOD: "sms",
+      AUTHENTICA_OTP_TEMPLATE_ID: 31,
+    });
+  });
+
+  it("refuses enabled sign-in code delivery without an authenticated hook", () => {
+    expect(() =>
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        AUTHENTICA_OTP_ENABLED: "true",
+        AUTHENTICA_API_KEY: "$2y$10$prod-authentica-key-7f3a9c2e8d4f",
+      }),
+    ).toThrow(/SUPABASE_SEND_SMS_HOOK_SECRET/);
+
+    expect(() =>
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        AUTHENTICA_OTP_ENABLED: "true",
+        AUTHENTICA_API_KEY: "$2y$10$prod-authentica-key-7f3a9c2e8d4f",
+        SUPABASE_SEND_SMS_HOOK_SECRET: "v1,whsec_short",
+      }),
+    ).toThrow(/SUPABASE_SEND_SMS_HOOK_SECRET/);
+  });
+
+  it("refuses a deployed placeholder Authentica credential", () => {
+    expect(() =>
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        AUTHENTICA_OTP_ENABLED: "true",
+        SUPABASE_SEND_SMS_HOOK_SECRET: `v1,whsec_${Buffer.from(
+          "prod-supabase-send-sms-hook-secret",
+        ).toString("base64")}`,
+      }),
+    ).toThrow(/AUTHENTICA_API_KEY/);
+  });
 });

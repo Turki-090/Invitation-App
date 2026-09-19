@@ -56,8 +56,24 @@ export interface WhatsappRsvpConfirmationEnvironment {
   META_WHATSAPP_MAX_ATTEMPTS: number;
 }
 
+/**
+ * Sign-in code delivery. Supabase Auth still generates and verifies the code;
+ * Authentica only carries it to the handset, which is why the hook secret and
+ * the provider credential are configured as one unit.
+ */
+export interface AuthenticaOtpEnvironment {
+  AUTHENTICA_OTP_ENABLED: boolean;
+  AUTHENTICA_BASE_URL: string;
+  AUTHENTICA_API_KEY: string;
+  AUTHENTICA_OTP_METHOD: "whatsapp" | "sms";
+  AUTHENTICA_OTP_TEMPLATE_ID: number;
+  AUTHENTICA_REQUEST_TIMEOUT_MS: number;
+  SUPABASE_SEND_SMS_HOOK_SECRET?: string;
+}
+
 export interface ApiEnvironment
   extends
+    AuthenticaOtpEnvironment,
     StorageEnvironment,
     ImportAndAssetLimitsEnvironment,
     ObservabilityEnvironment,
@@ -201,6 +217,24 @@ const whatsappRsvpConfirmationShape = {
   META_WHATSAPP_MAX_ATTEMPTS: positiveInteger.max(10).default(5),
 } as const;
 
+const authenticaOtpShape = {
+  AUTHENTICA_OTP_ENABLED: environmentBoolean,
+  AUTHENTICA_BASE_URL: z
+    .url({ protocol: /^https?$/ })
+    .default("https://api.authentica.sa/api/v2"),
+  AUTHENTICA_API_KEY: requiredText.default("dawah-local-authentica-api-key"),
+  /**
+   * The hook carries a phone number and nothing else, so email is not a
+   * deliverable channel here. A fallback channel is configured on the
+   * Authentica application itself.
+   */
+  AUTHENTICA_OTP_METHOD: z.enum(["whatsapp", "sms"]).default("whatsapp"),
+  AUTHENTICA_OTP_TEMPLATE_ID: positiveInteger.max(1_000_000).default(1),
+  AUTHENTICA_REQUEST_TIMEOUT_MS: positiveInteger.max(60_000).default(10_000),
+  /** Standard Webhooks secret issued by Supabase, stored as `v1,whsec_…`. */
+  SUPABASE_SEND_SMS_HOOK_SECRET: optionalText,
+} as const;
+
 const exportRetentionShape = {
   EXPORT_RETENTION_HOURS: positiveInteger.max(24 * 30).default(24 * 7),
 } as const;
@@ -263,6 +297,7 @@ const apiEnvironmentSchema = z
     ...whatsappRsvpConfirmationShape,
     ...observabilityShape,
     ...stage9ApiShape,
+    ...authenticaOtpShape,
     DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }),
     QUEUE_PREFIX: optionalText,
@@ -301,6 +336,7 @@ const apiEnvironmentSchema = z
   .superRefine((environment, context) => {
     validateRuntimeMode(environment, context);
     validateObservability(environment, context);
+    validateAuthenticaOtp(environment, context);
     validateDevelopmentBypass(
       environment.DAWAH_DEV_AUTH_BYPASS,
       environment,
@@ -326,6 +362,18 @@ const apiEnvironmentSchema = z
       "SUPABASE_URL",
       context,
     );
+    if (environment.AUTHENTICA_OTP_ENABLED) {
+      validateNonPlaceholderSecret(
+        environment.AUTHENTICA_API_KEY,
+        "AUTHENTICA_API_KEY",
+        context,
+      );
+      validateRequiredRemoteHttpsUrl(
+        environment.AUTHENTICA_BASE_URL,
+        "AUTHENTICA_BASE_URL",
+        context,
+      );
+    }
     validateNonPlaceholderSecret(
       environment.META_WHATSAPP_APP_SECRET,
       "META_WHATSAPP_APP_SECRET",
@@ -626,6 +674,46 @@ function validateObservability(
       context,
     );
   }
+}
+
+/**
+ * Sign-in code delivery is all or nothing.
+ *
+ * A hook that is reachable but cannot authenticate its caller would let anyone
+ * spend the account's balance sending codes to arbitrary numbers, and a hook
+ * that authenticates but has no provider credential silently breaks sign-in.
+ * Both are refused at startup rather than at the first sign-in attempt.
+ */
+function validateAuthenticaOtp(
+  environment: AuthenticaOtpEnvironment & { SUPABASE_URL?: string },
+  context: z.RefinementCtx,
+): void {
+  if (!environment.AUTHENTICA_OTP_ENABLED) return;
+
+  const secret = environment.SUPABASE_SEND_SMS_HOOK_SECRET;
+  if (!secret || !isStandardWebhookSecret(secret)) {
+    addIssue(
+      context,
+      "SUPABASE_SEND_SMS_HOOK_SECRET",
+      "Authentica sign-in delivery requires the Supabase send-SMS hook secret, in its issued `v1,whsec_` form.",
+    );
+  }
+  if (!environment.SUPABASE_URL) {
+    addIssue(
+      context,
+      "SUPABASE_URL",
+      "Authentica delivers codes on behalf of Supabase Auth, which must be configured.",
+    );
+  }
+}
+
+function isStandardWebhookSecret(value: string): boolean {
+  const encoded = value
+    .trim()
+    .replace(/^v1,/, "")
+    .replace(/^whsec_/, "");
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) return false;
+  return Buffer.from(encoded, "base64").byteLength >= 16;
 }
 
 function validateDevelopmentBypass(

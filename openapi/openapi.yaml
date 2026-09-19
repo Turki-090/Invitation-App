@@ -2076,6 +2076,80 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /webhooks/supabase-otp:
+    post:
+      summary: Deliver a Supabase-issued sign-in code through Authentica
+      description: >-
+        Supabase Auth send-SMS hook. Supabase generates and later verifies the
+        code; this endpoint only hands it to Authentica for delivery over
+        WhatsApp or SMS. Authenticated with the Standard Webhooks signature
+        issued by Supabase, never with a platform access token.
+      tags: [webhooks]
+      operationId: deliverSupabaseOtp
+      security: []
+      parameters:
+        - name: webhook-id
+          in: header
+          required: true
+          schema: { type: string }
+        - name: webhook-timestamp
+          in: header
+          required: true
+          schema: { type: string, pattern: "^[0-9]{1,15}$" }
+        - name: webhook-signature
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [user, sms]
+              properties:
+                user:
+                  type: object
+                  additionalProperties: true
+                  properties:
+                    phone: { type: string }
+                sms:
+                  type: object
+                  additionalProperties: true
+                  required: [otp]
+                  properties:
+                    otp: { type: string, pattern: "^[0-9]{4,10}$" }
+      responses:
+        "200":
+          description: Code accepted by the delivery provider.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: false }
+        "400":
+          description: Signed payload carried no deliverable recipient or code.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupabaseAuthHookError" }
+        "401":
+          description: Missing, stale, or invalid hook signature.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupabaseAuthHookError" }
+        "502":
+          description: Delivery provider rejected the code; retrying would not help.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupabaseAuthHookError" }
+        "503":
+          description: Delivery is unconfigured or temporarily unavailable; retry after the advertised delay.
+          headers:
+            retry-after:
+              schema: { type: string }
+              description: Seconds Supabase should wait before retrying.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupabaseAuthHookError" }
 components:
   securitySchemes:
     bearerAuth:
@@ -4006,6 +4080,18 @@ components:
         accepted: { type: boolean, const: true }
         queuedEvents: { type: integer, minimum: 0 }
         duplicateEvents: { type: integer, minimum: 0 }
+    SupabaseAuthHookError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [http_code, message]
+          properties:
+            http_code: { type: integer, minimum: 400, maximum: 599 }
+            message: { type: string, minLength: 1 }
     ReminderAudience:
       type: string
       enum: [ALL_PENDING, SENT_UNREAD, READ_NO_RESPONSE, APPROACHING_DEADLINE]
