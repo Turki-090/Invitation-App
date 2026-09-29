@@ -1,5 +1,9 @@
 # Production-readiness checklist
 
+Follow the [staging-to-production launch runbook](staging-to-production.md)
+for execution order. This checklist remains the release evidence register;
+creating the runbook does not change any readiness status.
+
 The Stage 10 exit gate requires that every item below has **recorded evidence**,
 an **approved exception**, or is **disabled behind a verified feature flag**.
 A tick with no evidence is not a pass.

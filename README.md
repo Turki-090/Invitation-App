@@ -119,8 +119,8 @@ capability-aware localized UI, and current-snapshot safe-resend contract are doc
 ## Host sign-in
 
 Hosts sign in with a phone one-time code. Supabase Auth generates the code,
-verifies it, and issues the session; Authentica delivers it over WhatsApp with
-an SMS fallback, through Supabase's send-SMS hook at
+verifies it, and issues the session; Authentica delivers it over SMS,
+through Supabase's send-SMS hook at
 `POST /api/v1/webhooks/supabase-otp`. The API authenticates that hook with its
 Standard Webhooks signature and forwards the code — it never generates,
 verifies, stores, or logs one.
@@ -140,6 +140,9 @@ stale, while contract compatibility tests keep the runtime Zod types assignable
 to the generated shapes.
 
 ## Operations
+
+For the step-by-step path from OTP setup to staging, a real-event pilot, and
+public production, use the [staging-to-production launch runbook](docs/staging-to-production.md).
 
 Deployed environments must set `LOG_FORMAT=json`, a `LOG_LEVEL` other than
 `debug`, and — when `METRICS_ENABLED` is true — a `METRICS_TOKEN` of at least 32
