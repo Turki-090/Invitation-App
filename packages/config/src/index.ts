@@ -68,6 +68,7 @@ export interface AuthenticaOtpEnvironment {
   AUTHENTICA_OTP_METHOD: "whatsapp" | "sms";
   AUTHENTICA_OTP_TEMPLATE_ID: number;
   AUTHENTICA_REQUEST_TIMEOUT_MS: number;
+  AUTHENTICA_OTP_ALLOWED_COUNTRIES: string[];
   SUPABASE_SEND_SMS_HOOK_SECRET?: string;
 }
 
@@ -134,6 +135,7 @@ export interface WebEnvironment {
   NEXT_PUBLIC_API_URL: string;
   NEXT_PUBLIC_SUPABASE_URL?: string;
   NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY?: string;
   NEXT_PUBLIC_DAWAH_DEV_AUTH_BYPASS: boolean;
 }
 
@@ -231,6 +233,24 @@ const authenticaOtpShape = {
   AUTHENTICA_OTP_METHOD: z.enum(["whatsapp", "sms"]).default("sms"),
   AUTHENTICA_OTP_TEMPLATE_ID: positiveInteger.max(1_000_000).default(1),
   AUTHENTICA_REQUEST_TIMEOUT_MS: positiveInteger.max(3_000).default(2_500),
+  /**
+   * ISO countries whose mobile numbers may receive a sign-in code. Anyone can
+   * ask Supabase for a code with the public anon key, so this list, not the
+   * web form, is what bounds SMS spend and keeps premium-rate destinations out.
+   */
+  AUTHENTICA_OTP_ALLOWED_COUNTRIES: z.preprocess(
+    (value) =>
+      typeof value === "string"
+        ? value
+            .split(",")
+            .map((country) => country.trim().toUpperCase())
+            .filter(Boolean)
+        : value,
+    z
+      .array(z.string().regex(/^[A-Z]{2}$/))
+      .min(1)
+      .default(["SA"]),
+  ),
   /** Standard Webhooks secret issued by Supabase, stored as `v1,whsec_…`. */
   SUPABASE_SEND_SMS_HOOK_SECRET: optionalText,
 } as const;
@@ -503,6 +523,8 @@ const webEnvironmentSchema = z
     NEXT_PUBLIC_API_URL: z.url().default("http://localhost:4000/api/v1"),
     NEXT_PUBLIC_SUPABASE_URL: optionalUrl,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: optionalText,
+    /** Public Cloudflare Turnstile key; set with Supabase CAPTCHA protection. */
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: optionalText,
     NEXT_PUBLIC_DAWAH_DEV_AUTH_BYPASS: environmentBoolean,
   })
   .passthrough()
@@ -752,15 +774,29 @@ function validateRemotePostgres(value: string, context: z.RefinementCtx): void {
       "The documented local database credentials cannot be used when deployed.",
     );
   }
-  if (
-    !new Set(["require", "verify-ca", "verify-full"]).has(
-      url.searchParams.get("sslmode") ?? "",
-    )
-  ) {
+  // Prisma's engine understands only disable, prefer, and require, and
+  // silently treats any other sslmode as prefer: it may fall back to plaintext
+  // and never checks the certificate. Verification is a separate parameter,
+  // sslaccept, whose default accepts any certificate.
+  const sslMode = url.searchParams.get("sslmode") ?? "";
+  if (sslMode === "verify-ca" || sslMode === "verify-full") {
     addIssue(
       context,
       "DATABASE_URL",
-      "Deployed PostgreSQL must explicitly require TLS with sslmode.",
+      `Prisma does not support sslmode=${sslMode} and silently downgrades it to prefer. Use sslmode=require&sslaccept=strict instead.`,
+    );
+  } else if (sslMode !== "require") {
+    addIssue(
+      context,
+      "DATABASE_URL",
+      "Deployed PostgreSQL must explicitly require TLS with sslmode=require.",
+    );
+  }
+  if (url.searchParams.get("sslaccept") !== "strict") {
+    addIssue(
+      context,
+      "DATABASE_URL",
+      "Deployed PostgreSQL must verify the server certificate with sslaccept=strict. Add sslcert=<absolute path to the provider CA> when that CA is not publicly trusted.",
     );
   }
 }

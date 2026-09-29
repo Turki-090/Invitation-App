@@ -11,6 +11,10 @@ const supabaseOrigin = environment.NEXT_PUBLIC_SUPABASE_URL
   : null;
 const connectSources = new Set(["'self'", apiOrigin]);
 const imageSources = new Set(["'self'", "blob:", "data:"]);
+// Cloudflare Turnstile runs a script and a challenge frame from its own origin.
+const captchaOrigin = environment.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+  ? "https://challenges.cloudflare.com"
+  : null;
 
 if (supabaseOrigin) {
   const supabaseUrl = new URL(supabaseOrigin);
@@ -25,7 +29,7 @@ if (development) {
 
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${development ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline'${development ? " 'unsafe-eval'" : ""}${captchaOrigin ? ` ${captchaOrigin}` : ""}`,
   "style-src 'self' 'unsafe-inline'",
   `connect-src ${[...connectSources].join(" ")}`,
   `img-src ${[...imageSources].join(" ")}`,
@@ -34,6 +38,7 @@ const contentSecurityPolicy = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
+  ...(captchaOrigin ? [`frame-src 'self' ${captchaOrigin}`] : []),
   "worker-src 'self' blob:",
   ...(deployed ? ["upgrade-insecure-requests"] : []),
 ].join("; ");

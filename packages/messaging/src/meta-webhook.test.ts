@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   MetaWebhookPayloadError,
   parseMetaWebhookPayload,
+  type MetaWebhookSkipReason,
   verifyMetaWebhookSignature,
 } from "./meta-webhook";
 
@@ -102,18 +103,70 @@ describe("Meta webhook contract", () => {
     );
   });
 
-  it("rejects a payload routed from another configured phone number", () => {
-    const payload = fixtureStatus(
-      "sent",
-      "1725880000",
-      undefined,
-      "999999999999999",
-    );
-    expect(() =>
-      parseMetaWebhookPayload(payload, {
+  it("skips another phone number's changes without dropping this number's replies", () => {
+    const skipped: MetaWebhookSkipReason[] = [];
+    const events = parseMetaWebhookPayload(
+      {
+        object: "whatsapp_business_account",
+        entry: [
+          {
+            changes: [
+              fixtureStatus("sent", "1725880000", undefined, "999999999999999")
+                .entry[0]!.changes[0]!,
+              {
+                field: "messages",
+                value: {
+                  metadata: { phone_number_id: "123456789012345" },
+                  messages: [
+                    {
+                      id: "wamid.reply",
+                      timestamp: "1725880010",
+                      type: "button",
+                      button: { payload: "accept" },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      },
+      {
         phoneNumberId: "123456789012345",
-      }),
-    ).toThrow(MetaWebhookPayloadError);
+        onSkipped: (reason) => skipped.push(reason),
+      },
+    );
+
+    expect(events).toEqual([
+      expect.objectContaining({ kind: "RESPONSE", responseValue: "accept" }),
+    ]);
+    expect(skipped).toEqual(["PHONE_NUMBER_MISMATCH"]);
+  });
+
+  it("skips unsupported and malformed items and keeps the rest", () => {
+    const skipped: MetaWebhookSkipReason[] = [];
+    const payload = fixtureStatus("delivered", "1725880000");
+    const value = payload.entry[0]!.changes[0]!.value as {
+      statuses: unknown[];
+    };
+    value.statuses.push(
+      { id: "wamid.deleted", status: "deleted", timestamp: "1725880001" },
+      { id: "wamid.no-time", status: "read" },
+      "not an item",
+    );
+
+    const events = parseMetaWebhookPayload(payload, {
+      onSkipped: (reason) => skipped.push(reason),
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({ kind: "STATUS", status: "DELIVERED" }),
+    ]);
+    expect(skipped).toEqual([
+      "UNSUPPORTED_STATUS",
+      "MALFORMED_ITEM",
+      "MALFORMED_ITEM",
+    ]);
   });
 });
 

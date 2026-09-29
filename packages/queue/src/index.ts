@@ -12,9 +12,15 @@ export const queueNames = {
   eventMaintenance: "event-maintenance",
 } as const;
 
+/**
+ * Five attempts at 5, 10, 20, then 40 seconds span about 75 seconds, which
+ * outlasts a routine managed-database or Redis failover. A shorter window
+ * exhausted every in-flight job during one, and exhaustion is what turns an
+ * outage into messages a host has to retry by hand.
+ */
 export const defaultJobOptions = {
   attempts: 5,
-  backoff: { type: "exponential", delay: 1_000 },
+  backoff: { type: "exponential", delay: 5_000 },
   removeOnComplete: { age: 24 * 60 * 60, count: 1_000 },
   removeOnFail: { age: 7 * 24 * 60 * 60, count: 5_000 },
 } satisfies JobsOptions;
@@ -144,19 +150,36 @@ export function whatsappWebhookJobId(webhookEventId: string): string {
   return `webhook-${webhookEventId}`;
 }
 
+/**
+ * A long-lived producer connection. Commands fail immediately while it is
+ * disconnected, so a request never hangs on Redis, but the connection itself
+ * keeps reconnecting: one failover or idle disconnect must not leave a process
+ * unable to enqueue until someone restarts it.
+ */
 export function createProducerRedis(
   redisUrl: string,
   connectionName: string,
 ): Redis {
   return new Redis(redisUrl, {
+    ...producerConnectionOptions(connectionName),
+    retryStrategy: producerReconnectDelay,
+  });
+}
+
+/** Capped linear backoff between producer reconnection attempts. */
+export function producerReconnectDelay(attempt: number): number {
+  return Math.min(attempt * 500, 5_000);
+}
+
+function producerConnectionOptions(connectionName: string) {
+  return {
     connectionName,
     connectTimeout: 5_000,
     enableOfflineQueue: false,
     enableReadyCheck: true,
     lazyConnect: true,
     maxRetriesPerRequest: 1,
-    retryStrategy: () => null,
-  });
+  };
 }
 
 export function createWorkerRedis(
@@ -176,7 +199,13 @@ export async function probeRedis(
   redisUrl: string,
   timeoutMilliseconds: number,
 ): Promise<boolean> {
-  const connection = createProducerRedis(redisUrl, "dawah-readiness");
+  // A probe answers for this instant only, so it must never retry.
+  const connection = new Redis(redisUrl, {
+    ...producerConnectionOptions("dawah-readiness"),
+    retryStrategy: () => null,
+  });
+  // The outcome is the return value; an unreachable server is not a log line.
+  connection.on("error", () => undefined);
   let timeout: NodeJS.Timeout | undefined;
 
   try {

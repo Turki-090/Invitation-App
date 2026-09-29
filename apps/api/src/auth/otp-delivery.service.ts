@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { createHash, createHmac } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
 import type { ApiEnvironment } from "@dawah/config";
+import { smsLoginCountry } from "@dawah/domain";
 import {
   AuthenticaError,
   AuthenticaOtpProvider,
@@ -38,6 +39,7 @@ export class OtpDeliveryService {
   private readonly hookSecret: string | undefined;
   private readonly method: "whatsapp" | "sms";
   private readonly templateId: number;
+  private readonly allowedCountries: ReadonlySet<string>;
   private readonly provider: AuthenticaOtpProvider;
 
   public constructor(
@@ -51,6 +53,18 @@ export class OtpDeliveryService {
     });
     this.method = config.get("AUTHENTICA_OTP_METHOD", { infer: true });
     this.templateId = config.get("AUTHENTICA_OTP_TEMPLATE_ID", { infer: true });
+    // Validated configuration holds a list, but ConfigService falls back to the
+    // raw comma-separated process environment for keys it was not given.
+    const allowedCountries: string[] | string | undefined = config.get(
+      "AUTHENTICA_OTP_ALLOWED_COUNTRIES",
+      { infer: true },
+    );
+    this.allowedCountries = new Set(
+      (typeof allowedCountries === "string"
+        ? allowedCountries.split(",")
+        : (allowedCountries ?? ["SA"])
+      ).map((country) => country.trim().toUpperCase()),
+    );
     this.provider = new AuthenticaOtpProvider({
       apiKey: config.get("AUTHENTICA_API_KEY", { infer: true }),
       baseUrl: config.get("AUTHENTICA_BASE_URL", { infer: true }),
@@ -103,6 +117,19 @@ export class OtpDeliveryService {
         throw error;
       this.logger.warn("auth.otp.hook_payload_rejected");
       return { httpCode: 400, message: "The hook payload is not supported." };
+    }
+
+    // Checked before the attempt is reserved or the provider contacted, so a
+    // refused destination costs neither a database write nor an SMS.
+    const country = smsLoginCountry(request.phone);
+    if (!country || !this.allowedCountries.has(country)) {
+      this.logger.warn("auth.otp.destination_refused", {
+        country: country ?? "NOT_MOBILE",
+      });
+      return {
+        httpCode: 400,
+        message: "Sign-in codes cannot be sent to this phone number.",
+      };
     }
 
     const key = createHash("sha256").update(headers.id!).digest("hex");

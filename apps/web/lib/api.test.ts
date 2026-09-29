@@ -2,6 +2,14 @@ import type { PublicInvitation, RsvpResult } from "@dawah/api-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPublicInvitation, submitPublicRsvp } from "./api";
 
+// The API base URL is read when the module loads, so pin it before the import
+// runs rather than depending on whatever the surrounding environment sets.
+const apiBaseUrl = vi.hoisted(() => {
+  const value = "https://api.dawah.test/api/v1";
+  process.env.NEXT_PUBLIC_API_URL = value;
+  return value;
+});
+
 const token = "a".repeat(43);
 const memberId = "10000000-0000-4000-8000-000000000001";
 const submissionId = "20000000-0000-4000-8000-000000000001";
@@ -25,7 +33,7 @@ describe("public invitation API helpers", () => {
     });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      `http://localhost:4000/api/v1/public/invitations/${token}?locale=en`,
+      `${apiBaseUrl}/public/invitations/${token}?locale=en`,
     );
     expect(fetchMock.mock.calls[0]?.[1]).toEqual({
       cache: "no-store",
@@ -34,7 +42,7 @@ describe("public invitation API helpers", () => {
       referrerPolicy: "no-referrer",
     });
     expect(fetchMock.mock.calls[1]?.[0]).toBe(
-      `http://localhost:4000/api/v1/public/invitations/${token}/rsvp?locale=en`,
+      `${apiBaseUrl}/public/invitations/${token}/rsvp?locale=en`,
     );
     expect(fetchMock.mock.calls[1]?.[1]).toEqual({
       body: JSON.stringify({

@@ -69,7 +69,17 @@ Run these only through approved read-only production access. Do not select
   configured phone-number ID, queue health, and provider-message correlation. A
   duplicate provider event is expected to deduplicate. A valid signed redelivery
   revives a failed webhook record and retries its retained deterministic queue
-  job. Do not edit stored webhook payload or provider IDs.
+  job. Independently, the worker's recovery sweep re-queues stored events that
+  are still received, queued, stale in processing, or failed for 15 minutes, for
+  up to 72 hours after receipt; `messaging.recovery_applied` logs each pass that
+  acted. An event still `FAILED` after that window fails deterministically and
+  needs a code or data fix, not another retry. Do not edit stored webhook
+  payload or provider IDs.
+- **Message stuck in `QUEUED` after an outage**: when a send job exhausts its
+  retries while the database is also unavailable, the "retry by hand" status
+  cannot be written at that moment. The recovery sweep replays it within a
+  minute of the database returning, so the message shows as failed and follows
+  the paths above. Nothing is resent automatically.
 - **Invitation image unavailable**: a provider-facing media `404` means the
   capability was missing, tampered, expired, or no longer matched its immutable
   snapshot. A `503` means the private object, MIME, length, size bound, or
@@ -108,8 +118,10 @@ endpoints before restoring traffic.
 
 Restore dependencies first, then allow deterministic queued jobs and bounded
 retries to resume. Re-submit only the original identical batch request with its
-same idempotency key when recovering saved or dispatch-exhausted work. Redeliver
-the original signed webhook when recovering a failed webhook job. For each
+same idempotency key when recovering saved or dispatch-exhausted work. Stored
+webhook events are re-queued by the worker's recovery sweep once dependencies
+are back; raw webhook bodies are not retained, so there is nothing to redeliver
+by hand. For each
 affected batch, reconcile message counts against its recorded `total_messages`;
 reconcile accepted attempts and webhook evidence by provider message ID, or by
 the logical callback ID for an early status that preceded provider-ID storage.
