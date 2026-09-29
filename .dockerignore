@@ -32,3 +32,7 @@ coverage
 System Design
 docs
 *.log
+
+# Local scratch output that does not belong to the application.
+tmp
+output

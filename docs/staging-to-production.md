@@ -83,6 +83,8 @@ are finalized only after the hosting choice is known.
 ## Stage 2 — Provision isolated staging
 
 Prerequisite: Stage 1 decisions. Follow [environments](operations/environments.md).
+Stages 2–3 on the chosen stack (Render, Neon, Upstash, R2) are written out
+step by step in [staging deployment on Render](operations/staging-deploy-render.md).
 
 - [ ] Provision PostgreSQL with TLS, Redis with `rediss://`, and a private
       encrypted storage bucket, with credentials isolated from production.
