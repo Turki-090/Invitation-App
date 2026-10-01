@@ -86,9 +86,9 @@
   --radius-xl: 20px;
   --radius-2xl: 28px;
   --radius-full: 999px;
-  --font-ui: 'IBM Plex Sans Arabic', 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
-  --font-display: 'Amiri', 'Cormorant Garamond', Georgia, serif;
-  --font-display-latin: 'Cormorant Garamond', 'Amiri', Georgia, serif;
+  --font-ui: 'IBM Plex Sans Arabic', 'IBM Plex Sans Variable', 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Amiri', 'Cormorant Garamond Variable', 'Cormorant Garamond', Georgia, serif;
+  --font-display-latin: 'Cormorant Garamond Variable', 'Cormorant Garamond', 'Amiri', Georgia, serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
   --text-xs: 12px;
   --text-sm: 13px;
