@@ -13,6 +13,7 @@ import {
   whatsappBatchJobId,
   whatsappMessageJobs,
   whatsappRsvpConfirmationJobs,
+  whatsappWebhookJobId,
   type ReminderJobData,
   type WhatsappSendJobData,
   type WhatsappWebhookJobData,
@@ -35,6 +36,7 @@ import {
   type ImportQueueJobData,
   type ImportQueueJobName,
 } from "./import-processor";
+import { createMessagingRecovery } from "./messaging-recovery";
 import {
   createWorkerObservability,
   instrumentMessagingProvider,
@@ -246,8 +248,8 @@ const reminderWorker = new Worker<ReminderJobData>(
     prefix: environment.QUEUE_PREFIX,
   },
 );
-const reminderSchedulerRegistration = reminderQueue
-  .upsertJobScheduler(
+const registerReminderScheduler = async (): Promise<void> => {
+  await reminderQueue.upsertJobScheduler(
     reminderSweepSchedulerId,
     { every: REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS },
     {
@@ -255,29 +257,48 @@ const reminderSchedulerRegistration = reminderQueue
       data: reminderSweepJobData(),
       opts: defaultJobOptions,
     },
-  )
-  .then(async () => {
-    const evaluationSlot = Math.floor(
-      Date.now() / REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS,
-    );
-    const startupSweep = await reminderQueue.add(
-      "sweep",
-      reminderSweepJobData(),
-      {
-        ...defaultJobOptions,
-        jobId: `reminder-startup-sweep-${evaluationSlot}`,
-      },
-    );
-    await retryFailedJob(startupSweep);
-    return true;
-  })
-  .catch((error: unknown) => {
-    logger.error("reminders.scheduler_registration_failed", { error });
-    errorReporter.captureException(error, {
-      transaction: "reminders/scheduler-registration",
-    });
-    return false;
-  });
+  );
+  const evaluationSlot = Math.floor(
+    Date.now() / REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS,
+  );
+  const startupSweep = await reminderQueue.add(
+    "sweep",
+    reminderSweepJobData(),
+    {
+      ...defaultJobOptions,
+      jobId: `reminder-startup-sweep-${evaluationSlot}`,
+    },
+  );
+  await retryFailedJob(startupSweep);
+};
+
+/**
+ * Registration keeps retrying rather than failing once: readiness waits on it,
+ * and a worker that booted while Redis was briefly unreachable would otherwise
+ * stay unready until someone restarted it.
+ */
+const reminderSchedulerRegistration = (async (): Promise<boolean> => {
+  for (let attempt = 1; !reminderQueue.closing; attempt += 1) {
+    try {
+      await registerReminderScheduler();
+      return true;
+    } catch (error: unknown) {
+      logger.error("reminders.scheduler_registration_failed", {
+        error,
+        attempt,
+      });
+      if (attempt === 1) {
+        errorReporter.captureException(error, {
+          transaction: "reminders/scheduler-registration",
+        });
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.min(attempt * 1_000, 30_000)).unref(),
+      );
+    }
+  }
+  return false;
+})();
 
 let confirmationSweepRunning = false;
 const sweepRsvpConfirmations = async (): Promise<void> => {
@@ -318,6 +339,52 @@ const confirmationSweepTimer = setInterval(() => {
 confirmationSweepTimer.unref();
 void sweepRsvpConfirmations().catch(() => undefined);
 
+const webhookQueue = new Queue<WhatsappWebhookJobData>(
+  queueNames.whatsappWebhook,
+  {
+    connection: producerRedis,
+    prefix: environment.QUEUE_PREFIX,
+    defaultJobOptions,
+  },
+);
+const messagingRecovery = createMessagingRecovery({
+  listFailedSendJobs: (start, end) => sendQueue.getFailed(start, end),
+  recordExhaustedSendJob: (job, exhaustedAt) =>
+    messagingRepository.recordExhaustedSendJob(job, exhaustedAt),
+  requeueStalledWebhooks: (now) =>
+    messagingRepository.requeueStalledWebhooks(now),
+  addWebhookJobs: (webhookEventIds) =>
+    webhookQueue.addBulk(
+      webhookEventIds.map((webhookEventId) => ({
+        name: "process",
+        data: { webhookEventId },
+        opts: { jobId: whatsappWebhookJobId(webhookEventId) },
+      })),
+    ),
+});
+let recoverySweepRunning = false;
+const sweepStrandedMessaging = async (): Promise<void> => {
+  if (recoverySweepRunning) return;
+  recoverySweepRunning = true;
+  try {
+    const [webhooks, exhaustedSends] = await Promise.all([
+      messagingRecovery.recoverWebhooks(),
+      messagingRecovery.reconcileExhaustedSends(),
+    ]);
+    if (webhooks > 0 || exhaustedSends > 0) {
+      logger.warn("messaging.recovery_applied", { webhooks, exhaustedSends });
+    }
+  } finally {
+    recoverySweepRunning = false;
+  }
+};
+const recoverySweepTimer = setInterval(() => {
+  void sweepStrandedMessaging().catch((error: unknown) => {
+    logger.error("messaging.recovery_sweep_failed", { error });
+  });
+}, 60_000);
+recoverySweepTimer.unref();
+
 // Queue connection errors are reported once per worker rather than per job:
 // they mean Redis is unreachable, which readiness already fails on.
 for (const [queue, worker] of [
@@ -340,8 +407,12 @@ whatsappSendWorker.on("failed", (job) => {
   const exhaustedAt = new Date(job.finishedOn ?? Date.now());
   void messagingRepository
     .recordExhaustedSendJob(job.data, exhaustedAt)
+    .then(() => {
+      if (job.id) messagingRecovery.markReconciled(job.id);
+    })
     .catch((error: unknown) => {
-      // The message stays queued in the database if this write is lost, so the
+      // The message stays queued in the database if this write is lost. The
+      // recovery sweep replays it once the database is back; until then the
       // failure has to be visible as its own incident, not only as a job retry.
       logger.error("messaging.exhausted_job_persistence_failed", {
         jobId: job.id,
@@ -534,6 +605,7 @@ const shutdown = async (signal: string): Promise<void> => {
   if (shuttingDown) return;
   shuttingDown = true;
   clearInterval(confirmationSweepTimer);
+  clearInterval(recoverySweepTimer);
   logger.info("worker.shutdown_started", { signal });
 
   server.closeIdleConnections();
@@ -547,6 +619,7 @@ const shutdown = async (signal: string): Promise<void> => {
     reminderWorker.close(),
     sendQueue.close(),
     reminderQueue.close(),
+    webhookQueue.close(),
     ...inspectedQueues.map((queue) => queue.close()),
     errorReporter.flush(2_000),
     prisma.$disconnect(),
@@ -567,6 +640,7 @@ const shutdown = async (signal: string): Promise<void> => {
       reminderWorker.close(true),
       sendQueue.close(),
       reminderQueue.close(),
+      webhookQueue.close(),
       ...inspectedQueues.map((queue) => queue.close()),
     ]);
     await prisma.$disconnect().catch(() => undefined);

@@ -1,4 +1,5 @@
 import { DEVELOPMENT_ACCESS_TOKEN } from "@dawah/api-contract";
+import { normalizeIdentityPhone } from "@dawah/domain";
 import {
   Inject,
   Injectable,
@@ -60,10 +61,15 @@ export class AuthService {
         issuer: this.issuer,
       });
       if (!payload.sub) throw new Error("Token subject is missing.");
+      // Supabase signs the phone as bare digits and an empty email for
+      // phone-only identities; team invitations and user rows hold E.164.
+      const phone = normalizeIdentityPhone(payload.phone);
       return {
         subject: payload.sub,
-        ...(typeof payload.email === "string" ? { email: payload.email } : {}),
-        ...(typeof payload.phone === "string" ? { phone: payload.phone } : {}),
+        ...(typeof payload.email === "string" && payload.email !== ""
+          ? { email: payload.email }
+          : {}),
+        ...(phone ? { phone } : {}),
       };
     } catch {
       throw this.invalidTokenError();

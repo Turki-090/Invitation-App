@@ -48,6 +48,9 @@ const en = {
     sendFailed:
       "The verification code could not be sent. Check the number and try again.",
     invalidCode: "The verification code is incorrect or has expired.",
+    captchaRequired: "Complete the security check, then request the code.",
+    captchaUnavailable:
+      "The security check could not load. Refresh the page and try again.",
     developmentTitle: "Local test environment",
     developmentNote:
       "Temporary mobile verification bypass. It cannot run in production.",

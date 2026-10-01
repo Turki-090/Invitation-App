@@ -13,8 +13,11 @@ import {
   MetaWebhookPayloadError,
   parseMetaWebhookPayload,
   verifyMetaWebhookSignature,
+  type MetaWebhookSkipReason,
 } from "@dawah/messaging";
+import type { Logger } from "@dawah/observability";
 import { Prisma } from "@prisma/client";
+import { LOGGER } from "../observability/observability.tokens";
 import { PrismaService } from "../prisma/prisma.service";
 import { sha256 } from "../preparation/invitation-source-hash";
 import { MessagingQueueService } from "./messaging-queue.service";
@@ -31,6 +34,7 @@ export class WhatsappWebhookService {
     private readonly queue: MessagingQueueService,
     @Inject(ConfigService)
     config: ConfigService<ApiEnvironment, true>,
+    @Inject(LOGGER) private readonly logger: Logger,
   ) {
     this.appSecret = config.get("META_WHATSAPP_APP_SECRET", { infer: true });
     this.verifyToken = config.get("META_WHATSAPP_WEBHOOK_VERIFY_TOKEN", {
@@ -75,9 +79,12 @@ export class WhatsappWebhookService {
       });
     }
     let events;
+    const skipped = new Map<MetaWebhookSkipReason, number>();
     try {
       events = parseMetaWebhookPayload(payload, {
         phoneNumberId: this.phoneNumberId,
+        onSkipped: (reason) =>
+          skipped.set(reason, (skipped.get(reason) ?? 0) + 1),
       });
     } catch (error) {
       if (error instanceof MetaWebhookPayloadError) {
@@ -87,6 +94,14 @@ export class WhatsappWebhookService {
         });
       }
       throw error;
+    }
+    if (skipped.size > 0) {
+      // Still acknowledged: a rejection would make Meta redeliver the whole
+      // POST for days, including the items beside these that did parse.
+      this.logger.warn("whatsapp.webhook.items_skipped", {
+        skipped: Object.fromEntries(skipped),
+        acceptedItems: events.length,
+      });
     }
     if (events.length === 0) {
       return { accepted: true, queuedEvents: 0, duplicateEvents: 0 };

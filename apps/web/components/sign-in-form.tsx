@@ -4,14 +4,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button, Field, Input } from "@dawah/ui";
 import { normalizeLoginPhone } from "@dawah/domain";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { developmentAuthBypassEnabled } from "@/lib/api";
-import { getSupabaseClient } from "@/lib/supabase";
-import type { AppLocale } from "@/i18n/config";
-import type { Dictionary } from "@/i18n/dictionaries";
-import { safeRelativeRedirect } from "@/lib/redirect";
+import { developmentAuthBypassEnabled } from "../lib/api";
+import { getSupabaseClient } from "../lib/supabase";
+import type { AppLocale } from "../i18n/config";
+import type { Dictionary } from "../i18n/dictionaries";
+import { safeRelativeRedirect } from "../lib/redirect";
+import { Turnstile } from "./turnstile";
 
 interface SignInFormProps {
   locale: AppLocale;
@@ -24,6 +25,10 @@ export function SignInForm({ locale, copy, redirectTo }: SignInFormProps) {
   const destination = safeRelativeRedirect(redirectTo, locale);
   const [phone, setPhone] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+  // Set only once Supabase CAPTCHA protection is enabled with the same key.
+  const captchaSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaGeneration, setCaptchaGeneration] = useState(0);
   const phoneSchema = z.object({
     phone: z
       .string()
@@ -62,10 +67,22 @@ export function SignInForm({ locale, copy, redirectTo }: SignInFormProps) {
         setServerError(copy.providerMissing);
         return;
       }
+      if (captchaSiteKey && !captchaToken) {
+        setServerError(copy.captchaRequired);
+        return;
+      }
       const { error } = await supabase.auth.signInWithOtp({
         phone: normalizeLoginPhone(submittedPhone),
-        options: { shouldCreateUser: true },
+        options: {
+          shouldCreateUser: true,
+          ...(captchaToken ? { captchaToken } : {}),
+        },
       });
+      if (captchaSiteKey) {
+        // A token is spent by one request, successful or not.
+        setCaptchaToken(null);
+        setCaptchaGeneration((generation) => generation + 1);
+      }
       if (error) {
         setServerError(copy.sendFailed);
         return;
@@ -177,6 +194,15 @@ export function SignInForm({ locale, copy, redirectTo }: SignInFormProps) {
           invalid={Boolean(phoneForm.formState.errors.phone)}
         />
       </Field>
+      {captchaSiteKey ? (
+        <Turnstile
+          key={captchaGeneration}
+          language={locale === "ar-SA" ? "ar" : "en"}
+          onToken={setCaptchaToken}
+          onUnavailable={() => setServerError(copy.captchaUnavailable)}
+          siteKey={captchaSiteKey}
+        />
+      ) : null}
       {serverError ? (
         <p className="form-error" role="alert">
           {serverError}

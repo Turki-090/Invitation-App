@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { once } from "node:events";
+import { createServer, type AddressInfo, type Socket } from "node:net";
+import { afterEach, describe, expect, it } from "vitest";
 import {
+  createProducerRedis,
   defaultJobOptions,
   exportJobId,
+  probeRedis,
+  producerReconnectDelay,
   reminderRunJobId,
   reminderRunJobs,
   reminderSweepJobData,
@@ -90,3 +95,106 @@ describe("WhatsApp queue identifiers", () => {
     ]);
   });
 });
+
+describe("Redis connections", () => {
+  let server: FakeRedisServer | undefined;
+
+  afterEach(async () => {
+    await server?.close();
+    server = undefined;
+  });
+
+  it("reconnects a producer after the server drops the connection", async () => {
+    server = await startFakeRedis();
+    const client = createProducerRedis(server.url, "dawah-test-producer");
+    try {
+      await client.connect();
+      await expect(client.ping()).resolves.toBe("PONG");
+
+      const reconnected = once(client, "ready");
+      server.dropConnections();
+      await reconnected;
+
+      await expect(client.ping()).resolves.toBe("PONG");
+    } finally {
+      client.disconnect(false);
+    }
+  });
+
+  it("backs off between producer reconnects without ever giving up", () => {
+    expect(producerReconnectDelay(1)).toBe(500);
+    expect(producerReconnectDelay(4)).toBe(2_000);
+    expect(producerReconnectDelay(1_000)).toBe(5_000);
+  });
+
+  it("reports readiness from a one-shot probe", async () => {
+    server = await startFakeRedis();
+    await expect(probeRedis(server.url, 2_000)).resolves.toBe(true);
+
+    const url = server.url;
+    await server.close();
+    server = undefined;
+    await expect(probeRedis(url, 2_000)).resolves.toBe(false);
+  });
+});
+
+interface FakeRedisServer {
+  url: string;
+  dropConnections(): void;
+  close(): Promise<void>;
+}
+
+/** Just enough RESP for ioredis to connect, run its ready check, and PING. */
+async function startFakeRedis(): Promise<FakeRedisServer> {
+  const sockets = new Set<Socket>();
+  const server = createServer((socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
+    socket.on("error", () => undefined);
+    let buffered = "";
+    socket.on("data", (chunk) => {
+      buffered += chunk.toString("utf8");
+      for (;;) {
+        const parsed = parseRespCommand(buffered);
+        if (!parsed) return;
+        buffered = buffered.slice(parsed.length);
+        const name = parsed.command[0]?.toUpperCase();
+        if (name === "PING") socket.write("+PONG\r\n");
+        else if (name === "INFO") socket.write("$0\r\n\r\n");
+        else socket.write("+OK\r\n");
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  return {
+    url: `redis://127.0.0.1:${port}`,
+    dropConnections: () => {
+      for (const socket of sockets) socket.destroy();
+    },
+    close: () =>
+      new Promise<void>((resolve) => {
+        for (const socket of sockets) socket.destroy();
+        server.close(() => resolve());
+      }),
+  };
+}
+
+function parseRespCommand(
+  input: string,
+): { command: string[]; length: number } | null {
+  const header = /^\*(\d+)\r\n/.exec(input);
+  if (!header) return null;
+  let offset = header[0].length;
+  const command: string[] = [];
+  for (let index = 0; index < Number(header[1]); index += 1) {
+    const bulk = /^\$(\d+)\r\n/.exec(input.slice(offset));
+    if (!bulk) return null;
+    const start = offset + bulk[0].length;
+    const end = start + Number(bulk[1]);
+    if (input.length < end + 2) return null;
+    command.push(input.slice(start, end));
+    offset = end + 2;
+  }
+  return { command, length: offset };
+}

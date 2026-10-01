@@ -30,6 +30,12 @@ overrides:
   js-yaml: "^4.3.2"
   # Stack exhaustion on recursive graphs; reached through the Prisma CLI config.
   deepmerge-ts: "^8.0.0"
+  # GHSA-qhr7-859c-m2p7 and GHSA-6j4f-fj2g-mc7p: stack exhaustion on nested
+  # brace groups; reached through minimatch in the worker's spreadsheet
+  # dependencies and the OpenAPI tooling. One pin per major line in use.
+  "brace-expansion@<1.1.20": "1.1.20"
+  "brace-expansion@>=2.0.0 <2.1.6": "2.1.6"
+  "brace-expansion@>=5.0.0 <5.0.11": "5.0.11"
 
 minimumReleaseAgeExclude:
   - "@redocly/cli@2.51.2"

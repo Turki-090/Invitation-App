@@ -21,21 +21,53 @@ The implementation continues forwarding Supabase's numeric-string `otp`, preserv
 
 Use deployment secret management. Never paste credentials into task messages, source files or logs.
 
-| Setting                         | Required value                                               |
-| ------------------------------- | ------------------------------------------------------------ |
-| `SUPABASE_URL`                  | Real project URL on API                                      |
-| `NEXT_PUBLIC_SUPABASE_URL`      | Same project URL on web                                      |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Project public anon key, never service-role key              |
-| `SUPABASE_SEND_SMS_HOOK_SECRET` | Dashboard-issued `v1,whsec_<base64>` on API                  |
-| `AUTHENTICA_OTP_ENABLED`        | `true`                                                       |
-| `AUTHENTICA_API_KEY`            | Active application key on API                                |
-| `AUTHENTICA_BASE_URL`           | `https://api.authentica.sa/api/v2`                           |
-| `AUTHENTICA_OTP_METHOD`         | `sms`                                                        |
-| `AUTHENTICA_OTP_TEMPLATE_ID`    | Approved SMS template; default 1 does not prove approval     |
-| `AUTHENTICA_REQUEST_TIMEOUT_MS` | `2500`, maximum `3000`                                       |
-| Database                        | Apply migration `20260919100000_otp_delivery_attempts` first |
+| Setting                            | Required value                                               |
+| ---------------------------------- | ------------------------------------------------------------ |
+| `SUPABASE_URL`                     | Real project URL on API                                      |
+| `NEXT_PUBLIC_SUPABASE_URL`         | Same project URL on web                                      |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`    | Project public anon key, never service-role key              |
+| `SUPABASE_SEND_SMS_HOOK_SECRET`    | Dashboard-issued `v1,whsec_<base64>` on API                  |
+| `AUTHENTICA_OTP_ENABLED`           | `true`                                                       |
+| `AUTHENTICA_API_KEY`               | Active application key on API                                |
+| `AUTHENTICA_BASE_URL`              | `https://api.authentica.sa/api/v2`                           |
+| `AUTHENTICA_OTP_METHOD`            | `sms`                                                        |
+| `AUTHENTICA_OTP_TEMPLATE_ID`       | Approved SMS template; default 1 does not prove approval     |
+| `AUTHENTICA_REQUEST_TIMEOUT_MS`    | `2500`, maximum `3000`                                       |
+| `AUTHENTICA_OTP_ALLOWED_COUNTRIES` | `SA`; add ISO codes only for launched markets                |
+| Database                           | Apply migration `20260919100000_otp_delivery_attempts` first |
 
 In Supabase enable Phone Auth, six-digit OTPs (matching the UI), expiration, resend cooldown and verification rate limits. Set the HTTPS hook URL to `https://<api-host>/api/v1/webhooks/supabase-otp`. Remove test-phone/static-code overrides. Use an asymmetric JWT signing key published in JWKS: this API does not support legacy HS256 verification. Disable both development auth bypass flags. Verify TLS, DNS, public ingress from Supabase, synchronized clocks, provider balance and sender/template activation. Configure edge volume controls above normal Supabase traffic.
+
+Anyone holding the public anon key can ask Supabase to send a code to any
+number, so the hook, not the web form, bounds SMS spend. It refuses numbers
+outside `AUTHENTICA_OTP_ALLOWED_COUNTRIES` and every non-mobile type
+(premium-rate, shared-cost, fixed-line) before reserving an attempt or calling
+Authentica, and logs `auth.otp.destination_refused` with the country only. A
+spike in that event is an SMS-pumping attempt. Keep the list to launched
+markets, and also enable Supabase CAPTCHA protection (see
+[CAPTCHA](#captcha)) so volume against allowed numbers is bounded too.
+
+## CAPTCHA
+
+Enable this before any public launch. With it on, Supabase refuses a code
+request unless it carries a fresh Cloudflare Turnstile token, so a script
+holding the anon key cannot request codes in bulk.
+
+1. Create a Turnstile widget in Cloudflare for the exact web hostnames of the
+   environment (managed mode). Use separate widgets for staging and production.
+2. In Supabase, open Authentication → Attack Protection, enable CAPTCHA
+   protection, choose Turnstile, and paste the widget's **secret** key.
+3. Set the widget's **site** key as `NEXT_PUBLIC_TURNSTILE_SITE_KEY` on the web
+   build. It is inlined at build time, so rebuild and redeploy the web app. The
+   content security policy admits `https://challenges.cloudflare.com` only when
+   this key is set.
+4. Deploy the web build before, or together with, the Supabase switch: with
+   CAPTCHA enabled in Supabase and no site key in the web build, every code
+   request is refused.
+
+The sign-in form sends each token once. It asks for a new challenge after
+every request, whether or not it succeeded. Code verification carries no token.
+The live acceptance below must confirm that sign-in completes with CAPTCHA on.
 
 ## Live end-to-end acceptance
 

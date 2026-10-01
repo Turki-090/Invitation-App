@@ -15,7 +15,7 @@ const safeProductionStorageEnvironment = {
 };
 
 const safeProductionDatabaseUrl =
-  "postgresql://service:secret@db.dawah.sa/dawah?sslmode=verify-full";
+  "postgresql://service:secret@db.dawah.sa/dawah?sslmode=require&sslaccept=strict";
 
 const safeProductionApiEnvironment = {
   NODE_ENV: "production",
@@ -91,6 +91,59 @@ describe("environment validation", () => {
       ASSET_MAX_IMAGE_PIXELS: 24_000_000,
       EXPORT_RETENTION_HOURS: 168,
     });
+  });
+
+  it.each([
+    [
+      "sslmode=verify-full&sslaccept=strict",
+      /does not support sslmode=verify-full/,
+    ],
+    [
+      "sslmode=verify-ca&sslaccept=strict",
+      /does not support sslmode=verify-ca/,
+    ],
+    ["sslmode=prefer&sslaccept=strict", /sslmode=require/],
+    ["sslaccept=strict", /sslmode=require/],
+    ["sslmode=require", /sslaccept=strict/],
+    ["sslmode=require&sslaccept=accept_invalid_certs", /sslaccept=strict/],
+  ])(
+    "refuses deployed PostgreSQL TLS settings Prisma would not enforce: %s",
+    (query, message) => {
+      const DATABASE_URL = `postgresql://service:secret@db.dawah.sa/dawah?${query}`;
+      expect(() =>
+        validateApiEnvironment({
+          ...safeProductionApiEnvironment,
+          DATABASE_URL,
+        }),
+      ).toThrow(message);
+      expect(() =>
+        validateWorkerEnvironment({
+          ...safeProductionWorkerEnvironment,
+          DATABASE_URL,
+        }),
+      ).toThrow(message);
+    },
+  );
+
+  it("parses the sign-in code country allow-list and defaults to Saudi Arabia", () => {
+    expect(
+      validateApiEnvironment(safeProductionApiEnvironment)
+        .AUTHENTICA_OTP_ALLOWED_COUNTRIES,
+    ).toEqual(["SA"]);
+    expect(
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        AUTHENTICA_OTP_ALLOWED_COUNTRIES: " sa, ae ,KW",
+      }).AUTHENTICA_OTP_ALLOWED_COUNTRIES,
+    ).toEqual(["SA", "AE", "KW"]);
+    for (const invalid of ["", "SAU", "SA,*"]) {
+      expect(() =>
+        validateApiEnvironment({
+          ...safeProductionApiEnvironment,
+          AUTHENTICA_OTP_ALLOWED_COUNTRIES: invalid,
+        }),
+      ).toThrow(/AUTHENTICA_OTP_ALLOWED_COUNTRIES/);
+    }
   });
 
   it("allows path-style HTTP object storage in local and test environments", () => {

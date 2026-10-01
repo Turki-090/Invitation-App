@@ -960,6 +960,71 @@ export class PrismaMessagingRepository
     });
   }
 
+  /**
+   * Marks stored webhook events that no job is going to finish as queued again
+   * and returns them for re-enqueueing. Meta stops redelivering once it has had
+   * a 200, so after BullMQ's own retries are spent this is the only path by
+   * which a guest's reply still gets applied. Re-processing is safe: a claim
+   * skips processed events and application is ordered by ingestion sequence.
+   */
+  public async requeueStalledWebhooks(
+    now = new Date(),
+    limit = 500,
+  ): Promise<readonly string[]> {
+    const stalledBefore = new Date(now.getTime() - 5 * 60_000);
+    const failedBefore = new Date(now.getTime() - 15 * 60_000);
+    const where = {
+      provider: "META_WHATSAPP",
+      // Bounded so an event that fails deterministically stops retrying and
+      // is left, still FAILED, for an operator.
+      receivedAt: { gte: new Date(now.getTime() - 72 * 3_600_000) },
+      OR: [
+        {
+          status: { in: ["RECEIVED", "QUEUED"] },
+          queuedAt: null,
+          receivedAt: { lte: stalledBefore },
+        },
+        {
+          status: { in: ["RECEIVED", "QUEUED"] },
+          queuedAt: { lte: stalledBefore },
+        },
+        { status: "FAILED", processedAt: { lte: failedBefore } },
+        {
+          status: "FAILED",
+          processedAt: null,
+          receivedAt: { lte: failedBefore },
+        },
+        { status: "PROCESSING", processingStartedAt: { lte: stalledBefore } },
+        {
+          status: "PROCESSING",
+          processingStartedAt: null,
+          receivedAt: { lte: stalledBefore },
+        },
+      ],
+    } satisfies Prisma.WebhookEventWhereInput;
+    const stalled = await this.prisma.webhookEvent.findMany({
+      where,
+      select: { id: true },
+      orderBy: { ingestionSequence: "asc" },
+      take: Math.max(1, Math.min(limit, 500)),
+    });
+    if (stalled.length === 0) return [];
+    const ids = stalled.map(({ id }) => id);
+    // The predicate is repeated so an event a live job claimed in between is
+    // left alone; its id is still returned, and re-enqueueing it is a no-op.
+    await this.prisma.webhookEvent.updateMany({
+      where: { AND: [where, { id: { in: ids } }] },
+      data: {
+        status: "QUEUED",
+        queuedAt: now,
+        processingStartedAt: null,
+        processedAt: null,
+        processingError: null,
+      },
+    });
+    return ids;
+  }
+
   private mediaHeader(snapshot: {
     readonly id: string;
     readonly assetId: string | null;

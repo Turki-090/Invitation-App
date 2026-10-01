@@ -11,20 +11,29 @@ weaken a security control.
 A staging or production service fails to boot — loudly, before serving a single
 request — if any of the following is true:
 
-| Rejected                                                                  | Why                                                             |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `NODE_ENV` is not `production`                                            | Development behaviour in a deployed environment.                |
-| A loopback or local database host, or the documented local credentials    | A deployed service pointed at a developer's database.           |
-| PostgreSQL without an explicit `sslmode` of require/verify-ca/verify-full | Unencrypted database traffic.                                   |
-| Redis that is not a remote `rediss://` endpoint                           | Unencrypted queue traffic.                                      |
-| Non-HTTPS or placeholder storage, Supabase, media, or Sentry URLs         | Plaintext transport or an unconfigured dependency.              |
-| Placeholder or `dawah-local-` / `dawah-test-` prefixed secrets            | A shipped example value used as a real credential.              |
-| A CORS origin that is not an explicit remote HTTPS origin                 | A browser origin that cannot be trusted.                        |
-| Either development authentication bypass flag                             | The bypass is local-only and is the highest-value control here. |
-| A Meta phone-number id that is still all zeros                            | The inert local placeholder.                                    |
-| `LOG_FORMAT` other than `json`, or `LOG_LEVEL` of `debug`                 | Unparseable or over-verbose deployed diagnostics.               |
-| `METRICS_ENABLED` without a non-placeholder token of 32+ characters       | An unauthenticated metrics endpoint.                            |
-| `PAYMENTS_ENABLED` without `BILLING_ENABLED`                              | Payment activation without the accounting it depends on.        |
+| Rejected                                                               | Why                                                             |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `NODE_ENV` is not `production`                                         | Development behaviour in a deployed environment.                |
+| A loopback or local database host, or the documented local credentials | A deployed service pointed at a developer's database.           |
+| PostgreSQL without both `sslmode=require` and `sslaccept=strict`       | Unencrypted, or unverified, database traffic. See below.        |
+| Redis that is not a remote `rediss://` endpoint                        | Unencrypted queue traffic.                                      |
+| Non-HTTPS or placeholder storage, Supabase, media, or Sentry URLs      | Plaintext transport or an unconfigured dependency.              |
+| Placeholder or `dawah-local-` / `dawah-test-` prefixed secrets         | A shipped example value used as a real credential.              |
+| A CORS origin that is not an explicit remote HTTPS origin              | A browser origin that cannot be trusted.                        |
+| Either development authentication bypass flag                          | The bypass is local-only and is the highest-value control here. |
+| A Meta phone-number id that is still all zeros                         | The inert local placeholder.                                    |
+| `LOG_FORMAT` other than `json`, or `LOG_LEVEL` of `debug`              | Unparseable or over-verbose deployed diagnostics.               |
+| `METRICS_ENABLED` without a non-placeholder token of 32+ characters    | An unauthenticated metrics endpoint.                            |
+| `PAYMENTS_ENABLED` without `BILLING_ENABLED`                           | Payment activation without the accounting it depends on.        |
+
+Prisma's engine understands only `sslmode` values `disable`, `prefer`, and
+`require`; it silently treats `verify-ca` and `verify-full` as `prefer`,
+which can fall back to plaintext and never checks the certificate. Certificate
+verification is the separate `sslaccept` parameter, whose default accepts any
+certificate. A deployed `DATABASE_URL` therefore ends in
+`?sslmode=require&sslaccept=strict`. When the provider signs with a CA that is
+not publicly trusted, add `&sslcert=<absolute path to that CA bundle>` and ship
+the bundle with the deployment rather than relaxing `sslaccept`.
 
 Configuration is therefore not a checklist item that can be forgotten. The
 checklist below covers what validation _cannot_ see: the infrastructure itself.

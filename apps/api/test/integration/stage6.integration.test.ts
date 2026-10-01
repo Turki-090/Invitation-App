@@ -5,6 +5,7 @@ import {
   type MessagingProvider,
   type MessagingTemplateSendInput,
 } from "@dawah/messaging";
+import { createLogger } from "@dawah/observability";
 import {
   createProducerRedis,
   queueNames,
@@ -278,6 +279,7 @@ describe("Stage 6 PostgreSQL messaging integration", () => {
       prismaService,
       queues.service,
       configFixture(),
+      createLogger({ service: "api", environment: "test", write: () => {} }),
     );
     const processWebhook = createWhatsappWebhookProcessor(repository);
     const earlyWebhookMessageId = dispatchedMessageIds[2]!;

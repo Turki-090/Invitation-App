@@ -28,8 +28,17 @@ export interface MetaResponseWebhookEvent {
 export type MetaWebhookEvent =
   MetaStatusWebhookEvent | MetaResponseWebhookEvent;
 
+/**
+ * Why one item of an otherwise valid delivery was not turned into an event.
+ * Values are bounded so they can be logged and counted without payload data.
+ */
+export type MetaWebhookSkipReason =
+  "PHONE_NUMBER_MISMATCH" | "UNSUPPORTED_STATUS" | "MALFORMED_ITEM";
+
 export interface MetaWebhookParseOptions {
   readonly phoneNumberId?: string;
+  /** Called once per skipped change or item. */
+  readonly onSkipped?: (reason: MetaWebhookSkipReason) => void;
 }
 
 export class MetaWebhookPayloadError extends Error {
@@ -55,6 +64,12 @@ export function verifyMetaWebhookSignature(
   );
 }
 
+/**
+ * Only a payload that is not a WhatsApp delivery at all is rejected. Meta
+ * batches unrelated items into one signed POST and retries a rejected POST for
+ * days, so one item from another phone number on the same app, or a status
+ * this platform does not model, must not take the guest replies beside it down.
+ */
 export function parseMetaWebhookPayload(
   payload: unknown,
   options: MetaWebhookParseOptions = {},
@@ -64,10 +79,30 @@ export function parseMetaWebhookPayload(
   }
   if (!Array.isArray(payload.entry)) throw new MetaWebhookPayloadError();
 
+  const skip = (reason: MetaWebhookSkipReason): void =>
+    options.onSkipped?.(reason);
+  const collect = (
+    items: unknown,
+    parse: (value: unknown) => MetaWebhookEvent,
+    result: MetaWebhookEvent[],
+  ): void => {
+    if (items === undefined) return;
+    if (!Array.isArray(items)) return skip("MALFORMED_ITEM");
+    for (const value of items) {
+      try {
+        result.push(parse(value));
+      } catch (error) {
+        if (!(error instanceof MetaWebhookItemError)) throw error;
+        skip(error.reason);
+      }
+    }
+  };
+
   const result: MetaWebhookEvent[] = [];
   for (const entry of payload.entry) {
     if (!isRecord(entry) || !Array.isArray(entry.changes)) {
-      throw new MetaWebhookPayloadError();
+      skip("MALFORMED_ITEM");
+      continue;
     }
     for (const change of entry.changes) {
       if (
@@ -83,28 +118,27 @@ export function parseMetaWebhookPayload(
           !isRecord(metadata) ||
           metadata.phone_number_id !== options.phoneNumberId
         ) {
-          throw new MetaWebhookPayloadError();
+          skip("PHONE_NUMBER_MISMATCH");
+          continue;
         }
       }
-      const statuses = change.value.statuses;
-      if (statuses !== undefined && !Array.isArray(statuses)) {
-        throw new MetaWebhookPayloadError();
-      }
-      for (const value of statuses ?? []) result.push(parseStatus(value));
-
-      const messages = change.value.messages;
-      if (messages !== undefined && !Array.isArray(messages)) {
-        throw new MetaWebhookPayloadError();
-      }
-      for (const value of messages ?? []) result.push(parseResponse(value));
+      collect(change.value.statuses, parseStatus, result);
+      collect(change.value.messages, parseResponse, result);
     }
   }
   return result;
 }
 
+class MetaWebhookItemError extends Error {
+  public constructor(public readonly reason: MetaWebhookSkipReason) {
+    super("A Meta webhook item was skipped.");
+    this.name = "MetaWebhookItemError";
+  }
+}
+
 function parseStatus(value: unknown): MetaStatusWebhookEvent {
   if (!isRecord(value) || typeof value.id !== "string") {
-    throw new MetaWebhookPayloadError();
+    throw new MetaWebhookItemError("MALFORMED_ITEM");
   }
   const status = normalizeStatus(value.status);
   const occurredAt = parseTimestamp(value.timestamp);
@@ -140,7 +174,7 @@ function parseStatus(value: unknown): MetaStatusWebhookEvent {
 
 function parseResponse(value: unknown): MetaResponseWebhookEvent {
   if (!isRecord(value) || typeof value.id !== "string") {
-    throw new MetaWebhookPayloadError();
+    throw new MetaWebhookItemError("MALFORMED_ITEM");
   }
   const contextProviderMessageId =
     isRecord(value.context) && typeof value.context.id === "string"
@@ -180,15 +214,17 @@ function normalizeStatus(value: unknown): MetaStatusWebhookEvent["status"] {
   if (value === "delivered") return "DELIVERED";
   if (value === "read") return "READ";
   if (value === "failed") return "FAILED";
-  throw new MetaWebhookPayloadError();
+  throw new MetaWebhookItemError("UNSUPPORTED_STATUS");
 }
 
 function parseTimestamp(value: unknown): Date {
   if (typeof value !== "string" || !/^\d+$/.test(value)) {
-    throw new MetaWebhookPayloadError();
+    throw new MetaWebhookItemError("MALFORMED_ITEM");
   }
   const date = new Date(Number(value) * 1_000);
-  if (Number.isNaN(date.getTime())) throw new MetaWebhookPayloadError();
+  if (Number.isNaN(date.getTime())) {
+    throw new MetaWebhookItemError("MALFORMED_ITEM");
+  }
   return date;
 }
 

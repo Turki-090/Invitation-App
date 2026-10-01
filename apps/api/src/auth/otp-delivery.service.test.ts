@@ -219,6 +219,62 @@ describe("OtpDeliveryService", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["a mobile number outside the allowed countries", "971501234567", {}],
+    [
+      "a premium-rate number in an allowed country",
+      "449098790000",
+      { AUTHENTICA_OTP_ALLOWED_COUNTRIES: ["SA", "GB"] },
+    ],
+  ])(
+    "refuses %s before reserving an attempt or contacting the provider",
+    async (_case, phone, overrides) => {
+      const fetch = stubAuthentica(accepted());
+      const store = memoryStore();
+      const request = signedRequest({
+        user: { phone },
+        sms: { otp: "123456" },
+      });
+
+      await expect(
+        service(overrides, store).deliver(
+          request.rawBody,
+          request.headers,
+          request.payload,
+        ),
+      ).resolves.toMatchObject({ httpCode: 400 });
+      expect(store.claim).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledWith(
+        "auth.otp.destination_refused",
+        expect.any(Object),
+      );
+    },
+  );
+
+  it.each([
+    ["a validated list", ["SA", "AE"]],
+    ["the raw comma-separated environment value", "sa, ae"],
+  ])(
+    "delivers to another country once it is explicitly allowed as %s",
+    async (_form, allowed) => {
+      const fetch = stubAuthentica(accepted());
+      const request = signedRequest({
+        user: { phone: "971501234567" },
+        sms: { otp: "123456" },
+      });
+
+      await expect(
+        service({ AUTHENTICA_OTP_ALLOWED_COUNTRIES: allowed }).deliver(
+          request.rawBody,
+          request.headers,
+          request.payload,
+        ),
+      ).resolves.toEqual({ httpCode: 200 });
+      expect(fetch).toHaveBeenCalledOnce();
+    },
+  );
+
   it("does not retry an ambiguous provider fault", async () => {
     stubAuthentica(new Response("", { status: 503 }));
 

@@ -41,6 +41,8 @@ const arSA = {
     providerMissingShort: "لم يتم إعداد موفر تسجيل الدخول بعد.",
     sendFailed: "تعذر إرسال رمز التحقق. تحقق من الرقم وحاول مرة أخرى.",
     invalidCode: "رمز التحقق غير صحيح أو انتهت صلاحيته.",
+    captchaRequired: "أكمل التحقق الأمني، ثم اطلب الرمز.",
+    captchaUnavailable: "تعذر تحميل التحقق الأمني. حدّث الصفحة وحاول مرة أخرى.",
     developmentTitle: "بيئة اختبار محلية",
     developmentNote: "تجاوز مؤقت للتحقق من رقم الجوال. لا يعمل في الإنتاج.",
     developmentLogin: "الدخول التجريبي",
