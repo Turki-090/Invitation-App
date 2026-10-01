@@ -1,0 +1,202 @@
+# Render Blueprint for the Dawah staging environment, in Frankfurt.
+#
+# Create it once from the Render dashboard (New > Blueprint, this repository).
+# Values marked `sync: false` are secrets or account-specific; Render asks for
+# them while creating the Blueprint and never reads them from this file. The
+# step-by-step guide, including where each value comes from, is
+# docs/operations/staging-deploy-render.md.
+#
+# Data services live outside Render on purpose: the application refuses
+# database and queue connections whose TLS certificates it cannot verify, and
+# Render's internal Postgres and Key Value endpoints do not offer that.
+# Postgres is Neon, Redis is Upstash, and private objects are Cloudflare R2.
+#
+# Deploys follow `main` only after every GitHub check passes, including the
+# CI job that applies database migrations to staging first.
+
+services:
+  - type: web
+    name: dawah-api-staging
+    runtime: docker
+    region: frankfurt
+    plan: 0.5c-512mb
+    branch: main
+    autoDeployTrigger: checksPass
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DAWAH_ENV
+        value: staging
+      - key: PORT
+        value: "4000"
+      - key: API_PORT
+        value: "4000"
+      # Neon direct connection string ending in
+      # ?sslmode=require&sslaccept=strict (the worker reads this value too).
+      - key: DATABASE_URL
+        sync: false
+      # Upstash rediss:// URL with eviction disabled.
+      - key: REDIS_URL
+        sync: false
+      - key: QUEUE_PREFIX
+        value: dawah:staging
+      # https://<account id>.r2.cloudflarestorage.com
+      - key: STORAGE_ENDPOINT
+        sync: false
+      - key: STORAGE_REGION
+        value: auto
+      - key: STORAGE_ACCESS_KEY_ID
+        sync: false
+      - key: STORAGE_SECRET_ACCESS_KEY
+        sync: false
+      - key: STORAGE_PRIVATE_BUCKET
+        value: dawah-private-staging
+      - key: STORAGE_FORCE_PATH_STYLE
+        value: "true"
+      # https://<project ref>.supabase.co
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
+      - key: DAWAH_DEV_AUTH_BYPASS
+        value: "false"
+      # Correct these three URLs if Render adds a suffix to a service name.
+      - key: API_CORS_ORIGINS
+        value: https://dawah-staging.onrender.com
+      - key: META_WHATSAPP_MEDIA_PUBLIC_BASE_URL
+        value: https://dawah-api-staging.onrender.com/api/v1
+      - key: META_WHATSAPP_MEDIA_SIGNING_SECRET
+        generateValue: true
+      # From the Meta developer app (test number until production activation).
+      - key: META_WHATSAPP_APP_SECRET
+        sync: false
+      - key: META_WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      # Generated here, then pasted into Meta's webhook configuration.
+      - key: META_WHATSAPP_WEBHOOK_VERIFY_TOKEN
+        generateValue: true
+      - key: EXPORT_DOWNLOAD_SIGNING_SECRET
+        generateValue: true
+      - key: CHECK_IN_ENABLED
+        value: "false"
+      - key: CHECK_IN_TOKEN_SIGNING_SECRET
+        generateValue: true
+      - key: BILLING_ENABLED
+        value: "false"
+      - key: PAYMENTS_ENABLED
+        value: "false"
+      # Stays off until Authentica confirms custom-code delivery (launch
+      # Stage 4); until then staging sign-in uses Supabase test numbers.
+      - key: AUTHENTICA_OTP_ENABLED
+        value: "false"
+      - key: AUTHENTICA_OTP_METHOD
+        value: sms
+      - key: AUTHENTICA_OTP_ALLOWED_COUNTRIES
+        value: SA
+      - key: LOG_LEVEL
+        value: info
+      - key: LOG_FORMAT
+        value: json
+      # Off until a private scraper exists; the route would be public here.
+      - key: METRICS_ENABLED
+        value: "false"
+
+  - type: worker
+    name: dawah-worker-staging
+    runtime: docker
+    region: frankfurt
+    plan: 0.5c-512mb
+    branch: main
+    autoDeployTrigger: checksPass
+    dockerfilePath: ./apps/worker/Dockerfile
+    dockerContext: .
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DAWAH_ENV
+        value: staging
+      - key: WORKER_PORT
+        value: "4001"
+      - key: DATABASE_URL
+        fromService:
+          type: web
+          name: dawah-api-staging
+          envVarKey: DATABASE_URL
+      - key: REDIS_URL
+        fromService:
+          type: web
+          name: dawah-api-staging
+          envVarKey: REDIS_URL
+      - key: QUEUE_PREFIX
+        value: dawah:staging
+      - key: STORAGE_ENDPOINT
+        fromService:
+          type: web
+          name: dawah-api-staging
+          envVarKey: STORAGE_ENDPOINT
+      - key: STORAGE_REGION
+        value: auto
+      - key: STORAGE_ACCESS_KEY_ID
+        fromService:
+          type: web
+          name: dawah-api-staging
+          envVarKey: STORAGE_ACCESS_KEY_ID
+      - key: STORAGE_SECRET_ACCESS_KEY
+        fromService:
+          type: web
+          name: dawah-api-staging
+          envVarKey: STORAGE_SECRET_ACCESS_KEY
+      - key: STORAGE_PRIVATE_BUCKET
+        value: dawah-private-staging
+      - key: STORAGE_FORCE_PATH_STYLE
+        value: "true"
+      - key: META_WHATSAPP_PHONE_NUMBER_ID
+        fromService:
+          type: web
+          name: dawah-api-staging
+          envVarKey: META_WHATSAPP_PHONE_NUMBER_ID
+      # Meta System User token (a 24-hour token only for a first smoke test).
+      - key: META_WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: META_WHATSAPP_MEDIA_PUBLIC_BASE_URL
+        value: https://dawah-api-staging.onrender.com/api/v1
+      - key: META_WHATSAPP_MEDIA_SIGNING_SECRET
+        fromService:
+          type: web
+          name: dawah-api-staging
+          envVarKey: META_WHATSAPP_MEDIA_SIGNING_SECRET
+      - key: LOG_LEVEL
+        value: info
+      - key: LOG_FORMAT
+        value: json
+      - key: METRICS_ENABLED
+        value: "false"
+
+  - type: web
+    name: dawah-staging
+    runtime: node
+    region: frankfurt
+    plan: 0.5c-512mb
+    branch: main
+    autoDeployTrigger: checksPass
+    # NODE_ENV is deliberately unset here: pnpm skips devDependencies under
+    # NODE_ENV=production, and `next build` / `next start` set it themselves.
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm generate && pnpm exec turbo run build --filter=@dawah/web...
+    startCommand: pnpm --filter @dawah/web exec next start --hostname 0.0.0.0 --port $PORT
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: DAWAH_ENV
+        value: staging
+      - key: NEXT_PUBLIC_API_URL
+        value: https://dawah-api-staging.onrender.com/api/v1
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      # The project's public anon key, never the service-role key.
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_DAWAH_DEV_AUTH_BYPASS
+        value: "false"

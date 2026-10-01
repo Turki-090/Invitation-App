@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Lets an operator re-run the pipeline, and with it the staging migration.
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -101,6 +103,44 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Audit dependencies for high and critical advisories
         run: pnpm audit --audit-level high
+
+  # Applies database migrations to staging before Render deploys the commit.
+  # Render deploys `main` only once every check on it has passed, so a failed
+  # migration stops the release instead of shipping code the schema lacks.
+  # Enabled by the `STAGING_MIGRATIONS=enabled` repository variable once the
+  # `staging` environment holds its DATABASE_URL secret.
+  migrate-staging:
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      github.ref == 'refs/heads/main' && vars.STAGING_MIGRATIONS == 'enabled'
+    needs: [verify, dependencies]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    concurrency:
+      group: migrate-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply pending migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::The staging environment has no DATABASE_URL secret."
+            exit 1
+          fi
+          pnpm migrate
 
   # Surfaces license and advisory changes introduced by a pull request itself,
   # which a whole-tree audit cannot distinguish from pre-existing findings.
