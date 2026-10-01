@@ -2286,7 +2286,9 @@ dialog:has(.event-wizard) {
   min-width: 0;
   padding: 0;
 }
-.public-invitation__members {
+/* Browsers paint a fieldset's background from the middle of its legend, so
+   the panel lives on a wrapper to keep the legend fully inside it. */
+.public-invitation__members-panel {
   background: var(--inv-cream-2);
   border-radius: var(--radius-lg);
   padding: 14px 18px;
