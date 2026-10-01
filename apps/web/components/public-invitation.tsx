@@ -355,35 +355,40 @@ function RsvpEditor({
       ) : null}
 
       {type === "NAMED_GROUP" ? (
-        <fieldset className="public-invitation__members">
-          <legend>{copy.chooseGuests}</legend>
-          {members.map((member) => (
-            <Checkbox
-              checked={selectedMemberIds.has(member.id)}
-              disabled={pending}
-              key={member.id}
-              label={member.name}
-              onChange={(event) => {
-                const next = new Set(selectedMemberIds);
-                if (event.currentTarget.checked) next.add(member.id);
-                else next.delete(member.id);
-                onMemberSelectionChange(next);
-              }}
-              size="guest"
-            />
-          ))}
-          <p aria-live="polite" className="public-invitation__selection-count">
-            {interpolate(copy.selectedOf, {
-              selected: formatNumber(selectedMemberIds.size, locale),
-              total: formatNumber(members.length, locale),
-            })}
-          </p>
-          {selectedMemberIds.size === 0 ? (
-            <p className="public-invitation__hint" id={namedHintId}>
-              {copy.selectOneOrDecline}
+        <div className="public-invitation__members-panel">
+          <fieldset className="public-invitation__members">
+            <legend>{copy.chooseGuests}</legend>
+            {members.map((member) => (
+              <Checkbox
+                checked={selectedMemberIds.has(member.id)}
+                disabled={pending}
+                key={member.id}
+                label={member.name}
+                onChange={(event) => {
+                  const next = new Set(selectedMemberIds);
+                  if (event.currentTarget.checked) next.add(member.id);
+                  else next.delete(member.id);
+                  onMemberSelectionChange(next);
+                }}
+                size="guest"
+              />
+            ))}
+            <p
+              aria-live="polite"
+              className="public-invitation__selection-count"
+            >
+              {interpolate(copy.selectedOf, {
+                selected: formatNumber(selectedMemberIds.size, locale),
+                total: formatNumber(members.length, locale),
+              })}
             </p>
-          ) : null}
-        </fieldset>
+            {selectedMemberIds.size === 0 ? (
+              <p className="public-invitation__hint" id={namedHintId}>
+                {copy.selectOneOrDecline}
+              </p>
+            ) : null}
+          </fieldset>
+        </div>
       ) : null}
 
       {type === "PRIMARY_WITH_COMPANIONS" ? (
