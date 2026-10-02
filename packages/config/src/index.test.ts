@@ -262,6 +262,24 @@ describe("environment validation", () => {
     ).toThrow(/META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_AR/);
   });
 
+  it("defaults to positional template variables and accepts named ones", () => {
+    expect(
+      validateWorkerEnvironment(safeProductionWorkerEnvironment),
+    ).toMatchObject({ META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT: "positional" });
+    expect(
+      validateWorkerEnvironment({
+        ...safeProductionWorkerEnvironment,
+        META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT: "named",
+      }),
+    ).toMatchObject({ META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT: "named" });
+    expect(() =>
+      validateWorkerEnvironment({
+        ...safeProductionWorkerEnvironment,
+        META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT: "NAMED",
+      }),
+    ).toThrow(/META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT/);
+  });
+
   it.each([
     "https://api.dawah.sa",
     "https://api.dawah.sa/api/v1?token=leaked",

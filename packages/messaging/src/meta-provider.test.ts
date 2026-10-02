@@ -118,6 +118,101 @@ describe("MetaWhatsAppProvider", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("addresses named template variables by their parameter names", async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ messages: [{ id: "wamid.named" }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const provider = new MetaWhatsAppProvider({
+      accessToken: "secret",
+      phoneNumberId: "123456",
+      graphApiVersion: "v25.0",
+      templateParameterFormat: "named",
+      fetch,
+    });
+
+    await provider.sendInvitation({
+      ...input,
+      bodyParameterNames: ["guest_name", "event_name"],
+    });
+
+    const [, request] = fetch.mock.calls[0]!;
+    expect(JSON.parse(String(request.body)).template.components).toEqual([
+      {
+        type: "body",
+        parameters: [
+          { type: "text", parameter_name: "guest_name", text: "Sarah" },
+          {
+            type: "text",
+            parameter_name: "event_name",
+            text: "Wedding of Noura and Omar",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("keeps positional templates unnamed even when names are known", async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ messages: [{ id: "wamid.positional" }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const provider = new MetaWhatsAppProvider({
+      accessToken: "secret",
+      phoneNumberId: "123456",
+      graphApiVersion: "v25.0",
+      fetch,
+    });
+
+    await provider.sendInvitation({
+      ...input,
+      bodyParameterNames: ["guest_name", "event_name"],
+    });
+
+    const [, request] = fetch.mock.calls[0]!;
+    expect(
+      JSON.parse(String(request.body)).template.components[0].parameters,
+    ).toEqual([
+      { type: "text", text: "Sarah" },
+      { type: "text", text: "Wedding of Noura and Omar" },
+    ]);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["fewer than the parameters", ["guest_name"]],
+    ["duplicated", ["guest_name", "guest_name"]],
+    ["not in Meta's format", ["guest_name", "Event Name"]],
+  ])(
+    "refuses a named send whose names are %s before contacting Meta",
+    async (_case, bodyParameterNames) => {
+      const fetch = vi.fn();
+      const provider = new MetaWhatsAppProvider({
+        accessToken: "secret",
+        phoneNumberId: "123456",
+        graphApiVersion: "v25.0",
+        templateParameterFormat: "named",
+        fetch,
+      });
+
+      await expect(
+        provider.sendInvitation({
+          ...input,
+          ...(bodyParameterNames ? { bodyParameterNames } : {}),
+        }),
+      ).rejects.toMatchObject({
+        providerCode: "PROVIDER_TEMPLATE_PARAMETER_NAMES",
+        failureClass: "PERMANENT",
+        retryable: false,
+      });
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
   it("classifies Meta rate limits as retryable without exposing response text", async () => {
     const fetch = vi.fn().mockResolvedValue(
       new Response(

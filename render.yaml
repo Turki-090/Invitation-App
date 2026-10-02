@@ -161,6 +161,10 @@ services:
       # Meta System User token (a 24-hour token only for a first smoke test).
       - key: META_WHATSAPP_ACCESS_TOKEN
         sync: false
+      # WhatsApp Manager only creates templates with named variables, so
+      # sends address them as {{guest_name}}, {{event_name}}, and so on.
+      - key: META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT
+        value: named
       - key: META_WHATSAPP_MEDIA_PUBLIC_BASE_URL
         value: https://dawah-api-staging.onrender.com/api/v1
       - key: META_WHATSAPP_MEDIA_SIGNING_SECRET

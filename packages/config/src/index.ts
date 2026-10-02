@@ -123,6 +123,7 @@ export interface WorkerEnvironment
   META_WHATSAPP_ACCESS_TOKEN: string;
   META_WHATSAPP_PHONE_NUMBER_ID: string;
   META_WHATSAPP_GRAPH_API_VERSION: string;
+  META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT: "positional" | "named";
   META_WHATSAPP_REQUEST_TIMEOUT_MS: number;
   META_WHATSAPP_SEND_CONCURRENCY: number;
   META_WHATSAPP_MAX_SENDS_PER_SECOND: number;
@@ -474,6 +475,11 @@ const workerEnvironmentSchema = z
       .string()
       .regex(/^v\d+\.\d+$/)
       .default("v25.0"),
+    // Meta fixes a template's variable style when it is created; templates made
+    // in WhatsApp Manager use named variables such as {{guest_name}}.
+    META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT: z
+      .enum(["positional", "named"])
+      .default("positional"),
     META_WHATSAPP_REQUEST_TIMEOUT_MS: positiveInteger
       .max(60_000)
       .default(10_000),

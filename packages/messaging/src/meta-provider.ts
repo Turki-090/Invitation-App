@@ -6,10 +6,20 @@ import {
   type ProviderMessageResult,
 } from "./types";
 
+/**
+ * How the WABA's templates declare body variables. Meta fixes this per
+ * template at creation: `{{1}}` is positional, `{{guest_name}}` is named, and a
+ * named template rejects any body parameter that lacks its `parameter_name`.
+ */
+export type MetaTemplateParameterFormat = "positional" | "named";
+
+const META_PARAMETER_NAME = /^[a-z_][a-z0-9_]*$/;
+
 export interface MetaWhatsAppProviderOptions {
   readonly accessToken: string;
   readonly phoneNumberId: string;
   readonly graphApiVersion: string;
+  readonly templateParameterFormat?: MetaTemplateParameterFormat;
   readonly requestTimeoutMilliseconds?: number;
   readonly graphApiBaseUrl?: string;
   readonly fetch?: typeof globalThis.fetch;
@@ -61,6 +71,15 @@ export class MetaWhatsAppProvider implements MessagingProvider {
   ): Promise<ProviderMessageResult> {
     if ((input.quickReplyPayloads?.length ?? 0) > 3) {
       throw new MessagingProviderError("PROVIDER_TEMPLATE_BUTTON_LIMIT", {
+        failureClass: "PERMANENT",
+        retryable: false,
+      });
+    }
+    if (
+      this.options.templateParameterFormat === "named" &&
+      !hasValidParameterNames(input)
+    ) {
+      throw new MessagingProviderError("PROVIDER_TEMPLATE_PARAMETER_NAMES", {
         failureClass: "PERMANENT",
         retryable: false,
       });
@@ -147,10 +166,15 @@ export class MetaWhatsAppProvider implements MessagingProvider {
       });
     }
     if (input.bodyParameters.length > 0) {
+      const names =
+        this.options.templateParameterFormat === "named"
+          ? input.bodyParameterNames
+          : undefined;
       components.push({
         type: "body",
-        parameters: input.bodyParameters.map((value) => ({
+        parameters: input.bodyParameters.map((value, index) => ({
           type: "text",
+          ...(names ? { parameter_name: names[index] } : {}),
           text: value,
         })),
       });
@@ -209,6 +233,19 @@ function providerErrorIdentity(body: unknown): {
 
 function isString(value: string | undefined): value is string {
   return value !== undefined;
+}
+
+/**
+ * A named template needs one well-formed, distinct name per body parameter;
+ * anything less is refused before Meta is contacted, as no retry can fix it.
+ */
+function hasValidParameterNames(input: MessagingTemplateSendInput): boolean {
+  const names = input.bodyParameterNames ?? [];
+  return (
+    names.length === input.bodyParameters.length &&
+    new Set(names).size === names.length &&
+    names.every((name) => META_PARAMETER_NAME.test(name))
+  );
 }
 
 function firstProviderMessageId(body: unknown): string | undefined {

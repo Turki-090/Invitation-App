@@ -211,7 +211,9 @@ fragment. The worker also requires `META_WHATSAPP_ACCESS_TOKEN`,
 `META_WHATSAPP_PHONE_NUMBER_ID`,
 `META_WHATSAPP_GRAPH_API_VERSION`, `META_WHATSAPP_REQUEST_TIMEOUT_MS`,
 `META_WHATSAPP_SEND_CONCURRENCY`, `META_WHATSAPP_MAX_SENDS_PER_SECOND`, and
-`META_WHATSAPP_MAX_ATTEMPTS`. Staging and production configuration reject the
+`META_WHATSAPP_MAX_ATTEMPTS`, and reads `META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT`
+(`positional` by default, `named` for templates whose variables are
+`{{guest_name}}`-style names). Staging and production configuration reject the
 repository's inert local/test placeholders and require the media base URL to use
 remote HTTPS. Treat a media `signature` query value as a bearer capability:
 ingress, CDN, reverse-proxy, tracing, and application logs must redact it or omit

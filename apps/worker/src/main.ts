@@ -157,6 +157,8 @@ const provider = instrumentMessagingProvider(
     accessToken: environment.META_WHATSAPP_ACCESS_TOKEN,
     phoneNumberId: environment.META_WHATSAPP_PHONE_NUMBER_ID,
     graphApiVersion: environment.META_WHATSAPP_GRAPH_API_VERSION,
+    templateParameterFormat:
+      environment.META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT,
     requestTimeoutMilliseconds: environment.META_WHATSAPP_REQUEST_TIMEOUT_MS,
   }),
   metrics,

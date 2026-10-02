@@ -235,6 +235,7 @@ export class PrismaMessagingRepository
           templateName: message.providerTemplateName,
           languageCode: message.locale === "ar_SA" ? "ar" : "en",
           bodyParameters: parameterOrder.map((key) => variables[key] ?? ""),
+          bodyParameterNames: parameterOrder,
           ...(quickReplyPayloads.length === 0 ? {} : { quickReplyPayloads }),
           ...(header ? { header } : {}),
         },
@@ -535,6 +536,7 @@ export class PrismaMessagingRepository
           templateName: confirmation.providerTemplateName,
           languageCode: confirmation.locale === "ar_SA" ? "ar" : "en",
           bodyParameters: parameterOrder.map((key) => variables[key] ?? ""),
+          bodyParameterNames: parameterOrder,
         },
       };
     });

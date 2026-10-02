@@ -48,12 +48,18 @@ Three, each in Arabic (`ar`) and English (`en`) — six approvals total.
 - **Header:** Image. The platform sends the invitation artwork as a
   `link` to a signed, expiring URL on our own API, so the header must be
   declared as an image header.
-- **Body:** positional variables `{{1}}`, `{{2}}`, … The count and order must
-  match the event template's `variableSchema` exactly; the platform fills them
-  in that order. Typical set: guest display name, event name, date, time, venue.
+- **Body:** named variables, spelled exactly as the platform's variable keys:
+  `{{guest_name}}`, `{{event_name}}`, `{{event_date}}`, `{{event_time}}`,
+  `{{venue}}`, and `{{allowed_companions}}`. Use the ones the template needs and
+  select the same set in the event template's `variableSchema`. WhatsApp Manager
+  creates templates with named variables, so the worker runs with
+  `META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT=named`; a WABA whose templates use
+  positional `{{1}}`, `{{2}}`, … keeps the default `positional`, and then the
+  `variableSchema` order must match the template's numbering instead.
 - **Buttons:** up to **three** quick replies. The provider rejects more than
-  three before contacting Meta. These carry the RSVP actions — for example
-  "سأحضر" / "لن أتمكن" (attending / not attending).
+  three before contacting Meta. These carry the RSVP actions in the platform's
+  order, so for a single-guest invitation the first button attends and the
+  second declines: "سأحضر" / "أعتذر".
 
 **2. Reminder** — category: Utility
 
@@ -62,7 +68,9 @@ recommended, since a reminder that can be answered in one tap converts better.
 
 **3. RSVP confirmation** — category: Utility
 
-- **No header, no buttons.** The platform sends body parameters only.
+- **No header, no buttons.** The platform sends body parameters only:
+  `{{guest_name}}`, `{{rsvp_status}}` (for example "حضور مؤكد"), and
+  `{{expected_attendees}}`.
 - Template names are set by environment variable, not per event:
   `META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_AR` and `…_EN`.
 - Names must match `^[a-z0-9_]{1,255}$`. Defaults are
@@ -70,9 +78,10 @@ recommended, since a reminder that can be answered in one tap converts better.
 
 ### Rules that will cost time if missed
 
-- Variable count mismatch between the Meta template and the platform template is
-  a **permanent** send failure, not a retry. Approve the Meta template first,
-  then configure the platform template to match it.
+- A variable mismatch between the Meta template and the platform template (a
+  different count, or a name Meta does not know) is a **permanent** send
+  failure, not a retry. Approve the Meta template first, then configure the
+  platform template to match it.
 - Template names are per-WABA. Staging and production numbers on different WABAs
   need separate approvals.
 - Marketing templates can be rate limited by quality score. A low score throttles
@@ -125,6 +134,7 @@ rather than half-working.
 | `META_WHATSAPP_MEDIA_SIGNING_SECRET`                  | We generate            | 32+ characters                     |
 | `META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_AR` / `_EN` | Approved names         | `^[a-z0-9_]+$`                     |
 | `META_WHATSAPP_GRAPH_API_VERSION`                     | Default `v25.0`        | Pin deliberately                   |
+| `META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT`             | Template style         | `named` for `{{guest_name}}` style |
 | `META_WHATSAPP_SEND_CONCURRENCY`                      | Default 4              | Keep inside Meta's limits          |
 | `META_WHATSAPP_MAX_SENDS_PER_SECOND`                  | Default 10             | Raise only with a known tier       |
 | `META_WHATSAPP_MAX_ATTEMPTS`                          | Default 5              |                                    |

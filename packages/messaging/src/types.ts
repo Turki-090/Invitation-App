@@ -11,6 +11,11 @@ export interface MessagingTemplateSendInput {
   readonly templateName: string;
   readonly languageCode: string;
   readonly bodyParameters: readonly string[];
+  /**
+   * The variable key of each body parameter, position for position. Templates
+   * created with named variables (`{{guest_name}}`) are addressed by these.
+   */
+  readonly bodyParameterNames?: readonly string[];
   /** Stable callback payloads for approved quick-reply template buttons. */
   readonly quickReplyPayloads?: readonly string[];
   readonly header?:
