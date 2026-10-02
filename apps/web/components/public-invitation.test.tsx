@@ -1,6 +1,12 @@
 import "../test/setup";
 import type { PublicInvitation, RsvpResult } from "@dawah/api-contract";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -47,7 +53,12 @@ describe("PublicInvitationClient", () => {
     const submitRsvp = vi.fn().mockResolvedValue(result);
     renderInvitation(invitation, submitRsvp, withResult(invitation, result));
 
-    await userEvent.click(screen.getByRole("checkbox", { name: "Mona" }));
+    const members = screen.getByRole("group", {
+      name: "Choose who will attend",
+    });
+    await userEvent.click(
+      within(members).getByRole("checkbox", { name: "Mona" }),
+    );
     expect(screen.getByText("1 of 2 attending")).toBeTruthy();
     await userEvent.click(
       screen.getByRole("button", { name: "Confirm attendance" }),
@@ -71,7 +82,12 @@ describe("PublicInvitationClient", () => {
     const submitRsvp = vi.fn().mockResolvedValue(result);
     renderInvitation(invitation, submitRsvp, withResult(invitation, result));
 
-    await userEvent.click(screen.getByRole("radio", { name: /Me \+ 2/ }));
+    const companions = screen.getByRole("group", {
+      name: "Choose the number of companions",
+    });
+    await userEvent.click(
+      within(companions).getByRole("radio", { name: /Me \+ 2/ }),
+    );
     await userEvent.click(
       screen.getByRole("button", { name: "Confirm attendance" }),
     );
