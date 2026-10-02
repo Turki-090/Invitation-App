@@ -184,8 +184,11 @@ services:
     autoDeployTrigger: checksPass
     # NODE_ENV is deliberately unset here: pnpm skips devDependencies under
     # NODE_ENV=production, and `next build` / `next start` set it themselves.
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm generate && pnpm exec turbo run build --filter=@dawah/web...
-    startCommand: pnpm --filter @dawah/web exec next start --hostname 0.0.0.0 --port $PORT
+    # Render's /usr/bin is read-only, so `corepack enable` cannot install its
+    # shims; the pinned pnpm goes into the project directory instead, ahead of
+    # the image's own pnpm on PATH. The start command needs no pnpm at all.
+    buildCommand: npm install --prefix .render-tools --no-save --no-audit --no-fund pnpm@11.19.0 && export PATH="$PWD/.render-tools/node_modules/.bin:$PATH" && pnpm install --frozen-lockfile && pnpm generate && pnpm exec turbo run build --filter=@dawah/web...
+    startCommand: cd apps/web && exec ./node_modules/.bin/next start --hostname 0.0.0.0 --port $PORT
     envVars:
       - key: NODE_VERSION
         value: "24"
