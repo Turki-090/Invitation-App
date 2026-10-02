@@ -48,14 +48,18 @@ Three, each in Arabic (`ar`) and English (`en`) — six approvals total.
 - **Header:** Image. The platform sends the invitation artwork as a
   `link` to a signed, expiring URL on our own API, so the header must be
   declared as an image header.
-- **Body:** named variables, spelled exactly as the platform's variable keys:
-  `{{guest_name}}`, `{{event_name}}`, `{{event_date}}`, `{{event_time}}`,
-  `{{venue}}`, and `{{allowed_companions}}`. Use the ones the template needs and
-  select the same set in the event template's `variableSchema`. WhatsApp Manager
-  creates templates with named variables, so the worker runs with
-  `META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT=named`; a WABA whose templates use
-  positional `{{1}}`, `{{2}}`, … keeps the default `positional`, and then the
-  `variableSchema` order must match the template's numbering instead.
+- **Body:** positional variables `{{1}}`, `{{2}}`, … The count and order must
+  match the event template's `variableSchema` exactly; the platform fills them
+  in that order. Typical set: guest display name, event name, date, time, venue.
+  Select the template's language (Arabic) before writing the body: with the
+  wrong language selected, WhatsApp Manager rejected `{{1}}` and asked for
+  named variables instead.
+- **Named variables instead:** templates written as `{{guest_name}}`,
+  `{{event_name}}`, `{{event_date}}`, `{{event_time}}`, `{{venue}}`, and
+  `{{allowed_companions}}` also work, but only with
+  `META_WHATSAPP_TEMPLATE_PARAMETER_FORMAT=named` on the worker, and that
+  setting applies to every template the deployment sends. Names must be the
+  platform's keys exactly.
 - **Buttons:** up to **three** quick replies. The provider rejects more than
   three before contacting Meta. These carry the RSVP actions in the platform's
   order, so for a single-guest invitation the first button attends and the
@@ -68,8 +72,10 @@ recommended, since a reminder that can be answered in one tap converts better.
 
 **3. RSVP confirmation** — category: Utility
 
-- **No header, no buttons.** The platform sends body parameters only:
-  `{{guest_name}}`, `{{rsvp_status}}` (for example "حضور مؤكد"), and
+- **No header, no buttons.** The platform sends three body parameters, in
+  this order: the guest's name `{{1}}`, the localized RSVP status `{{2}}` (for
+  example "حضور مؤكد"), and the expected attendee count `{{3}}`. Named
+  templates call them `{{guest_name}}`, `{{rsvp_status}}`, and
   `{{expected_attendees}}`.
 - Template names are set by environment variable, not per event:
   `META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_AR` and `…_EN`.
