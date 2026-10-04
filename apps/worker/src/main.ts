@@ -9,11 +9,13 @@ import {
   queueNames,
   reminderRunJobs,
   reminderSweepJobData,
+  reminderSweepJobId,
   reminderSweepSchedulerId,
   whatsappBatchJobId,
   whatsappMessageJobs,
   whatsappRsvpConfirmationJobs,
   whatsappWebhookJobId,
+  workerPollingOptions,
   type ReminderJobData,
   type WhatsappSendJobData,
   type WhatsappWebhookJobData,
@@ -49,6 +51,7 @@ import {
   PrismaReminderRepository,
   REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS,
 } from "./prisma-reminder-repository";
+import { createQueueErrorLogger } from "./queue-error-log";
 import { createQueueDepthSampler, type SampledQueue } from "./queue-metrics";
 import { createReminderProcessor } from "./reminder-processor";
 import { createWhatsappSendProcessor } from "./whatsapp-send-processor";
@@ -90,6 +93,7 @@ const healthWorker = new Worker(
     concurrency: 1,
     connection: redis,
     prefix: environment.QUEUE_PREFIX,
+    ...workerPollingOptions,
   },
 );
 const importProcessor = createImportProcessor({
@@ -118,6 +122,7 @@ const importWorker = new Worker<
     concurrency: 1,
     connection: redis,
     prefix: environment.QUEUE_PREFIX,
+    ...workerPollingOptions,
   },
 );
 const exportProcessor = createExportProcessor({
@@ -141,6 +146,7 @@ const exportWorker = new Worker<
     concurrency: 1,
     connection: redis,
     prefix: environment.QUEUE_PREFIX,
+    ...workerPollingOptions,
   },
 );
 const messagingRepository = new PrismaMessagingRepository(prisma, {
@@ -198,6 +204,7 @@ whatsappSendWorker = new Worker<WhatsappSendJobData>(
     },
     connection: redis,
     prefix: environment.QUEUE_PREFIX,
+    ...workerPollingOptions,
   },
 );
 const whatsappWebhookWorker = new Worker<WhatsappWebhookJobData>(
@@ -211,6 +218,7 @@ const whatsappWebhookWorker = new Worker<WhatsappWebhookJobData>(
     concurrency: Math.min(environment.META_WHATSAPP_SEND_CONCURRENCY * 2, 16),
     connection: redis,
     prefix: environment.QUEUE_PREFIX,
+    ...workerPollingOptions,
   },
 );
 const reminderQueue = new Queue<ReminderJobData>(queueNames.reminders, {
@@ -246,30 +254,49 @@ const reminderWorker = new Worker<ReminderJobData>(
     concurrency: 1,
     connection: redis,
     prefix: environment.QUEUE_PREFIX,
+    ...workerPollingOptions,
   },
 );
-const registerReminderScheduler = async (): Promise<void> => {
-  await reminderQueue.upsertJobScheduler(
-    reminderSweepSchedulerId,
-    { every: REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS },
-    {
-      name: "sweep",
-      data: reminderSweepJobData(),
-      opts: defaultJobOptions,
-    },
-  );
+const enqueueReminderSweep = async (): Promise<void> => {
   const evaluationSlot = Math.floor(
     Date.now() / REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS,
   );
-  const startupSweep = await reminderQueue.add(
-    "sweep",
-    reminderSweepJobData(),
-    {
-      ...defaultJobOptions,
-      jobId: `reminder-startup-sweep-${evaluationSlot}`,
-    },
-  );
-  await retryFailedJob(startupSweep);
+  const sweep = await reminderQueue.add("sweep", reminderSweepJobData(), {
+    ...defaultJobOptions,
+    jobId: reminderSweepJobId(evaluationSlot),
+  });
+  await retryFailedJob(sweep);
+};
+const registerReminderScheduler = async (): Promise<void> => {
+  // A BullMQ job scheduler keeps a delayed job pending, and a pending delayed
+  // job caps the reminder worker's idle wait at 10 seconds whatever its drain
+  // delay. The sweep is enqueued from a timer instead (below), and the
+  // scheduler an earlier release registered is removed.
+  await reminderQueue.removeJobScheduler(reminderSweepSchedulerId);
+  await enqueueReminderSweep();
+};
+
+/**
+ * Enqueues the sweep at the start of each evaluation slot. Every worker
+ * instance runs this timer; the slot's job id makes the sweep run once. A
+ * failed enqueue is retried within the slot rather than skipped to the next.
+ */
+let reminderSweepTimer: NodeJS.Timeout | undefined;
+const scheduleReminderSweep = (delayMilliseconds: number): void => {
+  reminderSweepTimer = setTimeout(() => {
+    void enqueueReminderSweep().then(
+      () =>
+        scheduleReminderSweep(
+          REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS -
+            (Date.now() % REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS),
+        ),
+      (error: unknown) => {
+        logger.error("reminders.sweep_enqueue_failed", { error });
+        scheduleReminderSweep(30_000);
+      },
+    );
+  }, delayMilliseconds);
+  reminderSweepTimer.unref();
 };
 
 /**
@@ -299,6 +326,13 @@ const reminderSchedulerRegistration = (async (): Promise<boolean> => {
   }
   return false;
 })();
+void reminderSchedulerRegistration.then((registered) => {
+  if (!registered) return;
+  scheduleReminderSweep(
+    REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS -
+      (Date.now() % REMINDER_RULE_EVALUATION_INTERVAL_MILLISECONDS),
+  );
+});
 
 let confirmationSweepRunning = false;
 const sweepRsvpConfirmations = async (): Promise<void> => {
@@ -385,8 +419,9 @@ const recoverySweepTimer = setInterval(() => {
 }, 60_000);
 recoverySweepTimer.unref();
 
-// Queue connection errors are reported once per worker rather than per job:
-// they mean Redis is unreachable, which readiness already fails on.
+// Queue connection errors are reported once per worker rather than per job,
+// and at most once a minute: they mean Redis is unreachable or refusing
+// commands, which readiness already fails on.
 for (const [queue, worker] of [
   [queueNames.health, healthWorker],
   [queueNames.imports, importWorker],
@@ -395,9 +430,7 @@ for (const [queue, worker] of [
   [queueNames.whatsappWebhook, whatsappWebhookWorker],
   [queueNames.reminders, reminderWorker],
 ] as const) {
-  worker.on("error", (error: Error) => {
-    logger.error("queue.connection_error", { queue, error });
-  });
+  worker.on("error", createQueueErrorLogger({ logger, queue }));
 }
 whatsappSendWorker.on("failed", (job) => {
   if (!job) return;
@@ -606,6 +639,7 @@ const shutdown = async (signal: string): Promise<void> => {
   shuttingDown = true;
   clearInterval(confirmationSweepTimer);
   clearInterval(recoverySweepTimer);
+  clearTimeout(reminderSweepTimer);
   logger.info("worker.shutdown_started", { signal });
 
   server.closeIdleConnections();

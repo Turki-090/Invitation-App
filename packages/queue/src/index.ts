@@ -26,6 +26,22 @@ export const defaultJobOptions = {
 } satisfies JobsOptions;
 
 /**
+ * Idle cost shared by every worker. An idle worker blocks on Redis for
+ * `drainDelay` seconds, then re-checks and scans for stalled jobs every
+ * `stalledInterval`. A new job wakes a blocked worker at once, so the long wait
+ * costs no pickup latency; a stalled job only exists after a worker died
+ * mid-job, and finding it within five minutes is enough.
+ *
+ * BullMQ's defaults (5 seconds and 30 seconds) cost about 26 commands a minute
+ * per idle worker: six workers spent a 500,000-command monthly Redis plan in
+ * two days with no traffic. These settings cost about 0.6 a minute per worker.
+ */
+export const workerPollingOptions = {
+  drainDelay: 300,
+  stalledInterval: 300_000,
+} as const;
+
+/**
  * Correlation carried from the request that enqueued a job into the worker
  * that runs it. It is optional because jobs also originate inside the worker —
  * scheduled sweeps and fan-out from a dispatch job — and because it must never
@@ -80,10 +96,21 @@ export interface ReminderRunJob {
   readonly scheduledFor: string;
 }
 
+/**
+ * The BullMQ job scheduler earlier releases used for the reminder sweep. Its
+ * always-pending delayed job capped the reminder worker's idle wait at BullMQ's
+ * 10-second maximum, so the worker removes it at startup and enqueues the sweep
+ * from a timer instead.
+ */
 export const reminderSweepSchedulerId = "automatic-reminder-sweep";
 
 export function reminderSweepJobData(): ReminderJobData {
   return { operation: "SWEEP" };
+}
+
+/** One sweep per evaluation slot, however many workers enqueue it. */
+export function reminderSweepJobId(evaluationSlot: number): string {
+  return `reminder-sweep-${evaluationSlot}`;
 }
 
 export function reminderRunJobId(ruleId: string, scheduleKey: string): string {
@@ -171,9 +198,9 @@ export function producerReconnectDelay(attempt: number): number {
   return Math.min(attempt * 500, 5_000);
 }
 
-function producerConnectionOptions(connectionName: string) {
+function producerConnectionOptions(connectionName?: string) {
   return {
-    connectionName,
+    ...(connectionName ? { connectionName } : {}),
     connectTimeout: 5_000,
     enableOfflineQueue: false,
     enableReadyCheck: true,
@@ -199,9 +226,13 @@ export async function probeRedis(
   redisUrl: string,
   timeoutMilliseconds: number,
 ): Promise<boolean> {
-  // A probe answers for this instant only, so it must never retry.
+  // A probe answers for this instant only, so it must never retry. It opens a
+  // connection on every platform health check, so it sends only the HELLO,
+  // AUTH, INFO, and PING that metered Redis plans do not bill: no connection
+  // name (CLIENT SETNAME) and no client info (two CLIENT SETINFO).
   const connection = new Redis(redisUrl, {
-    ...producerConnectionOptions("dawah-readiness"),
+    ...producerConnectionOptions(),
+    disableClientInfo: true,
     retryStrategy: () => null,
   });
   // The outcome is the return value; an unreachable server is not a log line.

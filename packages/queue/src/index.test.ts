@@ -10,6 +10,7 @@ import {
   reminderRunJobId,
   reminderRunJobs,
   reminderSweepJobData,
+  reminderSweepJobId,
   reminderSweepSchedulerId,
   whatsappBatchJobId,
   whatsappMessageJobId,
@@ -17,7 +18,20 @@ import {
   whatsappRsvpConfirmationJobId,
   whatsappRsvpConfirmationJobs,
   whatsappWebhookJobId,
+  workerPollingOptions,
 } from "./index";
+
+describe("worker polling", () => {
+  it("keeps six idle workers inside a 500,000-command monthly Redis plan", () => {
+    // Per drain cycle an idle worker sends one blocking pop and one fetch; per
+    // stalled interval it sends one stalled-job scan.
+    const commandsPerMinute =
+      (2 * 60) / workerPollingOptions.drainDelay +
+      60_000 / workerPollingOptions.stalledInterval;
+    const commandsPerMonth = commandsPerMinute * 6 * 60 * 24 * 30;
+    expect(commandsPerMonth).toBeLessThan(200_000);
+  });
+});
 
 describe("export queue identifiers", () => {
   it("creates a deterministic PII-free export job identifier", () => {
@@ -29,6 +43,7 @@ describe("reminder queue identifiers", () => {
   it("creates stable PII-free sweep and rule-run definitions", () => {
     expect(reminderSweepSchedulerId).toBe("automatic-reminder-sweep");
     expect(reminderSweepJobData()).toEqual({ operation: "SWEEP" });
+    expect(reminderSweepJobId(492_000)).toBe("reminder-sweep-492000");
     expect(reminderRunJobId("rule-id", "a".repeat(64))).toBe(
       `reminder-run-rule-id-${"a".repeat(64)}`,
     );
@@ -130,6 +145,10 @@ describe("Redis connections", () => {
   it("reports readiness from a one-shot probe", async () => {
     server = await startFakeRedis();
     await expect(probeRedis(server.url, 2_000)).resolves.toBe(true);
+    // Health checks run constantly; only unbilled commands may be sent.
+    expect(new Set(server.commands)).toEqual(
+      new Set(["HELLO", "INFO", "PING"]),
+    );
 
     const url = server.url;
     await server.close();
@@ -140,6 +159,8 @@ describe("Redis connections", () => {
 
 interface FakeRedisServer {
   url: string;
+  /** Upper-cased command names, in the order received. */
+  commands: string[];
   dropConnections(): void;
   close(): Promise<void>;
 }
@@ -147,6 +168,7 @@ interface FakeRedisServer {
 /** Just enough RESP for ioredis to connect, run its ready check, and PING. */
 async function startFakeRedis(): Promise<FakeRedisServer> {
   const sockets = new Set<Socket>();
+  const commands: string[] = [];
   const server = createServer((socket) => {
     sockets.add(socket);
     socket.on("close", () => sockets.delete(socket));
@@ -159,6 +181,7 @@ async function startFakeRedis(): Promise<FakeRedisServer> {
         if (!parsed) return;
         buffered = buffered.slice(parsed.length);
         const name = parsed.command[0]?.toUpperCase();
+        if (name) commands.push(name);
         if (name === "PING") socket.write("+PONG\r\n");
         else if (name === "INFO") socket.write("$0\r\n\r\n");
         else socket.write("+OK\r\n");
@@ -169,6 +192,7 @@ async function startFakeRedis(): Promise<FakeRedisServer> {
   const { port } = server.address() as AddressInfo;
   return {
     url: `redis://127.0.0.1:${port}`,
+    commands,
     dropConnections: () => {
       for (const socket of sockets) socket.destroy();
     },
