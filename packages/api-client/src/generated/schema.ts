@@ -1529,10 +1529,12 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Complete the Meta webhook verification challenge */
-        get: operations["verifyWhatsappWebhook"];
+        get?: never;
         put?: never;
-        /** Authenticate and persist Meta WhatsApp webhook events */
+        /**
+         * Authenticate and persist WhatsApp webhook events relayed by 360dialog
+         * @description 360dialog relays Meta's Cloud API webhook body unchanged but does not sign it. The request is authenticated by the shared token registered as a static header on the 360dialog webhook configuration.
+         */
         post: operations["receiveWhatsappWebhook"];
         delete?: never;
         options?: never;
@@ -5709,37 +5711,11 @@ export interface operations {
             503: components["responses"]["ServiceUnavailable"];
         };
     };
-    verifyWhatsappWebhook: {
-        parameters: {
-            query: {
-                "hub.mode": "subscribe";
-                "hub.verify_token": string;
-                "hub.challenge": string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Exact challenge value as plain text. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            429: components["responses"]["TooManyRequests"];
-        };
-    };
     receiveWhatsappWebhook: {
         parameters: {
             query?: never;
             header: {
-                "X-Hub-Signature-256": string;
+                "X-Dawah-Webhook-Token": string;
             };
             path?: never;
             cookie?: never;

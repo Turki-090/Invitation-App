@@ -1,4 +1,4 @@
-import { randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
   Inject,
@@ -12,7 +12,7 @@ import type { ApiEnvironment } from "@dawah/config";
 import {
   MetaWebhookPayloadError,
   parseMetaWebhookPayload,
-  verifyMetaWebhookSignature,
+  verifyDialog360WebhookToken,
   type MetaWebhookSkipReason,
 } from "@dawah/messaging";
 import type { Logger } from "@dawah/observability";
@@ -24,9 +24,8 @@ import { MessagingQueueService } from "./messaging-queue.service";
 
 @Injectable()
 export class WhatsappWebhookService {
-  private readonly appSecret: string;
-  private readonly verifyToken: string;
-  private readonly phoneNumberId: string;
+  private readonly webhookToken: string;
+  private readonly phoneNumberId: string | undefined;
 
   public constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -36,46 +35,24 @@ export class WhatsappWebhookService {
     config: ConfigService<ApiEnvironment, true>,
     @Inject(LOGGER) private readonly logger: Logger,
   ) {
-    this.appSecret = config.get("META_WHATSAPP_APP_SECRET", { infer: true });
-    this.verifyToken = config.get("META_WHATSAPP_WEBHOOK_VERIFY_TOKEN", {
-      infer: true,
-    });
+    this.webhookToken = config.get("D360_WEBHOOK_TOKEN", { infer: true });
     this.phoneNumberId = config.get("META_WHATSAPP_PHONE_NUMBER_ID", {
       infer: true,
     });
   }
 
-  public verifyChallenge(
-    mode: string | undefined,
-    token: string | undefined,
-    challenge: string | undefined,
-  ): string {
-    if (
-      mode !== "subscribe" ||
-      !token ||
-      !challenge ||
-      !constantTimeTextEqual(token, this.verifyToken)
-    ) {
-      throw new UnauthorizedException({
-        code: "WEBHOOK_VERIFICATION_FAILED",
-        message: "Webhook verification failed.",
-      });
-    }
-    return challenge;
-  }
-
   public async ingest(
     rawBody: Buffer | undefined,
-    signature: string | undefined,
+    webhookToken: string | undefined,
     payload: unknown,
   ): Promise<WhatsappWebhookAcknowledgement> {
     if (
       !rawBody ||
-      !verifyMetaWebhookSignature(rawBody, signature, this.appSecret)
+      !verifyDialog360WebhookToken(webhookToken, this.webhookToken)
     ) {
       throw new UnauthorizedException({
-        code: "WEBHOOK_SIGNATURE_INVALID",
-        message: "Webhook signature verification failed.",
+        code: "WEBHOOK_TOKEN_INVALID",
+        message: "Webhook authentication failed.",
       });
     }
     let events;
@@ -96,8 +73,8 @@ export class WhatsappWebhookService {
       throw error;
     }
     if (skipped.size > 0) {
-      // Still acknowledged: a rejection would make Meta redeliver the whole
-      // POST for days, including the items beside these that did parse.
+      // Still acknowledged: a rejection would make the provider redeliver the
+      // whole POST for days, including the items beside these that did parse.
       this.logger.warn("whatsapp.webhook.items_skipped", {
         skipped: Object.fromEntries(skipped),
         acceptedItems: events.length,
@@ -177,13 +154,4 @@ export class WhatsappWebhookService {
       duplicateEvents: events.length - created.count,
     };
   }
-}
-
-function constantTimeTextEqual(left: string, right: string): boolean {
-  const leftHash = sha256(left);
-  const rightHash = sha256(right);
-  return timingSafeEqual(
-    Buffer.from(leftHash, "hex"),
-    Buffer.from(rightHash, "hex"),
-  );
 }

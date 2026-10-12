@@ -76,7 +76,7 @@ retried automatically because the provider may already have accepted it.
 WhatsApp webhooks follow a second durable path:
 
 ```text
-Meta -> raw-body HMAC verification -> normalized immutable WebhookEvent
+360dialog -> webhook token check -> normalized immutable WebhookEvent
                                                   |
                                                   v
                                    deterministic webhook job

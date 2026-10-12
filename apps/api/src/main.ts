@@ -35,8 +35,8 @@ async function bootstrap(): Promise<void> {
   app.use(
     json({
       limit: config.get("API_BODY_LIMIT_BYTES", { infer: true }),
-      // Signature verification needs the exact bytes that were signed, which
-      // re-serializing the parsed body would not reproduce.
+      // Signature verification and the stored webhook payload hash need the
+      // exact bytes received, which re-serializing the body would not reproduce.
       verify: (request: Request & { rawBody?: Buffer }, _response, body) => {
         if (
           request.originalUrl.includes("/webhooks/whatsapp") ||

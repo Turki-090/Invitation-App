@@ -1,6 +1,7 @@
-// Provider webhook spike. The endpoint is unauthenticated, signature verified
-// and explicitly exempt from the request throttler, so it is the one path that
-// a provider can genuinely flood.
+// Provider webhook spike. The endpoint carries no user session, is
+// authenticated by the 360dialog webhook token header, and is explicitly
+// exempt from the request throttler, so it is the one path that a provider can
+// genuinely flood.
 //
 // Each request carries a batch of delivery-status callbacks. A configurable
 // share of them repeats an identifier that was already sent, which drives the
@@ -12,12 +13,11 @@
 //   k6 run -e PEAK_RATE=400 -e SPIKE_DURATION=2m load/k6/webhook-spike.js
 
 import http from "k6/http";
-import crypto from "k6/crypto";
 import exec from "k6/execution";
 import { check } from "k6";
 import { Counter, Rate } from "k6/metrics";
 import {
-  WEBHOOK_APP_SECRET,
+  WEBHOOK_TOKEN,
   WEBHOOK_PHONE_NUMBER_ID,
   RUN_ID,
   integer,
@@ -122,15 +122,12 @@ function payloadFor(sequence) {
 }
 
 export default function webhookSpike() {
-  // The API verifies the signature over the exact transmitted bytes, so the
-  // body is serialised once and both signed and sent in that form.
   const raw = JSON.stringify(payloadFor(exec.scenario.iterationInTest));
-  const signature = `sha256=${crypto.hmac("sha256", WEBHOOK_APP_SECRET, raw, "hex")}`;
   const response = http.post(url("/webhooks/whatsapp"), raw, {
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
-      "X-Hub-Signature-256": signature,
+      "X-Dawah-Webhook-Token": WEBHOOK_TOKEN,
     },
     tags: { endpoint: "webhook" },
   });
@@ -160,8 +157,8 @@ export default function webhookSpike() {
     rejections.add(1, { code: `HTTP_${response.status}` });
     if (response.status === 401) {
       exec.test.abort(
-        "The webhook signature was rejected. Pass -e WEBHOOK_APP_SECRET=<META_WHATSAPP_APP_SECRET> " +
-          "and -e WEBHOOK_PHONE_NUMBER_ID=<META_WHATSAPP_PHONE_NUMBER_ID> that the API is running with.",
+        "The webhook token was rejected. Pass -e WEBHOOK_TOKEN=<D360_WEBHOOK_TOKEN> " +
+          "that the API is running with.",
       );
     }
     console.error(`webhook rejected: ${describe(response)}`);

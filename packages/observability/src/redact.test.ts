@@ -77,7 +77,9 @@ describe("isRedactedKey", () => {
   it("redacts credential and personal keys regardless of spelling", () => {
     for (const key of [
       "accessToken",
-      "META_WHATSAPP_APP_SECRET",
+      "D360_API_KEY",
+      "D360_WEBHOOK_TOKEN",
+      "x-dawah-webhook-token",
       "capability_token",
       "authorization",
       "phoneE164",

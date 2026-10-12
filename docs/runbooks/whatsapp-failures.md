@@ -3,7 +3,7 @@
 Use this runbook when send batches stop progressing, provider errors spike,
 webhook delivery diverges from the provider, or a host reports a failed or
 duplicated invitation. Do not log or paste recipient phones, template variables,
-rendered content, access tokens, app secrets, verify tokens, signatures, or raw
+rendered content, 360dialog API keys, webhook tokens, signatures, or raw
 webhook payloads into tickets or chat. Treat the signed media URL as a bearer
 capability: do not retain its query string in ingress, CDN, proxy, tracing, or
 application logs.

@@ -22,6 +22,6 @@ invitation, and revalidated before provider contact. Confirmation hashes,
 idempotency records, scheduled-slot uniqueness, cooldown state, maximum counts,
 and deterministic queue identities prevent replay or accidental reminder spam.
 
-PII, access tokens, OTPs, and raw invitation capabilities are prohibited from logs. Public endpoints require rate limits, no-index headers, minimal responses, and abuse monitoring. Webhook endpoints require signature validation and event-id deduplication before asynchronous processing.
+PII, access tokens, OTPs, and raw invitation capabilities are prohibited from logs. Public endpoints require rate limits, no-index headers, minimal responses, and abuse monitoring. Webhook endpoints require origin authentication and event-id deduplication before asynchronous processing: a provider signature where the provider signs, otherwise a high-entropy shared token compared in constant time over HTTPS (360dialog, which relays WhatsApp callbacks unsigned).
 
 Secrets are environment-managed and rotated. Production uses HTTPS, restrictive CORS and CSP, payload limits, upload type/size validation, structured errors without stack traces, and monitored backups.

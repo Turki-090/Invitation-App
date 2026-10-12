@@ -158,15 +158,15 @@ agree on which row is which. Only the total group count can be raised, with
 
 Every script accepts these. Pass them with `k6 run -e NAME=value`.
 
-| Variable                  | Default                        | Meaning                                                                     |
-| ------------------------- | ------------------------------ | --------------------------------------------------------------------------- |
-| `BASE_URL`                | `http://127.0.0.1:4000/api/v1` | Versioned API root                                                          |
-| `ACCESS_TOKEN`            | `dawah-local-development`      | Bearer token; the development credential works only with the bypass enabled |
-| `EVENT_ID`                | the seeded load event          | Event under test                                                            |
-| `TEMPLATE_ID`             | the seeded template            | Approved invitation template                                                |
-| `RUN_ID`                  | `run1`                         | Namespaces every generated idempotency key                                  |
-| `WEBHOOK_APP_SECRET`      | `dawah-local-meta-app-secret`  | Must match `META_WHATSAPP_APP_SECRET`                                       |
-| `WEBHOOK_PHONE_NUMBER_ID` | `000000000000000`              | Must match `META_WHATSAPP_PHONE_NUMBER_ID`                                  |
+| Variable                  | Default                                | Meaning                                                                                |
+| ------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------- |
+| `BASE_URL`                | `http://127.0.0.1:4000/api/v1`         | Versioned API root                                                                     |
+| `ACCESS_TOKEN`            | `dawah-local-development`              | Bearer token; the development credential works only with the bypass enabled            |
+| `EVENT_ID`                | the seeded load event                  | Event under test                                                                       |
+| `TEMPLATE_ID`             | the seeded template                    | Approved invitation template                                                           |
+| `RUN_ID`                  | `run1`                                 | Namespaces every generated idempotency key                                             |
+| `WEBHOOK_TOKEN`           | `dawah-local-d360-webhook-token-value` | Must match `D360_WEBHOOK_TOKEN`                                                        |
+| `WEBHOOK_PHONE_NUMBER_ID` | `000000000000000`                      | Must match `META_WHATSAPP_PHONE_NUMBER_ID` when the API sets one, or items are skipped |
 
 `RUN_ID` matters. Idempotency keys are derived from it so that a replay pass
 can rebuild the keys an earlier pass used. Two runs against the same database

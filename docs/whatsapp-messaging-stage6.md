@@ -68,8 +68,9 @@ request with the same key resets only those messages and requeues the saved batc
 ## Provider and worker
 
 `@dawah/messaging` defines purpose-specific provider operations for invitation,
-reminder, and RSVP-confirmation templates. `MetaWhatsAppProvider` is the first
-adapter. It sends template messages through the configured Graph API version,
+reminder, and RSVP-confirmation templates. `Dialog360WhatsAppProvider` is the
+adapter. It sends Cloud API template messages through 360dialog's hosted API
+(`POST {D360_API_BASE_URL}/messages` with the `D360-API-KEY` header),
 maps the immutable message ID to Meta's opaque callback field, preserves body
 parameter order from the approved template, and returns the provider message ID
 needed for later correlation. Arabic snapshots use the `ar` provider language
@@ -138,15 +139,17 @@ numbers or rendered message content.
 
 ## Webhook ingestion and reduction
 
-Meta verifies ownership through `GET /api/v1/webhooks/whatsapp`; the verify token
-is compared in constant time. `POST /api/v1/webhooks/whatsapp` verifies
-`X-Hub-Signature-256` as an HMAC-SHA256 over the captured raw request bytes
-before parsing any event.
+360dialog relays Meta's webhook body unchanged but does not sign it, and has no
+subscription handshake. `POST /api/v1/webhooks/whatsapp` therefore requires the
+`X-Dawah-Webhook-Token` header that is registered with the 360dialog webhook,
+compares it with `D360_WEBHOOK_TOKEN` in constant time, and rejects the request
+before parsing any event when it does not match.
 
 The API accepts supported status and inbound-response evidence, assigns a stable
 provider event identity, stores normalized immutable payload evidence, and
-rejects payloads whose `metadata.phone_number_id` does not match the configured
-WhatsApp phone-number ID, and enqueues deterministic webhook jobs. The unique
+skips items whose `metadata.phone_number_id` does not match
+`META_WHATSAPP_PHONE_NUMBER_ID` when that filter is set, and enqueues
+deterministic webhook jobs. The unique
 `(provider, provider event ID)` constraint deduplicates provider retries. A
 signed redelivery can revive a previously failed webhook record and its retained
 failed queue job. The request returns only after durable persistence and queue
@@ -199,17 +202,16 @@ masked-recipient message results.
 
 ## Configuration
 
-The API requires `META_WHATSAPP_APP_SECRET`,
-`META_WHATSAPP_WEBHOOK_VERIFY_TOKEN`, and
-`META_WHATSAPP_PHONE_NUMBER_ID` so signed callbacks are also bound to the
-configured sender. The API and worker must share
+The API requires `D360_WEBHOOK_TOKEN` (32+ characters) and accepts an optional
+`META_WHATSAPP_PHONE_NUMBER_ID` that binds callbacks to the configured sender.
+The API and worker must share
 `META_WHATSAPP_MEDIA_PUBLIC_BASE_URL`,
 `META_WHATSAPP_MEDIA_SIGNING_SECRET`, and
 `META_WHATSAPP_MEDIA_URL_TTL_SECONDS`; the public base URL must resolve to the
 API from Meta's network, end in `/api/v1`, and contain no credentials, query, or
-fragment. The worker also requires `META_WHATSAPP_ACCESS_TOKEN`,
-`META_WHATSAPP_PHONE_NUMBER_ID`,
-`META_WHATSAPP_GRAPH_API_VERSION`, `META_WHATSAPP_REQUEST_TIMEOUT_MS`,
+fragment. The worker also requires `D360_API_KEY` and accepts
+`D360_API_BASE_URL` (default `https://waba-v2.360dialog.io`),
+`META_WHATSAPP_REQUEST_TIMEOUT_MS`,
 `META_WHATSAPP_SEND_CONCURRENCY`, `META_WHATSAPP_MAX_SENDS_PER_SECOND`, and
 `META_WHATSAPP_MAX_ATTEMPTS`. Staging and production configuration reject the
 repository's inert local/test placeholders and require the media base URL to use

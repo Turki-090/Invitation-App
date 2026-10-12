@@ -92,9 +92,8 @@ export interface ApiEnvironment
   API_CORS_ORIGINS: string[];
   API_BODY_LIMIT_BYTES: number;
   API_READY_TIMEOUT_MS: number;
-  META_WHATSAPP_APP_SECRET: string;
-  META_WHATSAPP_WEBHOOK_VERIFY_TOKEN: string;
-  META_WHATSAPP_PHONE_NUMBER_ID: string;
+  D360_WEBHOOK_TOKEN: string;
+  META_WHATSAPP_PHONE_NUMBER_ID?: string;
   EXPORT_DOWNLOAD_SIGNING_SECRET: string;
   EXPORT_DOWNLOAD_URL_TTL_SECONDS: number;
   EXPORT_RETENTION_HOURS: number;
@@ -120,9 +119,8 @@ export interface WorkerEnvironment
   QUEUE_PREFIX: string;
   WORKER_PORT: number;
   WORKER_READY_TIMEOUT_MS: number;
-  META_WHATSAPP_ACCESS_TOKEN: string;
-  META_WHATSAPP_PHONE_NUMBER_ID: string;
-  META_WHATSAPP_GRAPH_API_VERSION: string;
+  D360_API_KEY: string;
+  D360_API_BASE_URL: string;
   META_WHATSAPP_REQUEST_TIMEOUT_MS: number;
   META_WHATSAPP_SEND_CONCURRENCY: number;
   META_WHATSAPP_MAX_SENDS_PER_SECOND: number;
@@ -339,18 +337,25 @@ const apiEnvironmentSchema = z
       .max(10 * 1024 * 1024)
       .default(1024 * 1024),
     API_READY_TIMEOUT_MS: positiveInteger.max(30_000).default(2_000),
-    META_WHATSAPP_APP_SECRET: z
+    /**
+     * Shared token 360dialog sends in the webhook token header. 360dialog does
+     * not sign deliveries, so this token is the only proof of origin.
+     */
+    D360_WEBHOOK_TOKEN: z
       .string()
-      .min(16)
-      .default("dawah-local-meta-app-secret"),
-    META_WHATSAPP_WEBHOOK_VERIFY_TOKEN: z
-      .string()
-      .min(16)
-      .default("dawah-local-meta-verify-token"),
-    META_WHATSAPP_PHONE_NUMBER_ID: z
-      .string()
-      .regex(/^\d{6,32}$/)
-      .default("000000000000000"),
+      .min(32)
+      .default("dawah-local-d360-webhook-token-value"),
+    /**
+     * Meta's ID for the sending number. When set, webhook items for any other
+     * number are skipped; 360dialog includes it in every delivery's metadata.
+     */
+    META_WHATSAPP_PHONE_NUMBER_ID: z.preprocess(
+      emptyToUndefined,
+      z
+        .string()
+        .regex(/^\d{6,32}$/)
+        .optional(),
+    ),
   })
   .passthrough()
   .superRefine((environment, context) => {
@@ -395,13 +400,8 @@ const apiEnvironmentSchema = z
       );
     }
     validateNonPlaceholderSecret(
-      environment.META_WHATSAPP_APP_SECRET,
-      "META_WHATSAPP_APP_SECRET",
-      context,
-    );
-    validateNonPlaceholderSecret(
-      environment.META_WHATSAPP_WEBHOOK_VERIFY_TOKEN,
-      "META_WHATSAPP_WEBHOOK_VERIFY_TOKEN",
+      environment.D360_WEBHOOK_TOKEN,
+      "D360_WEBHOOK_TOKEN",
       context,
     );
     validateRequiredRemoteHttpsUrl(
@@ -424,11 +424,14 @@ const apiEnvironmentSchema = z
       "CHECK_IN_TOKEN_SIGNING_SECRET",
       context,
     );
-    if (/^0+$/.test(environment.META_WHATSAPP_PHONE_NUMBER_ID)) {
+    if (
+      environment.META_WHATSAPP_PHONE_NUMBER_ID !== undefined &&
+      /^0+$/.test(environment.META_WHATSAPP_PHONE_NUMBER_ID)
+    ) {
       addIssue(
         context,
         "META_WHATSAPP_PHONE_NUMBER_ID",
-        "A production Meta phone-number ID is required when deployed.",
+        "A deployed phone-number filter must be a real Meta phone-number ID.",
       );
     }
 
@@ -462,18 +465,12 @@ const workerEnvironmentSchema = z
     QUEUE_PREFIX: optionalText,
     WORKER_PORT: port.default(4_001),
     WORKER_READY_TIMEOUT_MS: positiveInteger.max(30_000).default(2_000),
-    META_WHATSAPP_ACCESS_TOKEN: z
-      .string()
-      .min(16)
-      .default("dawah-local-meta-access-token"),
-    META_WHATSAPP_PHONE_NUMBER_ID: z
-      .string()
-      .regex(/^\d{6,32}$/)
-      .default("000000000000000"),
-    META_WHATSAPP_GRAPH_API_VERSION: z
-      .string()
-      .regex(/^v\d+\.\d+$/)
-      .default("v25.0"),
+    /** 360dialog channel API key; it is bound to one sending number. */
+    D360_API_KEY: z.string().trim().min(16).default("dawah-local-d360-api-key"),
+    /** The messages endpoint is `${D360_API_BASE_URL}/messages`. */
+    D360_API_BASE_URL: z
+      .url({ protocol: /^https?$/ })
+      .default("https://waba-v2.360dialog.io"),
     META_WHATSAPP_REQUEST_TIMEOUT_MS: positiveInteger
       .max(60_000)
       .default(10_000),
@@ -489,8 +486,13 @@ const workerEnvironmentSchema = z
       validateSecureRedis(environment.REDIS_URL, context);
       validateDeployedStorage(environment, context);
       validateNonPlaceholderSecret(
-        environment.META_WHATSAPP_ACCESS_TOKEN,
-        "META_WHATSAPP_ACCESS_TOKEN",
+        environment.D360_API_KEY,
+        "D360_API_KEY",
+        context,
+      );
+      validateRequiredRemoteHttpsUrl(
+        environment.D360_API_BASE_URL,
+        "D360_API_BASE_URL",
         context,
       );
       validateRequiredRemoteHttpsUrl(
@@ -503,13 +505,6 @@ const workerEnvironmentSchema = z
         "META_WHATSAPP_MEDIA_SIGNING_SECRET",
         context,
       );
-      if (/^0+$/.test(environment.META_WHATSAPP_PHONE_NUMBER_ID)) {
-        addIssue(
-          context,
-          "META_WHATSAPP_PHONE_NUMBER_ID",
-          "A production Meta phone-number ID is required when deployed.",
-        );
-      }
     }
   })
   .transform((environment) => ({

@@ -43,13 +43,13 @@ plaintext (Key Value).
 
 Collect each value into your password manager as you go.
 
-| Value                                                   | Where                                                                                                                                 |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Neon** connection string                              | New project `dawah-staging`, region AWS Europe Central 1, Postgres 17. Copy the **direct** (not pooled) string.                       |
-| **Upstash** Redis URL                                   | New Redis database `dawah-staging`, region Frankfurt, TLS on, **eviction off**. Copy the `rediss://` URL.                             |
-| **R2** endpoint, access key ID, secret access key       | Enable R2, create bucket `dawah-private-staging` (public access off), then an API token with Object Read & Write on that bucket only. |
-| **Meta** app secret, test phone-number ID, access token | Meta developer app with the WhatsApp product, per [Meta activation](meta-whatsapp-activation.md) Phase 0.                             |
-| **Supabase** project URL and anon public key            | Existing staging project → Settings → API. Never the service-role key.                                                                |
+| Value                                             | Where                                                                                                                                 |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Neon** connection string                        | New project `dawah-staging`, region AWS Europe Central 1, Postgres 17. Copy the **direct** (not pooled) string.                       |
+| **Upstash** Redis URL                             | New Redis database `dawah-staging`, region Frankfurt, TLS on, **eviction off**. Copy the `rediss://` URL.                             |
+| **R2** endpoint, access key ID, secret access key | Enable R2, create bucket `dawah-private-staging` (public access off), then an API token with Object Read & Write on that bucket only. |
+| **360dialog** API key for the staging number      | 360dialog Hub, per [360dialog activation](whatsapp-360dialog-activation.md) Phase 0. Worker only.                                     |
+| **Supabase** project URL and anon public key      | Existing staging project → Settings → API. Never the service-role key.                                                                |
 
 Fix up two values before using them:
 
@@ -82,8 +82,9 @@ checks pass on `main`, and Render waits for it before deploying.
    `dawah-worker-staging` (background worker, Docker), and `dawah-staging`
    (web, Node), all Frankfurt on the smallest paid instance.
 3. Enter the prompted values from Step 2. The worker reuses the API's
-   database, Redis, storage, phone-number ID, and media secret automatically.
-4. Apply. Render generates the signing secrets and the webhook verify token.
+   database, Redis, storage, and media secret automatically. Leave the API's
+   `META_WHATSAPP_PHONE_NUMBER_ID` empty until the first webhook delivery.
+4. Apply. Render generates the signing secrets and `D360_WEBHOOK_TOKEN`.
 5. Note each service's actual URL. If Render added a suffix to a name, update:
    - API: `API_CORS_ORIGINS` (the web URL) and
      `META_WHATSAPP_MEDIA_PUBLIC_BASE_URL` (API URL + `/api/v1`);
@@ -123,6 +124,6 @@ In the staging Supabase project:
 | Runbook stage            | What unblocks it                                                                                                                                                                         |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 4 — OTP login            | Authentica confirms custom-code delivery; then set `AUTHENTICA_API_KEY`, the template ID, and `AUTHENTICA_OTP_ENABLED=true`, and enable [CAPTCHA](authentica-otp-activation.md#captcha). |
-| 5 — WhatsApp             | Meta webhook → `https://<api host>/api/v1/webhooks/whatsapp` with the generated verify token; approved templates; a System User token.                                                   |
+| 5 — WhatsApp             | 360dialog webhook → `https://<api host>/api/v1/webhooks/whatsapp` with the generated `D360_WEBHOOK_TOKEN` as `X-Dawah-Webhook-Token`; approved templates; `D360_API_KEY` on the worker.  |
 | 7 — Monitoring, recovery | Sentry DSN on API and worker; a restore drill from Neon's point-in-time recovery; alert routing.                                                                                         |
 | 9 — Production           | A copy of this setup with its own accounts, a custom domain, paid database tier with longer recovery window.                                                                             |

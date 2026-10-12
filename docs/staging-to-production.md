@@ -69,8 +69,8 @@ Working inventory, region decision, and provider setup handoff:
 - [ ] Confirm Authentica balance, enabled SMS template ID, sender availability,
       and custom-code support. A branded sender is optional if the default is usable.
 - [ ] Identify a controlled Saudi test handset; store its number outside Git.
-- [ ] Start Meta account, number, and template activation using
-      [the Meta runbook](operations/meta-whatsapp-activation.md). Verify current
+- [ ] Start 360dialog onboarding, number, and template activation using
+      [the 360dialog runbook](operations/whatsapp-360dialog-activation.md). Verify current
       provider requirements and pricing during activation; dated notes are not proof.
 - [ ] Set initial scope: `BILLING_ENABLED=false`, `PAYMENTS_ENABLED=false`, and
       `CHECK_IN_ENABLED=false` unless separately implemented/accepted launch needs

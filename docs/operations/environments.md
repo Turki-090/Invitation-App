@@ -21,7 +21,7 @@ request — if any of the following is true:
 | Placeholder or `dawah-local-` / `dawah-test-` prefixed secrets         | A shipped example value used as a real credential.              |
 | A CORS origin that is not an explicit remote HTTPS origin              | A browser origin that cannot be trusted.                        |
 | Either development authentication bypass flag                          | The bypass is local-only and is the highest-value control here. |
-| A Meta phone-number id that is still all zeros                         | The inert local placeholder.                                    |
+| A webhook phone-number filter that is all zeros                        | The inert local placeholder.                                    |
 | `LOG_FORMAT` other than `json`, or `LOG_LEVEL` of `debug`              | Unparseable or over-verbose deployed diagnostics.               |
 | `METRICS_ENABLED` without a non-placeholder token of 32+ characters    | An unauthenticated metrics endpoint.                            |
 | `PAYMENTS_ENABLED` without `BILLING_ENABLED`                           | Payment activation without the accounting it depends on.        |
@@ -91,9 +91,9 @@ checklist below covers what validation _cannot_ see: the infrastructure itself.
 
 - Supabase Auth project per environment, with its own keys. Only the anonymous
   key is public.
-- Meta WhatsApp: a non-production phone-number id and approved templates for
-  staging, separate production credentials, and a publicly reachable HTTPS
-  webhook with signature verification enabled. `META_WHATSAPP_MEDIA_PUBLIC_BASE_URL`
+- WhatsApp through 360dialog: a separate staging number with its own API key
+  and approved templates, separate production credentials, and a publicly
+  reachable HTTPS webhook registered with the `X-Dawah-Webhook-Token` header. `META_WHATSAPP_MEDIA_PUBLIC_BASE_URL`
   must be the deployment's own public API base, because the provider fetches
   invitation images from it during a send.
 
