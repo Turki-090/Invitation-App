@@ -369,6 +369,10 @@ describe("Stage 8 PostgreSQL collaboration and reminders integration", () => {
       orderBy: { id: "asc" },
     });
     expect(initialMessages).toHaveLength(invitationIds.length);
+    // A host's batch is redriven too if its enqueue never reached Redis.
+    expect(await reminderOutbox.listPendingBatchIds()).toContain(
+      initialBatch.id,
+    );
     let failedInitialMessageId: string | undefined;
     for (const [index, message] of initialMessages.entries()) {
       const claim = await repository.claimMessage(message.id, 5);
@@ -393,6 +397,9 @@ describe("Stage 8 PostgreSQL collaboration and reminders integration", () => {
     if (!failedInitialMessageId) {
       throw new Error("Expected the resend fixture's initial message.");
     }
+    expect(await reminderOutbox.listPendingBatchIds()).not.toContain(
+      initialBatch.id,
+    );
     const resendReadiness = await messaging.resendReadiness(
       ownerPrincipal,
       event.id,
@@ -582,7 +589,7 @@ describe("Stage 8 PostgreSQL collaboration and reminders integration", () => {
         },
       }),
     ).toBe(1);
-    expect(await reminderOutbox.listPendingReminderBatchIds()).toContain(
+    expect(await reminderOutbox.listPendingBatchIds()).toContain(
       run.sendBatchId,
     );
 
@@ -645,7 +652,7 @@ describe("Stage 8 PostgreSQL collaboration and reminders integration", () => {
     expect(
       await prisma.reminderRun.findUniqueOrThrow({ where: { id: run.id } }),
     ).toMatchObject({ status: "COMPLETED", completedAt: expect.any(Date) });
-    expect(await reminderOutbox.listPendingReminderBatchIds()).not.toContain(
+    expect(await reminderOutbox.listPendingBatchIds()).not.toContain(
       run.sendBatchId,
     );
 

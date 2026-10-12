@@ -40,12 +40,9 @@ describe("automatic reminder processor", () => {
     expect(dispatchBatch).not.toHaveBeenCalled();
   });
 
-  it("redrives reminder batches committed before their dispatch job existed", async () => {
+  it("redrives send batches committed before their dispatch job existed", async () => {
     const repository = stubRepository({
-      listPendingReminderBatchIds: vi.fn(async () => [
-        "batch-one",
-        "batch-two",
-      ]),
+      listPendingBatchIds: vi.fn(async () => ["batch-one", "batch-two"]),
     });
     const dispatchBatch = vi.fn(async () => undefined);
     const processor = createReminderProcessor({
@@ -138,7 +135,7 @@ function stubRepository(
 ): ReminderProcessorRepository {
   return {
     listDueRuleRuns: vi.fn(async () => []),
-    listPendingReminderBatchIds: vi.fn(async () => []),
+    listPendingBatchIds: vi.fn(async () => []),
     runScheduledRule: vi.fn(async () => ({
       outcome: "SKIPPED" as const,
       batchId: null,
