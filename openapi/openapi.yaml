@@ -2024,42 +2024,20 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /webhooks/whatsapp:
-    get:
-      summary: Complete the Meta webhook verification challenge
-      tags: [webhooks]
-      operationId: verifyWhatsappWebhook
-      security: []
-      parameters:
-        - name: hub.mode
-          in: query
-          required: true
-          schema: { type: string, const: subscribe }
-        - name: hub.verify_token
-          in: query
-          required: true
-          schema: { type: string }
-        - name: hub.challenge
-          in: query
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: Exact challenge value as plain text.
-          content:
-            text/plain:
-              schema: { type: string }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "429": { $ref: "#/components/responses/TooManyRequests" }
     post:
-      summary: Authenticate and persist Meta WhatsApp webhook events
+      summary: Authenticate and persist WhatsApp webhook events relayed by 360dialog
+      description: >-
+        360dialog relays Meta's Cloud API webhook body unchanged but does not
+        sign it. The request is authenticated by the shared token registered
+        as a static header on the 360dialog webhook configuration.
       tags: [webhooks]
       operationId: receiveWhatsappWebhook
       security: []
       parameters:
-        - name: X-Hub-Signature-256
+        - name: X-Dawah-Webhook-Token
           in: header
           required: true
-          schema: { type: string, pattern: "^sha256=[a-fA-F0-9]{64}$" }
+          schema: { type: string, minLength: 32 }
       requestBody:
         required: true
         content:

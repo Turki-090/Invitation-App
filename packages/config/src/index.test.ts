@@ -25,8 +25,7 @@ const safeProductionApiEnvironment = {
   SUPABASE_URL: "https://auth.dawah.sa",
   API_CORS_ORIGINS: "https://app.dawah.sa",
   DAWAH_DEV_AUTH_BYPASS: "false",
-  META_WHATSAPP_APP_SECRET: "prod-meta-app-secret-7f3a9c",
-  META_WHATSAPP_WEBHOOK_VERIFY_TOKEN: "prod-meta-verify-token-2e7b8d",
+  D360_WEBHOOK_TOKEN: "prod-d360-webhook-token-7f3a9c2e8d4f1a6b",
   META_WHATSAPP_PHONE_NUMBER_ID: "123456789012345",
   META_WHATSAPP_MEDIA_PUBLIC_BASE_URL: "https://api.dawah.sa/api/v1",
   META_WHATSAPP_MEDIA_SIGNING_SECRET:
@@ -43,8 +42,7 @@ const safeProductionWorkerEnvironment = {
   DAWAH_ENV: "production",
   DATABASE_URL: safeProductionDatabaseUrl,
   REDIS_URL: "rediss://cache.dawah.sa:6380",
-  META_WHATSAPP_ACCESS_TOKEN: "prod-meta-access-token-7f3a9c",
-  META_WHATSAPP_PHONE_NUMBER_ID: "123456789012345",
+  D360_API_KEY: "prodD360ApiKey7f3a9c2e8d4f",
   META_WHATSAPP_MEDIA_PUBLIC_BASE_URL: "https://api.dawah.sa/api/v1",
   META_WHATSAPP_MEDIA_SIGNING_SECRET:
     "prod-meta-media-signing-secret-2e7b8d4f1a6c",
@@ -247,6 +245,62 @@ describe("environment validation", () => {
     ).toThrow(
       /META_WHATSAPP_MEDIA_PUBLIC_BASE_URL|META_WHATSAPP_MEDIA_SIGNING_SECRET/,
     );
+  });
+
+  it("defaults the worker to the 360dialog Cloud API host", () => {
+    expect(
+      validateWorkerEnvironment(safeProductionWorkerEnvironment),
+    ).toMatchObject({
+      D360_API_KEY: "prodD360ApiKey7f3a9c2e8d4f",
+      D360_API_BASE_URL: "https://waba-v2.360dialog.io",
+    });
+  });
+
+  it("rejects placeholder 360dialog credentials and an insecure host when deployed", () => {
+    expect(() =>
+      validateWorkerEnvironment({
+        ...safeProductionWorkerEnvironment,
+        D360_API_KEY: "dawah-local-d360-api-key",
+      }),
+    ).toThrow(/D360_API_KEY/);
+    expect(() =>
+      validateWorkerEnvironment({
+        ...safeProductionWorkerEnvironment,
+        D360_API_BASE_URL: "http://waba-v2.360dialog.io",
+      }),
+    ).toThrow(/D360_API_BASE_URL/);
+    expect(() =>
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        D360_WEBHOOK_TOKEN: "dawah-local-d360-webhook-token-value",
+      }),
+    ).toThrow(/D360_WEBHOOK_TOKEN/);
+    expect(() =>
+      validateApiEnvironment({
+        ...safeProductionApiEnvironment,
+        D360_WEBHOOK_TOKEN: "too-short-to-resist-guessing",
+      }),
+    ).toThrow(/D360_WEBHOOK_TOKEN/);
+  });
+
+  it("treats the webhook phone-number filter as optional but real when set", () => {
+    const { META_WHATSAPP_PHONE_NUMBER_ID: _phoneNumberId, ...unfiltered } =
+      safeProductionApiEnvironment;
+    expect(
+      validateApiEnvironment(unfiltered).META_WHATSAPP_PHONE_NUMBER_ID,
+    ).toBeUndefined();
+    expect(
+      validateApiEnvironment({
+        ...unfiltered,
+        META_WHATSAPP_PHONE_NUMBER_ID: "",
+      }).META_WHATSAPP_PHONE_NUMBER_ID,
+    ).toBeUndefined();
+    expect(() =>
+      validateApiEnvironment({
+        ...unfiltered,
+        META_WHATSAPP_PHONE_NUMBER_ID: "000000000000000",
+      }),
+    ).toThrow(/META_WHATSAPP_PHONE_NUMBER_ID/);
   });
 
   it("normalizes provider-safe RSVP confirmation template names", () => {

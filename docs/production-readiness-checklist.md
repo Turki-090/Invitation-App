@@ -79,7 +79,7 @@ Last updated: 2026-09-17, at the close of Stage 10 repository work.
 | 5.1  | Repository security review completed                                       | Done                                      | [security-review.md](security/security-review.md)                   |
 | 5.2  | Authentication, authorization, and cross-event isolation verified by tests | Done                                      | Integration suites                                                  |
 | 5.3  | Public capability handling verified                                        | Done                                      | Stage 7 suite                                                       |
-| 5.4  | Webhook signature verification and deduplication verified                  | Done                                      | Stage 6 and 7 suites                                                |
+| 5.4  | Webhook authentication (360dialog token) and deduplication verified        | Done                                      | Stage 6 and 7 suites                                                |
 | 5.5  | Upload type, size, and content validation verified                         | Done                                      | Assets and imports unit tests                                       |
 | 5.6  | Idempotency and replay protection verified                                 | Done                                      | Stage 6, 8, 9 suites                                                |
 | 5.7  | Dependency audit gate in CI, high advisories resolved                      | Done                                      | `pnpm audit` job; workspace overrides                               |

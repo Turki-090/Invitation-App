@@ -313,8 +313,8 @@ Implementation record:
   classification, and conservative ambiguous-outcome handling for bare HTTP
   408/5xx, timeouts, and network breaks. Database row claims and attempt fencing
   prevent stale worker completion from overwriting newer evidence.
-- The raw-body webhook endpoint verifies HMAC signatures, rejects malformed
-  payloads and mismatched configured phone-number IDs, deduplicates stable
+- The webhook endpoint authenticates 360dialog's shared token, rejects malformed
+  payloads, skips items for a mismatched configured phone-number ID, deduplicates stable
   provider event IDs, persists evidence before queueing, and handles early and
   out-of-order states through provider-ID or logical callback-ID correlation.
   `FAILED` outranks `SENT` but not delivered/read/responded evidence. Host-facing

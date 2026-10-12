@@ -11,22 +11,21 @@ silently weakening a check.
 
 ## Inventory
 
-| Secret                               | Protects                             | Rotation class   | Blast radius of rotation                                              |
-| ------------------------------------ | ------------------------------------ | ---------------- | --------------------------------------------------------------------- |
-| `DATABASE_URL` password              | All data                             | Dual-credential  | None if overlapped; total outage if not.                              |
-| `REDIS_URL` password                 | Queues                               | Dual-credential  | Workers reconnect; in-flight jobs retry.                              |
-| `STORAGE_ACCESS_KEY_ID` / secret     | Private object storage               | Dual-credential  | Uploads, exports, and media fetches fail while mismatched.            |
-| `META_WHATSAPP_ACCESS_TOKEN`         | Outbound sending                     | Overlap          | Sends fail and retry; no duplicates.                                  |
-| `META_WHATSAPP_APP_SECRET`           | Inbound webhook signatures           | Provider-coupled | Unverified callbacks are rejected; statuses lag until resynchronised. |
-| `META_WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Webhook subscription handshake       | Provider-coupled | Only affects re-subscription.                                         |
-| `META_WHATSAPP_MEDIA_SIGNING_SECRET` | Signed private invitation-image URLs | **Invalidating** | Outstanding media links stop resolving mid-send.                      |
-| `EXPORT_DOWNLOAD_SIGNING_SECRET`     | Signed export download URLs          | **Invalidating** | Links already given to hosts stop working.                            |
-| `CHECK_IN_TOKEN_SIGNING_SECRET`      | Entry passes in guests' hands        | **Invalidating** | Every issued QR pass stops resolving.                                 |
-| `AUTHENTICA_API_KEY`                 | Sign-in code delivery                | Overlap          | Sign-in codes stop being delivered; no host can sign in.              |
-| `SUPABASE_SEND_SMS_HOOK_SECRET`      | The Supabase send-code hook          | Provider-coupled | Hook calls are rejected; no host can sign in until both sides match.  |
-| `METRICS_TOKEN`                      | Metrics scrape                       | Overlap          | Scrapes fail until the collector is updated; no user impact.          |
-| `SENTRY_DSN`                         | Error reporting destination          | Overlap          | Reports are dropped while mismatched.                                 |
-| Supabase keys                        | Authentication                       | Provider-coupled | Hosts cannot sign in while mismatched.                                |
+| Secret                               | Protects                             | Rotation class   | Blast radius of rotation                                             |
+| ------------------------------------ | ------------------------------------ | ---------------- | -------------------------------------------------------------------- |
+| `DATABASE_URL` password              | All data                             | Dual-credential  | None if overlapped; total outage if not.                             |
+| `REDIS_URL` password                 | Queues                               | Dual-credential  | Workers reconnect; in-flight jobs retry.                             |
+| `STORAGE_ACCESS_KEY_ID` / secret     | Private object storage               | Dual-credential  | Uploads, exports, and media fetches fail while mismatched.           |
+| `D360_API_KEY`                       | Outbound sending through 360dialog   | Provider-coupled | Sends rejected as unauthorized fail permanently; recover them after. |
+| `D360_WEBHOOK_TOKEN`                 | Inbound webhook authentication       | Provider-coupled | Deliveries are rejected and retried by 360dialog; statuses lag.      |
+| `META_WHATSAPP_MEDIA_SIGNING_SECRET` | Signed private invitation-image URLs | **Invalidating** | Outstanding media links stop resolving mid-send.                     |
+| `EXPORT_DOWNLOAD_SIGNING_SECRET`     | Signed export download URLs          | **Invalidating** | Links already given to hosts stop working.                           |
+| `CHECK_IN_TOKEN_SIGNING_SECRET`      | Entry passes in guests' hands        | **Invalidating** | Every issued QR pass stops resolving.                                |
+| `AUTHENTICA_API_KEY`                 | Sign-in code delivery                | Overlap          | Sign-in codes stop being delivered; no host can sign in.             |
+| `SUPABASE_SEND_SMS_HOOK_SECRET`      | The Supabase send-code hook          | Provider-coupled | Hook calls are rejected; no host can sign in until both sides match. |
+| `METRICS_TOKEN`                      | Metrics scrape                       | Overlap          | Scrapes fail until the collector is updated; no user impact.         |
+| `SENTRY_DSN`                         | Error reporting destination          | Overlap          | Reports are dropped while mismatched.                                |
+| Supabase keys                        | Authentication                       | Provider-coupled | Hosts cannot sign in while mismatched.                               |
 
 ## Dual-credential rotation
 
@@ -66,6 +65,28 @@ After rotating `CHECK_IN_TOKEN_SIGNING_SECRET`, every entry pass must be
 reissued before the next event. Treat a compromise-driven rotation as an
 incident: the invalidation is the point, and guests will need new passes.
 
+## WhatsApp provider rotation
+
+Both 360dialog credentials are single-valued, so neither can overlap.
+
+**`D360_API_KEY`.** Treat generating a new key in the 360dialog Hub as revoking
+the old one. A send rejected for an invalid key carries no Meta error code and
+is classified permanent, so rotate only when no send batch is in flight
+(`dawah_queue_depth{queue="whatsapp-send"}` and backlog age both zero) and
+outside event hours. Generate the key, update the worker's secret, restart the
+worker, then confirm `GET https://waba-v2.360dialog.io/v1/configs/webhook`
+with the new key still returns our webhook URL. Requeue any message that
+failed in the gap through failed-message recovery.
+
+**`D360_WEBHOOK_TOKEN`.** The API accepts exactly one token. Update the API's
+secret and restart it, then immediately re-register the webhook with the new
+`X-Dawah-Webhook-Token` header as in
+[`../operations/whatsapp-360dialog-activation.md`](../operations/whatsapp-360dialog-activation.md)
+Phase 2. Deliveries between the two steps are rejected with
+`401 WEBHOOK_TOKEN_INVALID` and retried by 360dialog, so statuses and RSVP
+replies arrive late rather than being lost. Because the token is the only proof
+a webhook is genuine, rotate it immediately if it may have been exposed.
+
 ## Sign-in code delivery rotation
 
 `AUTHENTICA_API_KEY` and `SUPABASE_SEND_SMS_HOOK_SECRET` both sit on the only
@@ -100,5 +121,5 @@ If a secret is believed to be exposed:
 ## Rehearsal
 
 Rotation is rehearsed in staging before the pilot, at minimum for the database
-password, the provider access token, and one invalidating signing secret. The
+password, the 360dialog API key, and one invalidating signing secret. The
 rehearsal records the outage window observed for each.

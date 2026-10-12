@@ -6,35 +6,48 @@ import {
   type ProviderMessageResult,
 } from "./types";
 
-export interface MetaWhatsAppProviderOptions {
-  readonly accessToken: string;
-  readonly phoneNumberId: string;
-  readonly graphApiVersion: string;
+export const DIALOG360_DEFAULT_API_BASE_URL = "https://waba-v2.360dialog.io";
+
+export interface Dialog360WhatsAppProviderOptions {
+  /** Channel API key. It is scoped to one phone number, so no number ID is sent. */
+  readonly apiKey: string;
+  readonly apiBaseUrl?: string;
   readonly requestTimeoutMilliseconds?: number;
-  readonly graphApiBaseUrl?: string;
   readonly fetch?: typeof globalThis.fetch;
   readonly now?: () => Date;
 }
 
-interface MetaErrorBody {
+/**
+ * 360dialog relays Meta's error body unchanged, so Meta's codes still drive
+ * retry classification. Its own rejections (an unknown API key, a blocked
+ * channel) carry no Meta code and fall through to the HTTP status.
+ */
+interface CloudApiErrorBody {
   readonly error?: {
     readonly code?: unknown;
     readonly error_subcode?: unknown;
   };
 }
 
-export class MetaWhatsAppProvider implements MessagingProvider {
+/**
+ * Sends approved templates through 360dialog's hosted WhatsApp Cloud API.
+ * The request body is the Cloud API payload Meta defines; 360dialog only
+ * changes the host and the credential.
+ */
+export class Dialog360WhatsAppProvider implements MessagingProvider {
   private readonly fetch: typeof globalThis.fetch;
   private readonly timeoutMilliseconds: number;
   private readonly baseUrl: string;
   private readonly now: () => Date;
 
-  public constructor(private readonly options: MetaWhatsAppProviderOptions) {
+  public constructor(
+    private readonly options: Dialog360WhatsAppProviderOptions,
+  ) {
     this.fetch = options.fetch ?? globalThis.fetch;
     this.timeoutMilliseconds = options.requestTimeoutMilliseconds ?? 10_000;
     this.baseUrl = (
-      options.graphApiBaseUrl ?? "https://graph.facebook.com"
-    ).replace(/\/$/, "");
+      options.apiBaseUrl ?? DIALOG360_DEFAULT_API_BASE_URL
+    ).replace(/\/+$/, "");
     this.now = options.now ?? (() => new Date());
   }
 
@@ -73,18 +86,15 @@ export class MetaWhatsAppProvider implements MessagingProvider {
     let response: Response;
     let body: unknown;
     try {
-      response = await this.fetch(
-        `${this.baseUrl}/${encodeURIComponent(this.options.graphApiVersion)}/${encodeURIComponent(this.options.phoneNumberId)}/messages`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${this.options.accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(this.payload(input)),
-          signal: controller.signal,
+      response = await this.fetch(`${this.baseUrl}/messages`, {
+        method: "POST",
+        headers: {
+          "D360-API-KEY": this.options.apiKey,
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(this.payload(input)),
+        signal: controller.signal,
+      });
       body = await readJson(response);
     } catch (error) {
       const timedOut = controller.signal.aborted;
@@ -194,7 +204,7 @@ function providerErrorIdentity(body: unknown): {
   if (typeof body !== "object" || body === null) {
     return { displayCode: "PROVIDER_HTTP_ERROR", codes: [] };
   }
-  const error = (body as MetaErrorBody).error;
+  const error = (body as CloudApiErrorBody).error;
   const code = typeof error?.code === "number" ? String(error.code) : undefined;
   const subcode =
     typeof error?.error_subcode === "number"

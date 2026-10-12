@@ -1,28 +1,11 @@
-import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   MetaWebhookPayloadError,
   parseMetaWebhookPayload,
   type MetaWebhookSkipReason,
-  verifyMetaWebhookSignature,
 } from "./meta-webhook";
 
 describe("Meta webhook contract", () => {
-  it("verifies the raw payload and rejects altered bytes", () => {
-    const body = Buffer.from('{"object":"whatsapp_business_account"}');
-    const signature = `sha256=${createHmac("sha256", "app-secret").update(body).digest("hex")}`;
-    expect(verifyMetaWebhookSignature(body, signature, "app-secret")).toBe(
-      true,
-    );
-    expect(
-      verifyMetaWebhookSignature(
-        Buffer.concat([body, Buffer.from(" ")]),
-        signature,
-        "app-secret",
-      ),
-    ).toBe(false);
-  });
-
   it("normalizes duplicate and out-of-order status fixtures deterministically", () => {
     const logicalMessageId = "0a837874-8e78-4d23-a389-48860b8e33bb";
     const delivered = fixtureStatus(

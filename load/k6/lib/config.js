@@ -61,10 +61,10 @@ export const TEMPLATE_ID = text("TEMPLATE_ID", FIXTURES.templateId);
  */
 export const RUN_ID = text("RUN_ID", "run1");
 
-/** Meta webhook credentials. These mirror the local example environments. */
-export const WEBHOOK_APP_SECRET = text(
-  "WEBHOOK_APP_SECRET",
-  "dawah-local-meta-app-secret",
+/** 360dialog webhook credentials. These mirror the local example environments. */
+export const WEBHOOK_TOKEN = text(
+  "WEBHOOK_TOKEN",
+  "dawah-local-d360-webhook-token-value",
 );
 export const WEBHOOK_PHONE_NUMBER_ID = text(
   "WEBHOOK_PHONE_NUMBER_ID",

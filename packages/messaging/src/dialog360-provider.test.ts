@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { MetaWhatsAppProvider } from "./meta-provider";
+import { Dialog360WhatsAppProvider } from "./dialog360-provider";
 import { MessagingProviderError } from "./types";
 
 const input = {
@@ -10,7 +10,7 @@ const input = {
   bodyParameters: ["Sarah", "Wedding of Noura and Omar"],
 } as const;
 
-describe("MetaWhatsAppProvider", () => {
+describe("Dialog360WhatsAppProvider", () => {
   it("sends an approved template and returns the wamid", async () => {
     const fetch = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ messages: [{ id: "wamid.123" }] }), {
@@ -18,10 +18,8 @@ describe("MetaWhatsAppProvider", () => {
         headers: { "content-type": "application/json" },
       }),
     );
-    const provider = new MetaWhatsAppProvider({
-      accessToken: "secret",
-      phoneNumberId: "123456",
-      graphApiVersion: "v25.0",
+    const provider = new Dialog360WhatsAppProvider({
+      apiKey: "secret",
       fetch,
       now: () => new Date("2026-09-09T10:00:00.000Z"),
     });
@@ -31,7 +29,8 @@ describe("MetaWhatsAppProvider", () => {
       providerMessageId: "wamid.123",
       acceptedAt: new Date("2026-09-09T10:00:00.000Z"),
     });
-    const [, request] = fetch.mock.calls[0]!;
+    const [url, request] = fetch.mock.calls[0]!;
+    expect(url).toBe("https://waba-v2.360dialog.io/messages");
     expect(JSON.parse(String(request.body))).toMatchObject({
       messaging_product: "whatsapp",
       to: "966501234567",
@@ -50,7 +49,48 @@ describe("MetaWhatsAppProvider", () => {
         ],
       },
     });
-    expect(request.headers.Authorization).toBe("Bearer secret");
+    expect(request.headers["D360-API-KEY"]).toBe("secret");
+    expect(request.headers).not.toHaveProperty("Authorization");
+  });
+
+  it("posts to a configured base such as the 360dialog sandbox", async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ messages: [{ id: "wamid.sandbox" }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const provider = new Dialog360WhatsAppProvider({
+      apiKey: "secret",
+      apiBaseUrl: "https://waba-sandbox.360dialog.io/v1/",
+      fetch,
+    });
+
+    await provider.sendReminder(input);
+
+    expect(fetch.mock.calls[0]![0]).toBe(
+      "https://waba-sandbox.360dialog.io/v1/messages",
+    );
+  });
+
+  it("treats a 360dialog rejection without a Meta code as permanent", async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const provider = new Dialog360WhatsAppProvider({
+      apiKey: "revoked",
+      fetch,
+    });
+
+    await expect(provider.sendInvitation(input)).rejects.toMatchObject({
+      providerCode: "PROVIDER_HTTP_ERROR",
+      httpStatus: 401,
+      failureClass: "PERMANENT",
+      retryable: false,
+    });
   });
 
   it("binds stable RSVP actions to Meta quick-reply callback payloads", async () => {
@@ -60,10 +100,8 @@ describe("MetaWhatsAppProvider", () => {
         headers: { "content-type": "application/json" },
       }),
     );
-    const provider = new MetaWhatsAppProvider({
-      accessToken: "secret",
-      phoneNumberId: "123456",
-      graphApiVersion: "v25.0",
+    const provider = new Dialog360WhatsAppProvider({
+      apiKey: "secret",
       fetch,
     });
 
@@ -98,10 +136,8 @@ describe("MetaWhatsAppProvider", () => {
 
   it("rejects more quick replies than Meta can represent", async () => {
     const fetch = vi.fn();
-    const provider = new MetaWhatsAppProvider({
-      accessToken: "secret",
-      phoneNumberId: "123456",
-      graphApiVersion: "v25.0",
+    const provider = new Dialog360WhatsAppProvider({
+      apiKey: "secret",
       fetch,
     });
 
@@ -128,10 +164,8 @@ describe("MetaWhatsAppProvider", () => {
         },
       ),
     );
-    const provider = new MetaWhatsAppProvider({
-      accessToken: "secret",
-      phoneNumberId: "123456",
-      graphApiVersion: "v25.0",
+    const provider = new Dialog360WhatsAppProvider({
+      apiKey: "secret",
       fetch,
     });
 
@@ -153,10 +187,8 @@ describe("MetaWhatsAppProvider", () => {
         headers: { "content-type": "application/json" },
       }),
     );
-    const provider = new MetaWhatsAppProvider({
-      accessToken: "secret",
-      phoneNumberId: "123456",
-      graphApiVersion: "v25.0",
+    const provider = new Dialog360WhatsAppProvider({
+      apiKey: "secret",
       fetch,
     });
     const imageUrl =
@@ -196,10 +228,8 @@ describe("MetaWhatsAppProvider", () => {
           { status: 400, headers: { "content-type": "application/json" } },
         ),
       );
-    const provider = new MetaWhatsAppProvider({
-      accessToken: "secret",
-      phoneNumberId: "123456",
-      graphApiVersion: "v25.0",
+    const provider = new Dialog360WhatsAppProvider({
+      apiKey: "secret",
       fetch,
     });
 

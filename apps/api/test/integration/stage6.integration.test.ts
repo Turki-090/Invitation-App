@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   MessagingProviderError,
   verifyWhatsappMediaSignature,
@@ -45,6 +45,7 @@ const database = new TestDatabase();
 const prisma = database.prisma;
 const prismaService = prisma as unknown as PrismaService;
 const access = new EventAccessService(prismaService);
+const stage6WebhookToken = "stage6-d360-webhook-token-2e7b8d4f1a6c";
 
 describe("Stage 6 PostgreSQL messaging integration", () => {
   beforeAll(async () => {
@@ -61,7 +62,7 @@ describe("Stage 6 PostgreSQL messaging integration", () => {
     await prisma.$disconnect();
   });
 
-  it("queues 2,000 logical sends idempotently and reconciles signed out-of-order webhooks", async () => {
+  it("queues 2,000 logical sends idempotently and reconciles authenticated out-of-order webhooks", async () => {
     const owner = await createUserFixture(prisma, {
       authProviderId: "stage6-messaging-owner",
     });
@@ -492,9 +493,16 @@ describe("Stage 6 PostgreSQL messaging integration", () => {
     });
 
     const duplicateBody = Buffer.from(JSON.stringify(readPayload));
+    for (const forgedToken of [undefined, "", `${stage6WebhookToken}x`]) {
+      await expect(
+        webhook.ingest(duplicateBody, forgedToken, readPayload),
+      ).rejects.toMatchObject({
+        response: { code: "WEBHOOK_TOKEN_INVALID" },
+      });
+    }
     const duplicateAck = await webhook.ingest(
       duplicateBody,
-      signature(duplicateBody),
+      stage6WebhookToken,
       readPayload,
     );
     expect(duplicateAck).toEqual({
@@ -513,7 +521,7 @@ describe("Stage 6 PostgreSQL messaging integration", () => {
     const recoverableStart = queues.webhookIds.length;
     await webhook.ingest(
       recoverableBody,
-      signature(recoverableBody),
+      stage6WebhookToken,
       recoverablePayload,
     );
     const recoverableWebhookId = queues.webhookIds[recoverableStart]!;
@@ -522,11 +530,7 @@ describe("Stage 6 PostgreSQL messaging integration", () => {
     ).resolves.toMatchObject({ outcome: "PROCESS" });
     await repository.recordWebhookFailure(recoverableWebhookId);
     await expect(
-      webhook.ingest(
-        recoverableBody,
-        signature(recoverableBody),
-        recoverablePayload,
-      ),
+      webhook.ingest(recoverableBody, stage6WebhookToken, recoverablePayload),
     ).resolves.toEqual({
       accepted: true,
       queuedEvents: 1,
@@ -546,7 +550,7 @@ describe("Stage 6 PostgreSQL messaging integration", () => {
     const crashedPayload = statusPayload("sent", "1725880008");
     const crashedBody = Buffer.from(JSON.stringify(crashedPayload));
     const crashedStart = queues.webhookIds.length;
-    await webhook.ingest(crashedBody, signature(crashedBody), crashedPayload);
+    await webhook.ingest(crashedBody, stage6WebhookToken, crashedPayload);
     const crashedWebhookId = queues.webhookIds[crashedStart]!;
     await expect(
       repository.claimWebhook(crashedWebhookId),
@@ -563,7 +567,7 @@ describe("Stage 6 PostgreSQL messaging integration", () => {
     const stalePayload = statusPayload("sent", "1725880007");
     const staleBody = Buffer.from(JSON.stringify(stalePayload));
     const staleStart = queues.webhookIds.length;
-    await webhook.ingest(staleBody, signature(staleBody), stalePayload);
+    await webhook.ingest(staleBody, stage6WebhookToken, stalePayload);
     const staleWebhookId = queues.webhookIds[staleStart]!;
     await expect(
       repository.claimWebhook(staleWebhookId),
@@ -575,7 +579,7 @@ describe("Stage 6 PostgreSQL messaging integration", () => {
       data: { processingStartedAt: new Date(Date.now() - 6 * 60 * 1_000) },
     });
     await expect(
-      webhook.ingest(staleBody, signature(staleBody), stalePayload),
+      webhook.ingest(staleBody, stage6WebhookToken, stalePayload),
     ).resolves.toEqual({
       accepted: true,
       queuedEvents: 1,
@@ -904,8 +908,7 @@ function rejectedProvider(): MessagingProvider {
 
 function configFixture() {
   const values: Record<string, string> = {
-    META_WHATSAPP_APP_SECRET: "stage6-app-secret",
-    META_WHATSAPP_WEBHOOK_VERIFY_TOKEN: "stage6-verify-token",
+    D360_WEBHOOK_TOKEN: stage6WebhookToken,
     META_WHATSAPP_PHONE_NUMBER_ID: "123456789012345",
   };
   return { get: (key: string) => values[key] } as never;
@@ -944,10 +947,6 @@ function statusPayload(
   };
 }
 
-function signature(body: Buffer): string {
-  return `sha256=${createHmac("sha256", "stage6-app-secret").update(body).digest("hex")}`;
-}
-
 async function ingestAndProcess(
   webhook: WhatsappWebhookService,
   queues: ReturnType<typeof queueRecorder>,
@@ -956,7 +955,7 @@ async function ingestAndProcess(
 ) {
   const body = Buffer.from(JSON.stringify(payload));
   const start = queues.webhookIds.length;
-  await webhook.ingest(body, signature(body), payload);
+  await webhook.ingest(body, stage6WebhookToken, payload);
   for (const webhookEventId of queues.webhookIds.slice(start)) {
     await processor({ data: { webhookEventId } } as never);
   }

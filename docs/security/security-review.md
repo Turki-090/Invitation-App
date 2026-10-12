@@ -55,10 +55,15 @@ hashes, scoped to exactly one invitation, revocable, rotatable, and answered
 uniformly whether missing, revoked, or expired. Public responses are shaped to
 the minimum, and private invitation routes carry no-store and no-index headers.
 
-**Webhooks.** Meta callbacks are signature-verified with a constant-time
-comparison against the raw body before any processing, deduplicated by provider
-event id, and reduced in durable ingestion order so a delayed callback cannot
-overwrite a newer host decision. Proven in the Stage 6 and Stage 7 suites.
+**Webhooks.** WhatsApp callbacks arrive through 360dialog, which relays Meta's
+body unsigned. Each request must carry the shared `X-Dawah-Webhook-Token`,
+compared in constant time before any processing; callbacks are then
+deduplicated by provider event id and reduced in durable ingestion order so a
+delayed callback cannot overwrite a newer host decision. Proven in the Stage 6
+and Stage 7 suites. Residual risk: unlike a body signature, the token does not
+bind the payload, so anyone holding it can forge statuses or replies. It is
+generated at 32+ characters, sent only over HTTPS, redacted from logs, and
+rotated on any suspicion of exposure.
 
 **Uploads.** Invitation imagery is accepted only when extension, declared MIME,
 and magic bytes agree, is re-decoded and re-encoded through a pixel-budgeted
@@ -121,7 +126,7 @@ procedure and named owner before general availability.
 media controller. This is correct: throttling the provider's callbacks would
 drop delivery and RSVP state, and throttling the media fetch would break sends
 outright. Both routes are protected instead by cryptographic verification —
-signature verification and event-id deduplication for webhooks, a checksum-bound
+shared-token authentication and event-id deduplication for webhooks, a checksum-bound
 signed and expiring URL for media — and both do bounded work.
 
 The residual exposure is request-volume abuse against unauthenticated paths.

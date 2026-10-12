@@ -1,7 +1,7 @@
 import { createServer, type ServerResponse } from "node:http";
 import { validateWorkerEnvironment } from "@dawah/config";
 import { defaultImportParserLimits } from "@dawah/imports";
-import { MetaWhatsAppProvider } from "@dawah/messaging";
+import { Dialog360WhatsAppProvider } from "@dawah/messaging";
 import {
   createProducerRedis,
   createWorkerRedis,
@@ -153,10 +153,9 @@ const messagingRepository = new PrismaMessagingRepository(prisma, {
     environment.META_WHATSAPP_RSVP_CONFIRMATION_TEMPLATE_EN,
 });
 const provider = instrumentMessagingProvider(
-  new MetaWhatsAppProvider({
-    accessToken: environment.META_WHATSAPP_ACCESS_TOKEN,
-    phoneNumberId: environment.META_WHATSAPP_PHONE_NUMBER_ID,
-    graphApiVersion: environment.META_WHATSAPP_GRAPH_API_VERSION,
+  new Dialog360WhatsAppProvider({
+    apiKey: environment.D360_API_KEY,
+    apiBaseUrl: environment.D360_API_BASE_URL,
     requestTimeoutMilliseconds: environment.META_WHATSAPP_REQUEST_TIMEOUT_MS,
   }),
   metrics,

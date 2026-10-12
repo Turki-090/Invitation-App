@@ -1,23 +1,25 @@
 import {
   Body,
   Controller,
-  Get,
   Headers,
   HttpCode,
   HttpStatus,
   Inject,
   Post,
-  Query,
   Req,
-  Res,
 } from "@nestjs/common";
 import type { WhatsappWebhookAcknowledgement } from "@dawah/api-contract";
+import { DIALOG360_WEBHOOK_TOKEN_HEADER } from "@dawah/messaging";
 import { SkipThrottle } from "@nestjs/throttler";
-import type { Request, Response } from "express";
+import type { Request } from "express";
 import { WhatsappWebhookService } from "./whatsapp-webhook.service";
 
 type RawBodyRequest = Request & { rawBody?: Buffer };
 
+/**
+ * 360dialog has no subscription handshake: the URL and its token header are
+ * registered through 360dialog's API, so only the delivery route exists.
+ */
 @Controller("webhooks/whatsapp")
 export class WhatsappWebhookController {
   public constructor(
@@ -25,29 +27,14 @@ export class WhatsappWebhookController {
     private readonly webhook: WhatsappWebhookService,
   ) {}
 
-  @Get()
-  public verify(
-    @Query("hub.mode") mode: string | undefined,
-    @Query("hub.verify_token") token: string | undefined,
-    @Query("hub.challenge") challenge: string | undefined,
-    @Res() response: Response,
-  ): void {
-    const verifiedChallenge = this.webhook.verifyChallenge(
-      mode,
-      token,
-      challenge,
-    );
-    response.status(HttpStatus.OK).type("text/plain").send(verifiedChallenge);
-  }
-
   @Post()
   @HttpCode(HttpStatus.OK)
   @SkipThrottle()
   public receive(
     @Req() request: RawBodyRequest,
-    @Headers("x-hub-signature-256") signature: string | undefined,
+    @Headers(DIALOG360_WEBHOOK_TOKEN_HEADER) webhookToken: string | undefined,
     @Body() payload: unknown,
   ): Promise<WhatsappWebhookAcknowledgement> {
-    return this.webhook.ingest(request.rawBody, signature, payload);
+    return this.webhook.ingest(request.rawBody, webhookToken, payload);
   }
 }

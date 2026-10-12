@@ -70,14 +70,14 @@ services:
         value: https://dawah-api-staging.onrender.com/api/v1
       - key: META_WHATSAPP_MEDIA_SIGNING_SECRET
         generateValue: true
-      # From the Meta developer app (test number until production activation).
-      - key: META_WHATSAPP_APP_SECRET
-        sync: false
+      # Generated here, then registered as the X-Dawah-Webhook-Token header on
+      # the 360dialog webhook (docs/operations/whatsapp-360dialog-activation.md).
+      - key: D360_WEBHOOK_TOKEN
+        generateValue: true
+      # Optional filter: Meta's ID for the 360dialog number, copied from
+      # metadata.phone_number_id in its first webhook. Leave empty until then.
       - key: META_WHATSAPP_PHONE_NUMBER_ID
         sync: false
-      # Generated here, then pasted into Meta's webhook configuration.
-      - key: META_WHATSAPP_WEBHOOK_VERIFY_TOKEN
-        generateValue: true
       - key: EXPORT_DOWNLOAD_SIGNING_SECRET
         generateValue: true
       - key: CHECK_IN_ENABLED
@@ -153,14 +153,12 @@ services:
         value: dawah-private-staging
       - key: STORAGE_FORCE_PATH_STYLE
         value: "true"
-      - key: META_WHATSAPP_PHONE_NUMBER_ID
-        fromService:
-          type: web
-          name: dawah-api-staging
-          envVarKey: META_WHATSAPP_PHONE_NUMBER_ID
-      # Meta System User token (a 24-hour token only for a first smoke test).
-      - key: META_WHATSAPP_ACCESS_TOKEN
+      # 360dialog channel API key for the sending number. A Blueprint sync may
+      # not prompt for it on this existing service; set it in the dashboard.
+      - key: D360_API_KEY
         sync: false
+      - key: D360_API_BASE_URL
+        value: https://waba-v2.360dialog.io
       - key: META_WHATSAPP_MEDIA_PUBLIC_BASE_URL
         value: https://dawah-api-staging.onrender.com/api/v1
       - key: META_WHATSAPP_MEDIA_SIGNING_SECRET

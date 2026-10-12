@@ -87,7 +87,7 @@ on a provider that is currently failing.
 ## Rehearsal
 
 Provider outage is rehearsed in staging before the pilot by revoking the
-provider access token and observing: retries with backoff, backlog age rising,
+360dialog API key and observing: retries with backoff, backlog age rising,
 the alert firing, jobs exhausting into durable records, and a clean drain after
 the credential is restored. The rehearsal is recorded in the
 production-readiness checklist.

@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 import type { MessageDeliveryStatus } from "@dawah/domain";
 
 export interface MetaStatusWebhookEvent {
@@ -48,27 +48,13 @@ export class MetaWebhookPayloadError extends Error {
   }
 }
 
-export function verifyMetaWebhookSignature(
-  rawBody: Uint8Array,
-  signatureHeader: string | undefined,
-  appSecret: string,
-): boolean {
-  if (!signatureHeader?.startsWith("sha256=")) return false;
-  const suppliedHex = signatureHeader.slice("sha256=".length);
-  if (!/^[a-f0-9]{64}$/i.test(suppliedHex)) return false;
-  const expected = createHmac("sha256", appSecret).update(rawBody).digest();
-  const supplied = Buffer.from(suppliedHex, "hex");
-  return (
-    supplied.byteLength === expected.byteLength &&
-    timingSafeEqual(supplied, expected)
-  );
-}
-
 /**
+ * Parses Meta's Cloud API webhook body, which 360dialog relays unchanged.
+ *
  * Only a payload that is not a WhatsApp delivery at all is rejected. Meta
- * batches unrelated items into one signed POST and retries a rejected POST for
- * days, so one item from another phone number on the same app, or a status
- * this platform does not model, must not take the guest replies beside it down.
+ * batches unrelated items into one POST and retries a rejected POST for days,
+ * so one item from another phone number on the same WABA, or a status this
+ * platform does not model, must not take the guest replies beside it down.
  */
 export function parseMetaWebhookPayload(
   payload: unknown,
