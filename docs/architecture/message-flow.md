@@ -26,9 +26,12 @@ Accepted, partially accepted, declined, cancelled, unsent, recently reminded,
 and maximum-count recipients are excluded with durable reason codes. The worker
 checks eligibility again while claiming each message so an RSVP or cancellation
 that races the batch is cancelled before provider contact. The hourly reminder
-sweep enqueues due rules and also redrives every durable reminder batch that
-still has queued messages. Deterministic job IDs and logical-message uniqueness
-make this outbox reconciliation safe to repeat.
+sweep enqueues due rules and also redrives every durable send batch, reminder
+or invitation, that still has queued messages. That covers a host's send whose
+batch committed while Redis refused the enqueue (`503
+BATCH_DISPATCH_UNAVAILABLE`) and was never retried with the same key.
+Deterministic job IDs and logical-message uniqueness make this outbox
+reconciliation safe to repeat.
 
 ```text
 Host -> readiness -> confirmation + Idempotency-Key -> API transaction

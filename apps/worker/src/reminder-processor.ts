@@ -11,7 +11,8 @@ export interface ReminderRuleRunResult {
 
 export interface ReminderProcessorRepository {
   listDueRuleRuns(now: Date): Promise<readonly ReminderRunJob[]>;
-  listPendingReminderBatchIds(): Promise<readonly string[]>;
+  /** Send batches of any type that may still lack a dispatch job. */
+  listPendingBatchIds(): Promise<readonly string[]>;
   runScheduledRule(
     data: Extract<ReminderJobData, { readonly operation: "RUN" }>,
     now: Date,
@@ -41,7 +42,7 @@ export function createReminderProcessor(options: ReminderProcessorOptions) {
     if (job.data.operation === "SWEEP") {
       const [runs, pendingBatchIds] = await Promise.all([
         options.repository.listDueRuleRuns(now),
-        options.repository.listPendingReminderBatchIds(),
+        options.repository.listPendingBatchIds(),
       ]);
       if (runs.length > 0) await options.enqueueRuleRuns(runs);
       await Promise.all(

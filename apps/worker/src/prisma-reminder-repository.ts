@@ -108,13 +108,16 @@ export class PrismaReminderRepository implements ReminderProcessorRepository {
   }
 
   /**
-   * Durable outbox reconciliation for the narrow failure window between a
-   * committed reminder run and creation of its deterministic dispatch job.
+   * Durable outbox reconciliation for every send batch whose deterministic
+   * dispatch job may never have been created: a reminder run that committed
+   * just before the worker stopped, or a host's send that committed while
+   * Redis refused the enqueue. The API answers the latter with a 503 and a
+   * same-key retry, but the key lives only in the open page and expires after
+   * a day, so without this sweep such a batch stays queued forever.
    */
-  public async listPendingReminderBatchIds(): Promise<readonly string[]> {
+  public async listPendingBatchIds(): Promise<readonly string[]> {
     const batches = await this.prisma.sendBatch.findMany({
       where: {
-        messageType: "REMINDER",
         status: { in: ["QUEUED", "DISPATCHING", "IN_PROGRESS"] },
         messages: { some: { status: "QUEUED" } },
       },

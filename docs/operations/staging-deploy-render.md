@@ -61,6 +61,14 @@ Fix up two values before using them:
 - **R2** endpoint: `https://<account id>.r2.cloudflarestorage.com`, with no
   bucket name in it.
 
+Upstash's free plan allows 500,000 commands a month per database and refuses
+every command once they are spent, which stops every queue and fails API
+readiness. The worker's six queues idle at about 160,000 commands a month
+(`workerPollingOptions` in `packages/queue`). Before that tuning, BullMQ's
+defaults spent the free allowance in two days with no traffic, so check the
+database's command count in the Upstash console after any change to worker
+or queue settings.
+
 ## Step 3 — Let CI migrate the staging database
 
 Migrations are a CI job, not part of a container start: `migrate-staging` in
