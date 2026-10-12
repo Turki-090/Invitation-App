@@ -36,6 +36,19 @@ overrides:
   "brace-expansion@<1.1.20": "1.1.20"
   "brace-expansion@>=2.0.0 <2.1.6": "2.1.6"
   "brace-expansion@>=5.0.0 <5.0.11": "5.0.11"
+  # GHSA-jqcg-44mw-7w3h: IPv4-mapped IPv6 addresses bypass trust-proxy
+  # subnets; reached through Express under @nestjs/platform-express.
+  proxy-addr: "^2.0.8"
+  # GHSA-wq5f-xc86-pv6w: librsvg flaw in sharp's bundled libvips. Next.js
+  # 16.3.8 still pins the vulnerable 0.35.4 for image optimization.
+  sharp: "0.35.5"
+  # GHSA-68fv-2mgg-jv7q: event-loop denial of service on crafted index maps;
+  # reached through postcss under Vite and Next.js.
+  source-map-js: "^1.2.2"
+  # GHSA-5gmw-xhrv-c9v3 and GHSA-85c8-ppgw-ccpr: prototype pollution to RCE
+  # through worker options; reached only through Vitest 3, which asks for the
+  # 1.x line. Test tooling, never shipped.
+  tinypool: "^2.1.2"
 
 minimumReleaseAgeExclude:
   - "@redocly/cli@2.51.2"
